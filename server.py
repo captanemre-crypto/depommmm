@@ -33,7 +33,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.5'
+VERSION = '2026-11-02.6'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -344,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
                 try: voices.extend(windows_tts({'action':'voices'}).get('voices',[]))
                 except ValueError: pass
                 return self.out({'voices':voices,'piper_installed':any(tts_piper_bridge.installed(v) for v in ('dfki','fahrettin','fettah'))})
-            if path=='/api/speech/status': return self.out({'installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file()})
+            if path=='/api/speech/status': return self.out(ses_baglanti.durum())
             if path=='/api/provider/status':
                 return self.out(SAG.durum())
             if path=='/api/openjarvis/status':
@@ -360,7 +360,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception: openjarvis_online=False
                 return self.out({'ollama':ollama,'model':MODEL,'models':[m['name'] for m in models.get('models',[])],
                                  'telegram_configured':bool(TOKEN),'version':VERSION,
-                                 'speech_installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file(),
+                                 'speech_installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file(),'speech_model':ses_baglanti.model(),
                                  'piper_installed':any(tts_piper_bridge.installed(v) for v in ('dfki','fahrettin','fettah')),
                                  'openjarvis_online':openjarvis_online,'arena_status':arena_bridge.snapshot().get('status','stopped'),
                                  'apps_supported':os.name=='nt','internet_access':internet_available(),
@@ -448,8 +448,14 @@ class Handler(BaseHTTPRequestHandler):
                         except OSError:pass
             if path=='/api/speech/transcribe':
                 if not isinstance(data.get('audio'),str): raise ValueError('Ses verisi gerekli.')
-                text=ses_baglanti.transcribe(data.get('audio'))
-                return self.out({'text':text})
+                ipucu=data.get('ipucu') or ''
+                if not isinstance(ipucu,str): raise ValueError('İpucu metin olmalı.')
+                text=ses_baglanti.transcribe(data.get('audio'), ipucu=ipucu[:300])
+                return self.out({'text':text,'model':ses_baglanti.model()})
+            if path=='/api/speech/model':
+                ad=str(data.get('model') or '').strip().lower()
+                if ad not in ses_baglanti.MODELLER: raise ValueError('Model base veya small olmalı.')
+                return self.out({'ok':True,'status':ses_baglanti.ayarla(ad)})
             if path=='/api/arena/test-api':
                 if data.get('confirmed') is not True: raise ValueError('Test isteği için onay gerekli.')
                 key=str(data.get('key','')).strip();model=str(data.get('model','')).strip();prompt=str(data.get('prompt','')).strip()

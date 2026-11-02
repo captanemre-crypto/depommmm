@@ -320,6 +320,25 @@ class ServerTestCase(unittest.TestCase):
         self.api('/api/provider/disconnect', {'confirmed': True})
         self.assertFalse(self.api('/api/provider/status')['configured'])
 
+    def test_speech_status_includes_model(self):
+        veri = self.api('/api/speech/status')
+        self.assertIn('installed', veri)
+        self.assertIn(veri['model'], ('base', 'small'))
+        self.assertIn('hint', veri)
+
+    def test_speech_model_switch(self):
+        import ses_baglanti
+        eski = ses_baglanti.AYAR
+        tmp = tempfile.TemporaryDirectory()
+        ses_baglanti.AYAR = Path(tmp.name) / 'whisper_ayar.json'
+        try:
+            veri = self.api('/api/speech/model', {'model': 'small'})
+            self.assertEqual(veri['status']['model'], 'small')
+            self.api('/api/speech/model', {'model': 'large'}, expect=400)
+        finally:
+            ses_baglanti.AYAR = eski
+            tmp.cleanup()
+
     def test_provider_test_endpoint_reports_success(self):
         server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
         veri = self.api('/api/provider/test', {'model': 'openai/gpt-oss-20b:free'})

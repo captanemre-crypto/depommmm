@@ -429,6 +429,32 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert(/https/i.test($('toast').textContent), 'https uyarısı gösterilmedi: ' + $('toast').textContent);
   });
 
+
+  await check('ses sekmesi: konuşma tanıma ayarları görünüyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('voiceTab').click();
+    await sleep(1200);
+    const metin = $('settingsBody').textContent;
+    assert(/Konuşma tanıma \(mikrofon\)/.test(metin), 'tanıma bölümü yok: ' + metin.slice(-200));
+    assert(/Cümle bitiş sessizliği/.test(metin), 'sessizlik ayarı yok');
+    assert(/Duyduğum metni/.test(metin), 'duyulan metin anahtarı yok');
+
+    // Sessizlik süresi değişince localStorage'a yazılmalı
+    const secimler = [...$('settingsBody').querySelectorAll('select')];
+    const sessizlik = secimler.find(sel => [...sel.options].some(o => /sn ·/.test(o.textContent)));
+    assert(sessizlik, 'sessizlik seçimi bulunamadı');
+    sessizlik.value = '2800';
+    sessizlik.dispatchEvent(new window.Event('change'));
+    await sleep(300);
+    assert(window.localStorage.getItem('emre-vad-sessizlik') === '2800',
+      'ayar kaydedilmedi: ' + window.localStorage.getItem('emre-vad-sessizlik'));
+  });
+
+  await check('ses: mikrofon kapalıyken kayıt başlamıyor', () => {
+    assert($('voiceToggle').getAttribute('aria-pressed') === 'false', 'mikrofon beklenmedik şekilde açık');
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));

@@ -44,3 +44,7 @@ saglayici_ayar.tmp
 # Node (E2E test aracı)
 node_modules/
 package-lock.json
+
+# Yerel Whisper (konuşma tanıma) model seçimi
+whisper_ayar.json
+ses_hata.log

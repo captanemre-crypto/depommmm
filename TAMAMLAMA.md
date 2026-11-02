@@ -128,3 +128,24 @@ Kök neden: 9Router/OmniRoute ailesinde bilinen geçit hatası — `/v1/models` 
 | K4 | Arayüz: **Bağlantıyı test et** düğmesi; sohbet hatası artık “Ollama ile…” yerine gerçek arka ucu yazar | ✅ |
 | K5 | `_http_mesaji` gövdeyi bir kez okuyacak şekilde yeniden yazıldı (HTTPError tekrar okunamıyordu), `_gonder`/`_ulasilamadi` yardımcıları | ✅ |
 | K6 | Testler: 2 yeni `test_saglayici.py` (x-api-key yedeği, 401 ipucu), 2 yeni `test_server.py` (`/api/provider/test`) → **115 test**; E2E **34/34** | ✅ |
+
+## Ek tur: konuşmayı eksik duyma sorunu
+
+**Belirti:** “Konuşmamı eksik duyuyor ve tam olarak algılamıyor.” (Mikrofon düğmesi, yerel Whisper)
+
+Kök nedenler ve düzeltmeler:
+
+| # | Kök neden | Düzeltme | Durum |
+| --- | --- | --- | --- |
+| L1 | 1,2 sn sessizlikte kayıt kesiliyordu → cümle ortadan bölünüyordu | Varsayılan 2,2 sn, Ayarlar › Ses'ten 1,2–3,5 sn arası seçilebilir | ✅ |
+| L2 | 16 sn üst sınırı uzun cümleyi kesiyordu | 30 sn varsayılan (15–60 sn) | ✅ |
+| L3 | Sabit 0,008 eşiği sessiz konuşmayı hiç “duyuldu” saymıyordu | Uyarlanır gürültü tabanı (`zemin*3`, en az 0,005) | ✅ |
+| L4 | Kayıtlar arasında boşluk → sonraki cümlenin başı kayboluyordu | `onstop` içinde anında yeni kayıt (`startClip`) | ✅ |
+| L5 | Parçalar ayrı komut sayılıyordu | 900 ms birleştirme penceresi (`birlestirGonder`), meşgulse 8 kez erteler | ✅ |
+| L6 | Asistan konuşurken söze girince kayıt atılıyordu | Barge-in: yüksek seste TTS durur, dinleme başlar | ✅ |
+| L7 | Ne duyulduğu görünmüyordu | “Duyduğum: …” bildirimi + ayarı | ✅ |
+| L8 | Whisper `base` Türkçede zayıf | `beam_size=5`, `temperature=0`, VAD dolgusu (700/600 ms), `initial_prompt` (defter/alacak/hatırlatıcı…), yinelenen segment atma, `small` modeli seçilebilir + `sesTanimaAyarlari` arayüzü | ✅ |
+| L9 | `whisper_ayar.json` ve `ses_hata.log` git'e girebilirdi | `.gitignore`'a eklendi | ✅ |
+| L10 | İşçi çökünce oturum boyunca ses ölü kalıyordu | `ses_baglanti` hata sonrası `worker=None` | ✅ |
+
+Testler: `tests/test_ses_baglanti.py` 9 test, `test_server.py` +2 (`/api/speech/status`, `/api/speech/model`) → **126 test**; E2E **36/36** (Ses sekmesinde tanıma ayarları ve sessizlik seçiminin kaydı).

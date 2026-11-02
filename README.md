@@ -238,3 +238,30 @@ Yine 401 alırsan sırayla dene:
 | 4 | Hâlâ 401 ise geçit hatasıdır: **OpenRouter** (`https://openrouter.ai/api/v1`, `:free` modeller) veya **Groq** (`https://api.groq.com/openai/v1`) gibi doğrudan bir sağlayıcıya geç |
 
 Hata mesajları artık hangi arka ucun kullanıldığını söyler: *“Yapay zekâ sağlayıcısı ile bağlantı kurulamadı: Ücretsiz API (<adres> · <model>): …”*. Ayrıntı, `http://127.0.0.1:8765/api/provider/test` yanıtında da görünür.
+
+## Konuşma tanıma: “eksik duyuyor” sorunu ve çözümü
+
+Mikrofon (sol alttaki ◉ düğmesi) tamamen **yerel** çalışır: tarayıcı sesi kaydeder, Whisper bu bilgisayarda çözer, hiçbir ses dışarı gitmez. Eski sürümde cümleler erken kesiliyordu; şu an:
+
+| Sorun (eski) | Şimdi |
+| --- | --- |
+| 1,2 sn sessizlikte cümle bölünüyordu | Varsayılan **2,2 sn** (Ayarlar › Ses › *Cümle bitiş sessizliği*: 1,2 / 1,8 / 2,2 / 2,8 / 3,5 sn) |
+| En fazla 16 sn kayıt → uzun cümle yarıda kesiliyordu | **30 sn** (15/30/45/60 seçilebilir) |
+| Sabit ses eşiği → sessiz konuşan hiç algılanmıyordu | **Uyarlanır eşik**: arka plan gürültüsü ölçülür, eşik onun 3 katına çıkar |
+| Kayıt bitince ~1 sn boşluk → sonraki cümlenin başı kaçıyordu | Yeni kayıt **anında** başlar; cümlenin başı ve sonu korunur |
+| İki parça ayrı ayrı komut sayılıyordu | 900 ms içinde gelen parçalar **birleştirilir**, tek komut olarak gönderilir |
+| Asistan konuşurken söze girince yok sayılıyordu | **Söz kesme (barge-in)**: yüksek ses algılanınca okuma durur, dinlemeye geçilir |
+| Ne anladığı görünmüyordu | *Ayarlar › Ses › Duyduğum metni göster* açıkken `Duyduğum: …` bildirimi çıkar |
+| Whisper `base` modeli Türkçede kelime kaçırıyordu | VAD dolgusu + 600 ms konuşma payı, `beam_size=5`, Türkçe bağlam ipucu; **small** modeli seçilebilir |
+
+Türkçe doğruluğu artırmak için (bir kez, internet gerekir):
+
+```bat
+ses_small_kur.bat
+```
+
+Sonra Ayarlar › Ses › *Tanıma modeli* → **small** → *Tanıma modelini kaydet*. Model seçimi `whisper_ayar.json` içinde tutulur (git'e girmez), bir sonraki konuşmada geçerli olur. `small` yavaştır ama belirgin şekilde daha doğrudur; eski bilgisayarda `base` ile devam edebilirsin.
+
+Ayrıca sunucu tarafında tanıma şu şekilde iyileştirildi: `vad_parameters(min_silence_duration_ms=700, speech_pad_ms=600)`, `no_speech_threshold=0.6`, `compression_ratio_threshold=2.4`, tekrarlanan segmentlerin atılması ve Türkçe alan sözcükleri içeren `initial_prompt`. İşçi çökerse bir sonraki istekte kendini yeniden başlatır.
+
+**Test:** `python3 -m unittest tests.test_ses_baglanti` (9 test) · `POST /api/speech/model {model:'base'|'small'}` · `GET /api/speech/status` → `{installed, model, models, hint}`

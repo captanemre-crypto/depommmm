@@ -49,9 +49,68 @@ const toggle=document.getElementById('voiceToggle');let localStream=null,audioCo
 function setToggle(on){listening=on;try{localStorage.setItem('emre-voice-enabled',on?'1':'0')}catch(e){}toggle.setAttribute('aria-pressed',String(on));toggle.innerHTML=on?'◉ &nbsp; Dinliyor':'◉ &nbsp; Ses kapalı';toggle.style.borderColor=on?'#5be5bf':'#37747a'}
 function stopLocalVoice(){setToggle(false);discardClip=true;cancelAnimationFrame(raf);if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch(e){};if(localStream)localStream.getTracks().forEach(t=>t.stop());localStream=null;if(audioContext)audioContext.close().catch(()=>{});audioContext=null;analyser=null;recorder=null;noiseSince=0;localPending=false}
 function acceptLocalText(text){let normalized=text.toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü0-9 ]/gi,' ').replace(/\s+/g,' ').trim();if(normalized.length<3||!/[a-zçğıöşü]/i.test(normalized)||/^(ı+|i+|e+|a+|h+|hı+|hmm+|hımm+|şş+|eee+|aaa+|ııı+|ıh|öhöm|of|ah|uh|mm+|heh|ya|ha|altyazı|abone ol)$/.test(normalized))return;if(normalized===lastVoiceText&&Date.now()-lastVoiceAt<6000)return;lastVoiceText=normalized;lastVoiceAt=Date.now();command(text)}
-async function processClip(blob){if(!listening||discardClip||blob.size<500){localPending=false;return}localPending=true;try{let data=await new Promise((resolve,reject)=>{let reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob)});let r=await api('/api/speech/transcribe',{audio:data});if(listening&&!speechActive&&!busy&&r.text)acceptLocalText(r.text)}catch(e){notify(e.message)}finally{localPending=false}}
-function monitorVoice(){if(!listening||!analyser)return;let values=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(values);let sum=0;for(let x of values)sum+=x*x;let loud=Math.sqrt(sum/values.length)>.008,now=performance.now();if(!speechActive&&!busy&&!localPending){if(!recorder){try{let clipChunks=[],heard=false,started=now,lastVoice=now,drop=false;let r=new MediaRecorder(localStream,{mimeType:'audio/webm;codecs=opus'});recorder=r;r.ondataavailable=e=>{if(e.data.size)clipChunks.push(e.data)};r.onstop=()=>{if(recorder===r)recorder=null;noiseSince=0;if(heard&&!drop&&listening&&!discardClip){processClip(new Blob(clipChunks,{type:'audio/webm'}))}else{localPending=false}};r._voiceUpdate=(isLoud,time)=>{if(isLoud){heard=true;lastVoice=time}if((heard&&time-lastVoice>1200&&time-started>400)||time-started>16000||(!heard&&time-started>8000)){if(!heard)drop=true;localPending=true;r.stop()}};discardClip=false;r.start()}catch(e){notify('Bu tarayıcı yerel ses kaydını desteklemiyor.');stopLocalVoice();return}}if(recorder&&recorder.state==='recording')recorder._voiceUpdate(loud,now)}else if(recorder&&recorder.state==='recording'){discardClip=true;recorder.stop()}raf=requestAnimationFrame(monitorVoice)}
-toggle.onclick=async()=>{if(listening){stopLocalVoice();ttsGeneration++;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource)try{ttsSource.stop()}catch(e){};ttsSource=null;speechActive=false;return}if(!apiToken){notify('Yerel sunucuyu başlatıp sayfayı aç.');return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder||!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){notify('Yerel ses için mikrofon ve WebM destekli bir tarayıcı gerekli.');return}try{let speechStatus=await api('/api/speech/status');if(!speechStatus.installed){notify('Önce ses_kur.bat ile yerel ses modelini kur.');return}localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=2048;audioContext.createMediaStreamSource(localStream).connect(analyser);setToggle(true);discardClip=false;notify('Yerel mikrofon açık. Ses CPU ile işlenecek.');monitorVoice()}catch(e){stopLocalVoice();notify('Yerel ses veya mikrofon açılamadı. Sunucu ve mikrofon iznini kontrol et.')}};
+let birikim='',birikimZaman=0;
+function sesSayi(ad,varsayilan,enAz,enCok){let v=Number(localStorage.getItem(ad));if(!Number.isFinite(v)||v<=0)return varsayilan;return Math.min(enCok,Math.max(enAz,v))}
+function sessizlikSuresi(){return sesSayi('emre-vad-sessizlik',2200,800,6000)}
+function enUzunKayit(){return sesSayi('emre-vad-uzun',30000,5000,90000)}
+function birlestirGonder(text,deneme=0){birikim=(birikim?birikim+' ':'')+text;clearTimeout(birikimZaman);birikimZaman=setTimeout(()=>{if(busy&&deneme<8){birlestirGonder('',deneme+1);return}const t=birikim.trim();birikim='';if(t&&!speechActive)acceptLocalText(t)},Math.max(250,sesSayi('emre-vad-birlestir',900,250,2500)))}
+async function processClip(blob){if(!listening||discardClip||blob.size<500){localPending=false;return}localPending=true;try{let data=await new Promise((resolve,reject)=>{let reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob)});let r=await api('/api/speech/transcribe',{audio:data,ipucu:lastVoiceText||''});let duyulan=String(r.text||'').trim();if(listening&&!speechActive&&duyulan){if(localStorage.getItem('emre-voice-echo')!=='0')notify('Duyduğum: '+(duyulan.length>140?duyulan.slice(0,140)+'…':duyulan));birlestirGonder(duyulan)}}catch(e){notify(e.message)}finally{localPending=false}}
+let zemin=0.004;
+function startClip(){
+  if(!listening||recorder||!localStream)return null;
+  try{
+    let clipChunks=[],heard=false,started=performance.now(),lastVoice=started,drop=false;
+    let r=new MediaRecorder(localStream,{mimeType:'audio/webm;codecs=opus'});
+    recorder=r;
+    r.ondataavailable=e=>{if(e.data.size)clipChunks.push(e.data)};
+    r.onstop=()=>{
+      if(recorder===r)recorder=null;
+      localPending=false;
+      if(heard&&!drop&&listening&&!discardClip&&clipChunks.length)processClip(new Blob(clipChunks,{type:'audio/webm'}));
+      // Kayıt bitince hemen yenisini başlat: cümlenin başı kaçmasın.
+      if(listening&&!speechActive&&!busy)setTimeout(()=>startClip(),0);
+    };
+    r._voiceUpdate=(isLoud,time)=>{
+      if(isLoud){heard=true;lastVoice=time}
+      let sessizlik=sessizlikSuresi();
+      let bitti=(heard&&time-lastVoice>sessizlik&&time-started>700)||(heard&&time-started>enUzunKayit())||(!heard&&time-started>8000);
+      if(bitti){
+        if(!heard)drop=true;
+        localPending=true;
+        try{r.stop()}catch(e){recorder=null;localPending=false}
+      }
+    };
+    discardClip=false;
+    r.start();
+    return r;
+  }catch(e){notify('Bu tarayıcı yerel ses kaydını desteklemiyor.');stopLocalVoice();return null}
+}
+function monitorVoice(){
+  if(!listening||!analyser)return;
+  let values=new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(values);
+  let sum=0;for(let x of values)sum+=x*x;
+  let rms=Math.sqrt(sum/values.length);
+  let esik=Math.max(0.005,zemin*3),cokYuksek=rms>esik*2.4;
+  let loud=rms>esik,now=performance.now();
+  if(!loud)zemin=zemin*0.97+rms*0.03;
+  // Kullanıcı asistan konuşurken araya girerse okumayı kes ve dinlemeye geç.
+  if(speechActive&&cokYuksek){
+    ttsGeneration++;
+    if(ttsCancel){ttsCancel();ttsCancel=null}
+    if(ttsSource){try{ttsSource.stop()}catch(e){}ttsSource=null}
+    speechActive=false;discardClip=false;
+  }
+  if(!localPending&&!speechActive&&!busy){
+    if(!recorder)startClip();
+    if(recorder&&recorder.state==='recording')recorder._voiceUpdate(loud,now);
+  }else if(recorder&&recorder.state==='recording'&&(speechActive||discardClip)){
+    discardClip=true;try{recorder.stop()}catch(e){recorder=null}
+  }
+  raf=requestAnimationFrame(monitorVoice);
+}
+
+toggle.onclick=async()=>{if(listening){birikim='';clearTimeout(birikimZaman);stopLocalVoice();ttsGeneration++;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource)try{ttsSource.stop()}catch(e){};ttsSource=null;speechActive=false;return}if(!apiToken){notify('Yerel sunucuyu başlatıp sayfayı aç.');return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder||!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){notify('Yerel ses için mikrofon ve WebM destekli bir tarayıcı gerekli.');return}try{let speechStatus=await api('/api/speech/status');if(!speechStatus.installed){notify('Önce ses_kur.bat ile yerel ses modelini kur.');return}localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=2048;audioContext.createMediaStreamSource(localStream).connect(analyser);setToggle(true);discardClip=false;zemin=0.004;birikim='';notify('Yerel mikrofon açık. Ses CPU ile işlenecek.');monitorVoice()}catch(e){stopLocalVoice();notify('Yerel ses veya mikrofon açılamadı. Sunucu ve mikrofon iznini kontrol et.')}};
 document.getElementById('mic').onclick=()=>toggle.click();document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{if(b.dataset.section==='Keşfet')openArena();else if(b.dataset.section==='Sohbet'){showChatPage()}else if(b.dataset.section==='Telegram')showTelegram();else if(b.dataset.section==='Hatırlatıcılar')showReminders();else if(b.dataset.section==='Defter')showLedger();else if(b.dataset.section==='Ayarlar')showSettings();else if(b.dataset.section==='Geliştirici')showDeveloper();else if(b.dataset.section==='Uygulamalar')showApps();else if(b.dataset.section!=='Ana sayfa')notify(b.dataset.section+' bölümü henüz hazırlanmadı.');else window.scrollTo({top:0,behavior:'smooth'})});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>b.dataset.action==='Hatırlatıcı ekle'?showReminders():notify(b.dataset.action+' özelliği henüz bağlı değil.'));
 
 
@@ -241,10 +300,72 @@ document.getElementById('providerTab').onclick=async()=>{
 };
 function showProviderTab(){document.getElementById('providerTab').click()}
 
+/* --- Konuşma tanıma (mikrofon) ayarları: model + cümle bitişi ------------------ */
+async function sesTanimaAyarlari(body){
+  body.append(element('h2','Konuşma tanıma (mikrofon)'));
+  const bilgi=element('p','Durum okunuyor…');bilgi.className='hint';body.append(bilgi);
+  const kutuStil='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';
+  const etiket=(t,ilk)=>{const l=element('p',t);l.className='hint';l.style.margin=(ilk?'16px':'12px')+' 0 4px';return l};
+
+  let durum=null;
+  try{ durum=await api('/api/speech/status'); bilgi.textContent='Kurulu model: '+durum.model+'. '+(durum.hint||''); }
+  catch(e){ bilgi.textContent='Ses modeli durumu alınamadı: '+e.message; }
+
+  if(durum&&durum.installed){
+    const modelSec=document.createElement('select');
+    modelSec.style.cssText=kutuStil;
+    for(const m of (durum.models||['base','small'])){
+      const o=element('option', m==='small'?'small · daha doğru, yavaş':'base · hızlı, kelime kaçırabilir');
+      o.value=m;modelSec.append(o);
+    }
+    modelSec.value=durum.model;
+    const modelKaydet=button('Tanıma modelini kaydet',async()=>{
+      try{
+        const r=await api('/api/speech/model',{model:modelSec.value});
+        notify('Tanıma modeli: '+r.status.model+'. Bir sonraki konuşmada geçerli olur.');
+        bilgi.textContent='Kurulu model: '+r.status.model+'. '+(r.status.hint||'');
+      }catch(e){notify(e.message)}
+    });
+    body.append(etiket('Tanıma modeli',true),modelSec,modelKaydet);
+  }else if(durum){
+    bilgi.textContent='Yerel ses modeli kurulu değil. Mikrofon için önce ses_kur.bat dosyasını çalıştır.';
+  }
+
+  const sessizlik=document.createElement('select');
+  sessizlik.style.cssText=kutuStil;
+  for(const ms of [[1200,'1,2 sn · hızlı yanıt (cümleyi bölebilir)'],[1800,'1,8 sn · dengeli'],[2200,'2,2 sn · önerilen'],[2800,'2,8 sn · yavaş konuşanlar'],[3500,'3,5 sn · çok uzun cümleler']]){
+    const o=element('option',ms[1]);o.value=String(ms[0]);sessizlik.append(o);
+  }
+  sessizlik.value=String(sesSayisiYerel('emre-vad-sessizlik',2200));
+  sessizlik.onchange=()=>{localStorage.setItem('emre-vad-sessizlik',sessizlik.value);notify('Cümle bitiş sessizliği güncellendi.')};
+
+  const uzun=document.createElement('select');
+  uzun.style.cssText=kutuStil;
+  for(const ms of [[15000,'15 sn'],[30000,'30 sn · önerilen'],[45000,'45 sn'],[60000,'60 sn']]){
+    const o=element('option',ms[1]);o.value=String(ms[0]);uzun.append(o);
+  }
+  uzun.value=String(sesSayisiYerel('emre-vad-uzun',30000));
+  uzun.onchange=()=>{localStorage.setItem('emre-vad-uzun',uzun.value);notify('En uzun cümle süresi güncellendi.')};
+
+  const yankiLabel=document.createElement('label');
+  yankiLabel.style.cssText='display:block;margin:10px 5px;color:#a6c1c3;font-size:12px';
+  const yanki=document.createElement('input');
+  yanki.type='checkbox';yanki.checked=localStorage.getItem('emre-voice-echo')!=='0';
+  yanki.onchange=()=>localStorage.setItem('emre-voice-echo',yanki.checked?'1':'0');
+  yankiLabel.append(yanki,document.createTextNode(' Duyduğum metni ekranda göster (ne anladığımı görürsün)'));
+
+  body.append(etiket('Cümle bitiş sessizliği — bir cümleyi kaçırmamak için artır',true),
+    sessizlik,etiket('En uzun cümle'),uzun,yankiLabel,
+    (()=>{const p=element('p','Kısa duraklamalar artık cümleyi bölmüyor; mikrofon cümlenin başından itibaren kaydediyor ve '+
+      'asistan konuşurken sözünü kesersen okuma durup dinlemeye geçiyor. Türkçe doğruluk için small modeli önerilir; '+
+      'kurmak için ses_small_kur.bat dosyasını çalıştır (internet gerekir).');p.className='hint';return p})());
+}
+function sesSayisiYerel(ad,varsayilan){const v=Number(localStorage.getItem(ad));return Number.isFinite(v)&&v>0?v:varsayilan}
+
 /* Ollama sekmesinde geçerli arka ucu göster */
 document.getElementById('openjarvisTab').onclick=async()=>{selectSettingsTab('openjarvisTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','OpenJarvis bağlantısı'),element('p','OpenJarvis yerel sunucusunu Ollama ile kullan. Emre’nin defter ve uygulama izinleri ayrı yönetilir.'));let status=element('p','Bağlantı kontrol ediliyor…');status.className='hint';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px';for(let [v,t] of [['ollama','Ollama doğrudan · CPU'],['openjarvis','OpenJarvis · CPU modeli']]){let o=element('option',t);o.value=v;select.append(o)}select.value=localStorage.getItem('emre-backend')||'ollama';let note=element('p','OpenJarvis için bilgisayarında yerel sunucu ve emre-cpu modeli gerekir. Model seçimini Ollama modeli sekmesinden yap. Sunucu yalnızca 127.0.0.1:8766 üzerinden bağlanır. İşlemci kullanımını ollama ps ile doğrula.');note.className='hint';body.append(status,select,button('Bağlantıyı kaydet',()=>{localStorage.setItem('emre-backend',select.value);conversation=[];localStorage.removeItem('emre-context');persistActiveChat();notify('Bağlantı seçildi; sohbet bağlamı temizlendi.')}),button('Durumu yenile',async()=>{try{let r=await api('/api/openjarvis/status');status.textContent=r.online?'OpenJarvis yerel sunucusu erişilebilir.':'OpenJarvis sunucusu çalışmıyor veya erişilemiyor.'}catch(e){status.textContent=e.message}}),note);try{let r=await api('/api/openjarvis/status');status.textContent=r.online?'OpenJarvis yerel sunucusu erişilebilir.':'OpenJarvis sunucusu çalışmıyor veya erişilemiyor.'}catch(e){status.textContent=e.message}};
 document.getElementById('browserAccessTab').onclick=()=>{selectSettingsTab('browserAccessTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Tarayıcı erişimi'),element('p','Tarayıcı kontrolü henüz bağlı değil. Bu seçim yalnızca hazırlık tercihidir; şimdilik herhangi bir tarayıcı işlemini etkinleştirmez veya denetlemez.'));let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let [value,label] of [['restricted','Kısıtlı · işlemler onaylı'],['full','Tam erişim · işlem onayı yok']]){let option=element('option',label);option.value=value;select.append(option)}select.value=localStorage.getItem('emre-browser-access')==='full'?'full':'restricted';let info=element('p','LUX FUTURES için emir açmama hedefi iki modda da geçerlidir. Botun masaüstü sürümü ve işlem yolları incelenmeden bu korumanın çalıştığı garanti edilemez.');info.className='hint';body.append(select,button('Tercihi kaydet',()=>{localStorage.setItem('emre-browser-access',select.value);notify('Tercih kaydedildi; tarayıcı kontrolü henüz bağlı değil.')}),info)};
-document.getElementById('voiceTab').onclick=async()=>{selectSettingsTab('voiceTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Yerel konuşma sesi'),element('p','Bilgisayarında kurulu Türkçe seslerden seçim yap. Sesin tonu, seçtiğin örnekle birebir aynı olmayabilir.'));let status=element('p','Yerel sesler aranıyor…');status.className='hint';body.append(status);try{let r=await api('/api/tts/voices');if(!r.voices?.length){status.textContent='Yerel ses bulunamadı. Piper için ses_model_kur.bat dosyasını çalıştır.';return}status.textContent='Türkçe sesler bulundu.';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let v of r.voices){let o=element('option',(v.label||v.name)+' · '+v.gender);o.value=v.name;select.append(o)}select.value=localStorage.getItem('emre-tts-voice')||r.voices.find(v=>String(v.gender).toLowerCase()==='male')?.name||r.voices[0].name;if(!select.value)select.value=r.voices[0].name;let save=button('Sesi kaydet',()=>{localStorage.setItem('emre-tts-voice',select.value);notify('Yerel ses seçildi.')});let test=button('Örneği dinle',()=>{localStorage.setItem('emre-tts-voice',select.value);playLocalSpeech('İyi akşamlar dostum. Ben Emre. Her şey kontrol altında; sen rahatına bak. Sistemleri izliyorum ve ihtiyaç duyduğunda buradayım.')});let reverbLabel=document.createElement('label');reverbLabel.style.cssText='display:block;margin:14px 5px;color:#a6c1c3;font-size:12px';let reverbToggle=document.createElement('input');reverbToggle.type='checkbox';reverbToggle.checked=localStorage.getItem('emre-reverb')==='1';reverbToggle.onchange=()=>localStorage.setItem('emre-reverb',reverbToggle.checked?'1':'0');reverbLabel.append(reverbToggle,document.createTextNode(' Hafif reverb (isteğe bağlı)'));let note=element('p','Ses bilgisayarında oluşturulur. Anlaşılırlığı kontrol etmek için önce reverb kapalı dinle. Fahrettin ve Fettah yerel seslerini seçebilirsin.');note.className='hint';body.append(select,save,test,reverbLabel,note)}catch(e){status.textContent=e.message}};
+document.getElementById('voiceTab').onclick=async()=>{selectSettingsTab('voiceTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Yerel konuşma sesi'),element('p','Bilgisayarında kurulu Türkçe seslerden seçim yap. Sesin tonu, seçtiğin örnekle birebir aynı olmayabilir.'));let status=element('p','Yerel sesler aranıyor…');status.className='hint';body.append(status);try{let r=await api('/api/tts/voices');if(!r.voices?.length){status.textContent='Yerel ses bulunamadı. Piper için ses_model_kur.bat dosyasını çalıştır.';sesTanimaAyarlari(body);return}status.textContent='Türkçe sesler bulundu.';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let v of r.voices){let o=element('option',(v.label||v.name)+' · '+v.gender);o.value=v.name;select.append(o)}select.value=localStorage.getItem('emre-tts-voice')||r.voices.find(v=>String(v.gender).toLowerCase()==='male')?.name||r.voices[0].name;if(!select.value)select.value=r.voices[0].name;let save=button('Sesi kaydet',()=>{localStorage.setItem('emre-tts-voice',select.value);notify('Yerel ses seçildi.')});let test=button('Örneği dinle',()=>{localStorage.setItem('emre-tts-voice',select.value);playLocalSpeech('İyi akşamlar dostum. Ben Emre. Her şey kontrol altında; sen rahatına bak. Sistemleri izliyorum ve ihtiyaç duyduğunda buradayım.')});let reverbLabel=document.createElement('label');reverbLabel.style.cssText='display:block;margin:14px 5px;color:#a6c1c3;font-size:12px';let reverbToggle=document.createElement('input');reverbToggle.type='checkbox';reverbToggle.checked=localStorage.getItem('emre-reverb')==='1';reverbToggle.onchange=()=>localStorage.setItem('emre-reverb',reverbToggle.checked?'1':'0');reverbLabel.append(reverbToggle,document.createTextNode(' Hafif reverb (isteğe bağlı)'));let note=element('p','Ses bilgisayarında oluşturulur. Anlaşılırlığı kontrol etmek için önce reverb kapalı dinle. Fahrettin ve Fettah yerel seslerini seçebilirsin.');note.className='hint';body.append(select,save,test,reverbLabel,note)}catch(e){status.textContent=e.message}sesTanimaAyarlari(body)};
 const canvas=document.getElementById('energy'),ctx=canvas.getContext('2d');
 let tick=0;const TAU=Math.PI*2;let seed=27;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}const sparks=Array.from({length:360},()=>({lat:Math.asin(rand()*2-1),lon:rand()*TAU,r:136+rand()*25,alpha:.15+rand()*.75,phase:rand()*TAU}));const traces=Array.from({length:48},()=>({lat:(rand()-.5)*2.7,lon:rand()*TAU,len:.13+rand()*.75,step:.05+rand()*.2,r:140+rand()*18,alpha:.12+rand()*.35}));
 function project(lat,lon,r,t){let x=r*Math.cos(lat)*Math.cos(lon+t*.23),y=r*Math.sin(lat),z=r*Math.cos(lat)*Math.sin(lon+t*.23);let tilt=.26;let yy=y*Math.cos(tilt)-z*Math.sin(tilt),zz=y*Math.sin(tilt)+z*Math.cos(tilt),scale=400/(400-zz*.48);return [250+x*scale,250+yy*scale,zz]}
