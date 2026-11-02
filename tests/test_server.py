@@ -22,10 +22,7 @@ import server  # noqa: E402
 class ServerTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory()
-        cls.original_db = server.DB
         cls.original_key = server.KEY
-        server.DB = Path(cls.tmp.name) / 'test.sqlite3'
         server.KEY = 'test-anahtar'
         cls.httpd = server.EmreServer(('127.0.0.1', 0), server.Handler)
         cls.port = cls.httpd.server_address[1]
@@ -37,9 +34,18 @@ class ServerTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.httpd.shutdown()
         cls.httpd.server_close()
-        cls.tmp.cleanup()
-        server.DB = cls.original_db
         server.KEY = cls.original_key
+
+    def setUp(self):
+        # Her test kendi geçici veritabanıyla çalışır: testler birbirinin
+        # kayıtlarını görmez (mükerrer hesap kontrolü yüzünden önemli).
+        self.tmp = tempfile.TemporaryDirectory()
+        self.original_db = server.DB
+        server.DB = Path(self.tmp.name) / 'test.sqlite3'
+
+    def tearDown(self):
+        server.DB = self.original_db
+        self.tmp.cleanup()
 
     def raw(self, path, data=None, token='test-anahtar', origin=None, method=None):
         body = json.dumps(data).encode() if data is not None else None
@@ -180,6 +186,67 @@ class ServerTestCase(unittest.TestCase):
         self.api('/api/reminders/delete', {'id': reminder['id']}, expect=400)
         self.api('/api/reminders/delete', {'id': reminder['id'], 'confirmed': True})
         self.assertFalse(any(r['id'] == reminder['id'] for r in self.api('/api/reminders')['reminders']))
+
+    # --- hatırlatıcı (sohbetten, Ollama olmadan) ----------------------------
+    def test_chat_creates_reminder_without_ollama(self):
+        cevap = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'yarın 09:00 su iç diye hatırlat'}],
+                                       'session': 'test-oturum'})
+        self.assertIn('Hatırlatıcı kuruldu', cevap['reply'])
+        kayitlar = self.api('/api/reminders')['reminders']
+        self.assertTrue(any(r['text'] == 'su iç' for r in kayitlar))
+
+    def test_chat_history_is_stored(self):
+        self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'yarın 10:00 test diye hatırlat'}],
+                               'session': 'gecmis-1'})
+        oturumlar = self.api('/api/history')['sessions']
+        self.assertTrue(any(o['session'] == 'gecmis-1' for o in oturumlar))
+        detay = self.api('/api/history?session=gecmis-1')
+        self.assertEqual(detay['messages'][0]['role'], 'user')
+        self.assertGreaterEqual(len(detay['messages']), 2)
+        silinen = self.api('/api/history/delete', {'session': 'gecmis-1', 'confirmed': True})
+        self.assertGreaterEqual(silinen['deleted'], 2)
+
+    # --- dışa aktarma ------------------------------------------------------
+    def test_csv_export(self):
+        self.api('/api/ledger', {'person': 'Dışa Kişi', 'kind': 'receivable', 'amount': 125075})
+        status, body, ctype = self.raw('/api/ledger/export?format=csv')
+        self.assertEqual(status, 200)
+        self.assertIn('text/csv', ctype)
+        self.assertTrue(body.startswith(b'\xef\xbb\xbf'), 'CSV BOM ile başlamalı (Excel/Türkçe)')
+        metin = body.decode('utf-8-sig')
+        self.assertIn('Dışa Kişi', metin)
+        self.assertIn('1.250,75', metin)
+
+    def test_backup_contains_all_tables(self):
+        status, veri, ctype = self.raw('/api/backup')
+        self.assertEqual(status, 200)
+        if isinstance(veri, (bytes, str)):
+            veri = json.loads(veri)
+        for anahtar in ('accounts', 'ledger', 'reminders', 'messages', 'surum'):
+            self.assertIn(anahtar, veri)
+
+    def test_ledger_pagination(self):
+        for i in range(3):
+            self.api('/api/ledger', {'person': 'Sayfa', 'kind': 'payable', 'amount': 100 + i})
+        veri = self.api('/api/ledger?limit=1&offset=0')
+        self.assertEqual(len(veri['entries']), 1)
+        self.assertGreaterEqual(veri['total'], 3)
+        self.api('/api/ledger?limit=abc', expect=400)
+
+    # --- telegram arka planı ----------------------------------------------
+    def test_telegram_inbox_requires_token(self):
+        self.api('/api/telegram/updates', expect=400)
+        self.api('/api/telegram/poll', {}, expect=400)
+        durum = self.api('/api/status')['telegram']
+        self.assertFalse(durum['configured'])
+
+    # --- güvenlik başlıkları ----------------------------------------------
+    def test_csp_header_present(self):
+        req = urllib.request.Request(self.base + '/')
+        with urllib.request.urlopen(req, timeout=10) as res:
+            csp = res.headers.get('Content-Security-Policy', '')
+            self.assertIn("default-src 'self'", csp)
+            self.assertIn("frame-ancestors 'none'", csp)
 
     # --- istek gövdesi -----------------------------------------------------
     def test_chunked_body_accepted(self):

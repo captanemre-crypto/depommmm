@@ -20,7 +20,14 @@ function request(path, options = {}) {
       res.on('data', c => data += c);
       res.on('end', () => {
         const ct = res.headers['content-type'] || '';
-        resolve({ status: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, ctype: ct, text: data, json: async () => JSON.parse(data) });
+        resolve({
+          status: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          ctype: ct,
+          text: data,
+          json: async () => JSON.parse(data),
+          headers: { get: (name) => res.headers[String(name).toLowerCase()] ?? null },
+        });
       });
     });
     req.on('error', reject);
@@ -59,10 +66,13 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   const dom = new JSDOM(html, {
     url: BASE + '/', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole,
     beforeParse(window) {
-      window.fetch = (path, opt = {}) => {
+      window.fetch = async (path, opt = {}) => {
         const target = String(path).startsWith('http') ? String(path) : BASE + path;
         const headers = Object.assign({}, opt.headers || {});
-        return request(target, { method: opt.method, body: opt.body, headers });
+        const res = await request(target, { method: opt.method, body: opt.body, headers });
+        // jsdom'da Response.blob yok: indirme akışını test edebilmek için ekle.
+        res.blob = async () => new window.Blob([res.text], { type: res.ctype || 'application/octet-stream' });
+        return res;
       };
       window.HTMLCanvasElement.prototype.getContext = () => makeCtx();
       window.AudioContext = class { constructor() { this.state = 'running'; this.destination = {}; } decodeAudioData() { return Promise.resolve({}); } createBufferSource() { return { connect() {}, start() {}, stop() {}, buffer: null, onended: null }; } createGain() { return { connect() {}, gain: { value: 1 } }; } close() { return Promise.resolve(); } };
@@ -247,6 +257,77 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       await sleep(600);
       assert(/yenile|F5|anahtar/i.test($('toast').textContent + $('simpleBody').textContent), '403 için yönlendirme yok: ' + $('toast').textContent);
     } finally { window.fetch = original; }
+  });
+
+
+  await check('sohbetten hatırlatıcı (Ollama olmadan)', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Sohbet').click();
+    await sleep(300);
+    $('input').value = 'yarın 09:00 su iç diye hatırlat';
+    $('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await sleep(900);
+    assert(/Hatırlatıcı kuruldu/.test($('messages').textContent), 'hatırlatıcı yanıtı görünmedi: ' + $('messages').textContent.slice(-200));
+    const r = await (await request('/api/reminders')).json();
+    assert(r.reminders.some(x => x.text === 'su iç'), 'hatırlatıcı sunucuda yok');
+  });
+
+  await check('sunucu geçmişi paneli oturumları listeliyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Sohbet').click();
+    await sleep(700);
+    const box = $('serverHistoryList');
+    assert(box, 'sunucu geçmişi kutusu yok');
+    assert(box.children.length > 0, 'oturum listesi boş');
+    const ilk = box.querySelector('button');
+    ilk.click();
+    await sleep(700);
+    assert(/su iç/.test($('messages').textContent), 'oturum yüklenmedi');
+  });
+
+  await check('defter CSV ve yedek indirme düğmeleri', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Defter').click();
+    await sleep(400);
+    assert($('ledgerExport') && $('ledgerBackup'), 'indirme düğmeleri yok');
+    const indirilen = [];
+    window.URL.createObjectURL = (blob) => { indirilen.push(blob.size); return 'blob:test'; };
+    window.URL.revokeObjectURL = () => {};
+    const clickStub = window.HTMLAnchorElement.prototype.click;
+    window.HTMLAnchorElement.prototype.click = function () { indirilen.push(this.download); };
+    try {
+      $('ledgerExport').click(); await sleep(700);
+      $('ledgerBackup').click(); await sleep(700);
+    } finally { window.HTMLAnchorElement.prototype.click = clickStub; }
+    assert(indirilen.some(x => String(x).endsWith('.csv')), 'CSV indirilmedi: ' + JSON.stringify(indirilen));
+    assert(indirilen.some(x => String(x).endsWith('.json')), 'JSON yedek indirilmedi: ' + JSON.stringify(indirilen));
+  });
+
+  await check('erişilebilirlik: canlı bölge ve toast rolü', () => {
+    const liste = $('messages');
+    assert(liste.getAttribute('role') === 'log', 'mesaj listesinde role=log yok');
+    assert(liste.getAttribute('aria-live') === 'polite', 'aria-live yok');
+    assert($('toast').getAttribute('role') === 'status', 'toast role=status değil');
+  });
+
+  await check('Escape onay penceresini kapatıyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Defter').click();
+    await sleep(400);
+    $('ledgerNew').click(); await sleep(100);
+    assert(d.querySelector('.ledger-overlay'), 'pencere açılmadı');
+    d.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(150);
+    assert(!d.querySelector('.ledger-overlay'), 'Escape pencereyi kapatmadı');
+  });
+
+  await check('ayarlarda sürüm bilgisi görünüyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(700);
+    assert(/Sürüm:/.test($('settingsBody').textContent), 'sürüm bilgisi yok');
+  });
+
+  await check('telegram bölümü yoklama durumunu gösteriyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Telegram').click();
+    await sleep(600);
+    const metin = $('simpleBody').textContent;
+    assert(/anahtar|bağla|Yoklama|ayarlanmamış/i.test(metin), 'Telegram durumu gösterilmedi: ' + metin.slice(0, 150));
   });
 
   // localStorage'da token saklanmıyor mu?

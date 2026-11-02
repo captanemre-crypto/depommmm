@@ -1,6 +1,10 @@
 """Local speech worker bridge with bounded audio, serialized requests and timeouts."""
-import os, threading, tempfile, base64
+import base64
+import os
+import tempfile
+import threading
 from pathlib import Path
+
 from yerel_isci import YerelIsci
 
 ROOT = Path(__file__).resolve().parent

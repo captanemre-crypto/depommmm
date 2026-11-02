@@ -1,5 +1,6 @@
 import threading
 from pathlib import Path
+
 from yerel_isci import YerelIsci
 
 ROOT = Path(__file__).resolve().parent

@@ -63,7 +63,7 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-46 test; defter araçları, tutar ayrıştırma, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı akışı, girdi doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+80 test; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
 `tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (23 kontrol).
@@ -99,3 +99,34 @@ Sunucu yalnızca standart kütüphaneyi kullanır. İsteğe bağlı özellikleri
 - Telegram mesajları `update_id` imleciyle izleniyor; aynı mesaj tekrar gösterilmiyor.
 - Arayüzdeki "Sistem durumu" ve "Yaklaşan hatırlatıcılar" panelleri artık canlı veriyle güncelleniyor.
 - `/favicon.ico` sunuluyor, yanıtlara `nosniff` ve `no-referrer` başlıkları eklendi.
+
+## Sohbetten hatırlatıcı
+"Sohbet" bölümünde doğal Türkçe ile hatırlatıcı kurabilirsin: `yarın 09:00 Ahmet'i ara diye hatırlat`, `3 gün sonra saat 18:00 sunum`, `15 Kasım 14:30 fatura`, `pazartesi sabah 9 kontrol`, `akşam 8 ilaç`, `5 dk sonra çay`, `15.11.2026 14:30 toplantı`.
+Tarih/saat anlaşılamazsa kayıt **yapılmaz** ve desteklenen biçimler örneklenir; geçmiş bir zaman da reddedilir. Bu yol modelden bağımsızdır: Ollama kapalıyken de çalışır. Aynı cümlede defter işlemi varsa (örn. `Ahmete 1.500 TL alacak ekle yarın hatırlat`) hem defter kaydı hem hatırlatıcı oluşturulur.
+
+## Kalıcı sohbet geçmişi
+Her sohbet mesajı `emre.sqlite3` içindeki `messages` tablosuna yazılır (oturum kimliğiyle). Sohbet sayfasındaki **Sunucu geçmişi** panelinden oturumlar listelenir, birine tıklayınca mesajlar yüklenir. Bu geçmiş tarayıcı depolamasından bağımsızdır: masaüstü sürümü (WebView2) ile tarayıcı aynı kaydı görür. `POST /api/history/delete` ile oturum veya tüm geçmiş silinebilir.
+
+## Defter ve yedek dışa aktarma
+Defter sayfasındaki **⤓ CSV** düğmesi tüm hareketleri `;` ayırıcı ve UTF-8 BOM ile indirir (Excel'de Türkçe karakterler doğru görünür). **⤓ Yedek** düğmesi hesaplar, defter, hatırlatıcılar ve sohbet geçmişini tek JSON dosyasında toplar. Uçlar: `GET /api/ledger/export?format=csv|json`, `GET /api/backup`. Defter okuması `limit`/`offset` ile sayfalanır (varsayılan 500, üst sınır 2000).
+
+## Telegram arka plan yoklaması
+Bot anahtarı bağlandığında sunucu, Telegram'ı **uzun yoklama** ile dinleyen bir arka plan iş parçacığı başlatır. Gelen mesajlar veritabanına yazılır, okunmamış sayısı Ayarlar'da ve Telegram bölümünde görünür. `getUpdates` imleci (offset) veritabanında tutulduğu için sunucu yeniden başladığında aynı mesaj tekrar gösterilmez. Arayüz yalnızca yerel API'yi okur; Telegram'a doğrudan bağlanmaz. Uçlar: `GET /api/telegram/updates`, `POST /api/telegram/mark-read`, `POST /api/telegram/poll`.
+
+## Denetim izi
+Defter kayıtlarında `source` (`manual` veya `chat`) ve `raw_text` (kaydı tetikleyen cümle) kolonları tutulur; eski veritabanları açılışta otomatik güncellenir (ALTER TABLE). `GET /api/ledger` yanıtı `source` alanını da döndürür.
+
+## Ses modeli indirme doğrulaması
+`ses_model_kur.bat` / `piper_indir.py` indirilen dosyaları boyut ve JSON yapısı açısından doğrular, SHA-256 özetini hesaplar ve `sesler/<dosya>.sha256` olarak saklar. Sonraki çalıştırmalarda özet uyuşmazsa dosya kullanılmaz. Hugging Face yayınlanmış bir sağlama listesi vermediği için bu "ilk kullanımda güven" yöntemidir; ilk indirmenin güvenilirliği kaynağa (HTTPS) bağlıdır.
+
+## Geliştirme araçları
+`pyproject.toml` içinde ruff yapılandırması vardır: `ruff check .` (CI'da zorunlu adım). Arayüz E2E paketi `tools/e2e` altındadır ve CI'da ayrı iş olarak çalışır.
+
+## Bilinen sınırlar (2026-11-02 itibarıyla)
+- **Web'den bilgi alma yok:** "ara" komutu Google'ı yeni sekmede açar; asistan içeriği okumaz/özetlemez.
+- **Uyandırma sözcüğü yok:** mikrofon düğmeyle açılır.
+- **Arka plan hatırlatma servisi yok:** bildirim yalnızca sayfa/WebView açıkken ve izin verildiğinde görünür; Windows hizmeti kurulmaz.
+- **Veritabanı şifrelenmez:** `emre.sqlite3` düz metindir; disk şifrelemesi işletim sistemi düzeyinde yapılmalıdır.
+- **Telefon erişimi yok:** sunucu yalnızca `127.0.0.1` dinler.
+- **Windows üzerinde uçtan uca doğrulanmadı:** SAPI/Piper sesleri, WebView2, tepsi simgesi, `.bat` akışları ve OpenJarvis süreç yönetimi gerçek makinede denenmelidir.
+- **Lisans dosyası yok:** kamuya açık paylaşım öncesi lisans seçilmelidir.

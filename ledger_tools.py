@@ -1,8 +1,9 @@
 """Narrow Ollama tools for the local ledger; never move actual money."""
-import re, json
+import json
+import re
 from datetime import datetime
 
-TOOLS=[{'type':'function','function':{'name':'ledger_record','description':'Kullanıcı açıkça deftere alacak, verecek, alınmış tahsilat veya yapılmış ödeme kaydetmek isterse kayıt oluştur. Para transferi yapmaz. Bilgi eksik veya belirsizse çağırma. Sadece son kullanıcı mesajındaki rakamla yazılmış tutarı kullan. Hatırlatma istenirse tam tarih ve saat olmalı; yoksa kullanıcıya sor.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kullanıcının yazdığı kişi adı'},'kind':{'type':'string','enum':['receivable','payable','received','paid'],'description':'receivable=benim alacağım; payable=benim borcum; received=aldığım tahsilat; paid=yaptığım ödeme'},'amount_kurus':{'type':'integer','description':'TL tutarı kuruş cinsinden; 1000 TL = 100000 kuruş'},'note':{'type':'string'},'remind_at':{'type':'string','description':'İstenmişse YYYY-MM-DDTHH:MM yerel tarih saat, yoksa boş'}},'required':['person','kind','amount_kurus']}}},{'type':'function','function':{'name':'ledger_list','description':'Kullanıcının alacak verecek defteri hesaplarını ve hareketlerini görüntüler.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kişi adı, tüm kayıtlar için boş bırak'}},'required':[]}}}]
+TOOLS=[{'type':'function','function':{'name':'ledger_record','description':'Kullanıcı açıkça deftere alacak, verecek, alınmış tahsilat veya yapılmış ödeme kaydetmek isterse kayıt oluştur. Para transferi yapmaz. Bilgi eksik veya belirsizse çağırma. Sadece son kullanıcı mesajındaki rakamla yazılmış tutarı kullan. Hatırlatma istenirse tam tarih ve saat olmalı; yoksa kullanıcıya sor.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kullanıcının yazdığı kişi adı'},'kind':{'type':'string','enum':['receivable','payable','received','paid'],'description':'receivable=benim alacağım; payable=benim borcum; received=aldığım tahsilat; paid=yaptığım ödeme'},'amount_kurus':{'type':'integer','description':'TL tutarı kuruş cinsinden; 1000 TL = 100000 kuruş'},'note':{'type':'string'},'remind_at':{'type':'string','description':'İstenmişse YYYY-MM-DDTHH:MM yerel tarih saat, yoksa boş'}},'required':['person','kind','amount_kurus']}}},{'type':'function','function':{'name':'ledger_list','description':'Kullanıcının alacak verecek defteri hesaplarını ve hareketlerini görüntüler.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kişi adı, tüm kayıtlar için boş bırak'}},'required':[]}}},{'type':'function','function':{'name':'reminder_create','description':'Kullanıcı açıkça hatırlatıcı kurmak isterse kayıt oluştur. Tam tarih ve saat gerekir; eksikse çağırma, kullanıcıya sor. Geçmiş zaman için kayıt oluşturma.','parameters':{'type':'object','properties':{'text':{'type':'string','description':'Hatırlatılacak iş, kullanıcının söylediği biçimde'},'remind_at':{'type':'string','description':'YYYY-MM-DDTHH:MM yerel tarih saat'}},'required':['text','remind_at']}}}]
 LABELS={'receivable':'Alacak','payable':'Verecek','received':'Tahsilat','paid':'Ödeme'}
 
 
@@ -50,6 +51,22 @@ def amount_matches(text):
 def execute(name,args,db,last_user):
     if isinstance(args,str): args=json.loads(args)
     if not isinstance(args,dict): raise ValueError('İşlem bilgileri geçersiz.')
+    if name=='reminder_create':
+        from datetime import datetime as _dt
+
+        import zaman_ayristir
+        text=str(args.get('text','')).strip()[:300]
+        raw=str(args.get('remind_at','')).strip()
+        if not text: raise ValueError('Hatırlatıcı metni gerekli.')
+        try: when=_dt.fromisoformat(raw)
+        except ValueError:
+            when=zaman_ayristir.parse_when(raw)
+            if when is None: raise ValueError('Hatırlatıcı için tarih ve saati anlayamadım.')
+        if when.tzinfo is not None: raise ValueError('Tarih yerel saat olmalı.')
+        if when<=_dt.now(): raise ValueError('Hatırlatıcı zamanı geçmişte kalıyor.')
+        with db() as c:
+            cur=c.execute('INSERT INTO reminders(text,due) VALUES (?,?)',(text,when.isoformat(timespec='minutes')))
+        return f'Hatırlatıcı kuruldu: {when.strftime("%d.%m.%Y %H:%M")} — {text} (Kayıt no: {cur.lastrowid}).'
     if name=='ledger_list':
         person=str(args.get('person','')).strip()
         with db() as c:
@@ -70,7 +87,6 @@ def execute(name,args,db,last_user):
     lower=last_user.lower()
     if not re.search(r'alacağ|alacak|borç|borcum|verecek|ödedim|ödeme|tahsil|aldım|kaydet|deftere',lower) or re.search(r'var\s+m[ıi]|ne kadar|kaç lira|\?',lower): raise ValueError('Kayıt isteği net değil; kişiyi, tutarı ve işlem türünü belirt.')
     if due and not re.search(r'hatırla|hatırlat|uyar|bildir',lower): raise ValueError('Hatırlatıcı isteği açık değil.')
-    if not due and re.search(r'hatırla|hatırlat|uyar|bildir',lower): raise ValueError('Hatırlatıcı için tarih ve saati belirt.')
     if not person or len(person)>100 or person.casefold() not in last_user.casefold(): raise ValueError('Kişi adı son mesajda açıkça bulunmalı; tekrar söyle.')
     if kind not in LABELS or type(amount) is not int or not 0<amount<=100000000000: raise ValueError('İşlem türü veya tutar belirsiz.')
     # Models can misinterpret quantities: accept only a numeric amount that matches the utterance.

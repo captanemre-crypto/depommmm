@@ -1,12 +1,28 @@
 """EMRE local server: standard-library only. Run on Windows: py server.py"""
-import json, os, socket, sqlite3, urllib.request, urllib.error, time, secrets, re, subprocess, sys, tempfile, base64, contextlib
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
+import base64
+import contextlib
+import json
+import os
+import re
+import secrets
+import socket
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
+
 import arena_bridge
+import hatirlatici
 import ledger_tools
 import ses_baglanti
+import telegram_bot
 import tts_piper_bridge
 
 ROOT = Path(__file__).resolve().parent
@@ -16,9 +32,34 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02'
-TG_OFFSET = {'value': None}  # Telegram getUpdates imleci: ayni mesaj tekrar gosterilmez.
+VERSION = '2026-11-02.2'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
+
+_INITIALIZED = set()
+
+
+def _init_schema(conn, path):
+    """Tabloları ve kolonları oluşturur; süreç başına yalnızca bir kez çalışır."""
+    if path in _INITIALIZED:
+        return
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY, text TEXT NOT NULL, due TEXT NOT NULL, done INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY, person TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT NOT NULL DEFAULT "", due TEXT, created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE, note TEXT NOT NULL DEFAULT "");
+        CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, session TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS telegram_messages (id INTEGER PRIMARY KEY, update_id INTEGER UNIQUE, chat_id INTEGER, sender TEXT, text TEXT, date INTEGER, read INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS telegram_state (key TEXT PRIMARY KEY, value TEXT);
+        CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session, id);
+        CREATE INDEX IF NOT EXISTS idx_ledger_person ON ledger(person);
+    """)
+    # Eski veritabanları için denetim izi kolonları (A6)
+    columns = {row[1] for row in conn.execute('PRAGMA table_info(ledger)')}
+    if 'source' not in columns:
+        conn.execute('ALTER TABLE ledger ADD COLUMN source TEXT')
+    if 'raw_text' not in columns:
+        conn.execute('ALTER TABLE ledger ADD COLUMN raw_text TEXT')
+    _INITIALIZED.add(path)
+
 
 @contextlib.contextmanager
 def db():
@@ -33,9 +74,7 @@ def db():
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('PRAGMA synchronous=NORMAL')
         conn.execute('PRAGMA busy_timeout=10000')
-        conn.execute('CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY, text TEXT NOT NULL, due TEXT NOT NULL, done INTEGER DEFAULT 0)')
-        conn.execute('CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY, person TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT NOT NULL DEFAULT "", due TEXT, created TEXT NOT NULL)')
-        conn.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE, note TEXT NOT NULL DEFAULT "")')
+        _init_schema(conn, str(DB))
         yield conn
         conn.commit()
     except BaseException:
@@ -44,6 +83,18 @@ def db():
         raise
     finally:
         conn.close()
+
+
+BOT = telegram_bot.TelegramBot(lambda: db())
+
+
+def store_message(session, role, text):
+    """Sohbet mesajını sunucuda sakla (A4: kalıcı geçmiş, cihazdan bağımsız)."""
+    if not session or not text:
+        return
+    with db() as conn:
+        conn.execute('INSERT INTO messages(session,role,text,created) VALUES (?,?,?,?)',
+                     (session[:80], role, str(text)[:6000], datetime.now().isoformat(timespec='seconds')))
 
 
 def text_field(data, name, limit, required=False, default='', label=None):
@@ -163,6 +214,64 @@ class Handler(BaseHTTPRequestHandler):
         data=json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(status); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data)))
         self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY'); self.end_headers(); self.wfile.write(data)
+    def raw(self, payload, ctype, filename=None, status=200):
+        self.send_response(status)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(payload)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Frame-Options', 'DENY')
+        if filename:
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+        self.end_headers()
+        self.wfile.write(payload)
+    # --- dışa aktarma yardımcıları (A5) ---------------------------------
+    def export_ledger(self, query):
+        import csv
+        import io
+        params = dict(pair.split('=', 1) for pair in query.split('&') if '=' in pair)
+        bicim = (params.get('format') or 'csv').lower()
+        if bicim not in ('csv', 'json'):
+            raise ValueError('Desteklenen biçimler: csv, json.')
+        with db() as c:
+            rows = c.execute('SELECT id,person,kind,amount,note,due,created,source FROM ledger ORDER BY id').fetchall()
+        turkce = {'receivable': 'Alacak', 'payable': 'Verecek', 'received': 'Tahsilat', 'paid': 'Ödeme'}
+        kayitlar = [{'id': r[0], 'kisi': r[1], 'tur': turkce.get(r[2], r[2]), 'tutar_tl': r[3] / 100,
+                      'not': r[4], 'vade': r[5], 'olusturma': r[6], 'kaynak': r[7] or 'manual'} for r in rows]
+        stamp = datetime.now().strftime('%Y%m%d-%H%M')
+        if bicim == 'json':
+            data = json.dumps({'defter': kayitlar}, ensure_ascii=False, indent=2).encode('utf-8')
+            return self.raw(data, 'application/json; charset=utf-8', f'emre-defter-{stamp}.json')
+        out = io.StringIO()
+        writer = csv.writer(out, delimiter=';', lineterminator='\r\n')
+        writer.writerow(['Kayıt No', 'Kişi', 'İşlem', 'Tutar (TL)', 'Açıklama', 'Vade', 'Oluşturma', 'Kaynak'])
+        for k in kayitlar:
+            tutar = f"{k['tutar_tl']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            writer.writerow([k['id'], k['kisi'], k['tur'], tutar,
+                             k['not'], k['vade'] or '', k['olusturma'], k['kaynak']])
+        # BOM: Excel'in UTF-8'i Türkçe karakterlerle doğru açması için.
+        return self.raw(b'\xef\xbb\xbf' + out.getvalue().encode('utf-8'),
+                        'text/csv; charset=utf-8', f'emre-defter-{stamp}.csv')
+
+    def export_backup(self):
+        with db() as c:
+            veri = {
+                'surum': VERSION,
+                'olusturma': datetime.now().isoformat(timespec='seconds'),
+                'accounts': [dict(zip(('id', 'name', 'note'), r)) for r in
+                             c.execute('SELECT id,name,note FROM accounts ORDER BY id')],
+                'ledger': [dict(zip(('id', 'person', 'kind', 'amount', 'note', 'due', 'created', 'source', 'raw_text'), r))
+                           for r in c.execute('SELECT id,person,kind,amount,note,due,created,source,raw_text FROM ledger ORDER BY id')],
+                'reminders': [dict(zip(('id', 'text', 'due', 'done'), r)) for r in
+                              c.execute('SELECT id,text,due,done FROM reminders ORDER BY id')],
+                'messages': [dict(zip(('id', 'session', 'role', 'text', 'created'), r)) for r in
+                             c.execute('SELECT id,session,role,text,created FROM messages ORDER BY id')],
+            }
+        stamp = datetime.now().strftime('%Y%m%d-%H%M')
+        return self.raw(json.dumps(veri, ensure_ascii=False, indent=2).encode('utf-8'),
+                        'application/json; charset=utf-8', f'emre-yedek-{stamp}.json')
+
     def valid_host(self):
         """Yalnızca loopback adlarına yanıt ver.
 
@@ -211,7 +320,10 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/':
             html=(ROOT/'index.html').read_text(encoding='utf-8').replace('</head>', '<meta name="emre-token" content="'+KEY+'"></head>', 1).encode()
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Content-Length',str(len(html))); self.send_header('Cache-Control','no-store')
-            self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY'); self.end_headers(); self.wfile.write(html); return
+            self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY')
+            # Yalnızca kendi kaynağımıza bağlanılabilir; dış script/çerçeve engellenir.
+            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            self.end_headers(); self.wfile.write(html); return
         if path=='/favicon.ico':
             icon=ROOT/'emre.ico'
             if not icon.is_file(): return self.out({'error':'Bulunamadı'},404)
@@ -247,30 +359,50 @@ class Handler(BaseHTTPRequestHandler):
                                  'speech_installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file(),
                                  'piper_installed':any(tts_piper_bridge.installed(v) for v in ('dfki','fahrettin','fettah')),
                                  'openjarvis_online':openjarvis_online,'arena_status':arena_bridge.snapshot().get('status','stopped'),
-                                 'apps_supported':os.name=='nt','internet_access':internet_available()})
+                                 'apps_supported':os.name=='nt','internet_access':internet_available(),
+                                 'telegram':BOT.status(),'telegram_unread':BOT.messages(1).get('unread',0) if BOT.configured() else 0,
+                                 'arena_message':arena_bridge.snapshot().get('message','')})
             if path=='/api/accounts':
                 with db() as c: rows=c.execute('SELECT name,note FROM accounts ORDER BY name').fetchall()
                 return self.out({'accounts':[{'name':r[0],'note':r[1]} for r in rows]})
             if path=='/api/ledger':
-                with db() as c: rows=c.execute('SELECT id,person,kind,amount,note,due,created FROM ledger ORDER BY id DESC').fetchall()
-                return self.out({'entries':[{'id':r[0],'person':r[1],'kind':r[2],'amount':r[3],'note':r[4],'due':r[5],'created':r[6]} for r in rows]})
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try:
+                    limit=min(max(int(query.get('limit',500)),1),2000)
+                    offset=max(int(query.get('offset',0)),0)
+                except ValueError: raise ValueError('Sayfalama parametreleri geçersiz.')
+                with db() as c:
+                    total=c.execute('SELECT COUNT(*) FROM ledger').fetchone()[0]
+                    rows=c.execute('SELECT id,person,kind,amount,note,due,created,source FROM ledger ORDER BY id DESC LIMIT ? OFFSET ?',(limit,offset)).fetchall()
+                return self.out({'entries':[{'id':r[0],'person':r[1],'kind':r[2],'amount':r[3],'note':r[4],'due':r[5],'created':r[6],'source':r[7] or 'manual'} for r in rows],
+                                 'total':total,'limit':limit,'offset':offset})
+            if path=='/api/ledger/export':
+                return self.export_ledger(urlparse(self.path).query)
+            if path=='/api/backup':
+                return self.export_backup()
             if path=='/api/reminders':
                 with db() as c: rows=c.execute('SELECT id,text,due,done FROM reminders ORDER BY due').fetchall()
                 return self.out({'reminders':[{'id':r[0],'text':r[1],'due':r[2],'done':bool(r[3])} for r in rows]})
+            if path=='/api/history':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                session=query.get('session','')
+                with db() as c:
+                    if session:
+                        rows=c.execute('SELECT role,text,created FROM messages WHERE session=? ORDER BY id',(session,)).fetchall()
+                        if not rows: raise ValueError('Bu oturumda kayıt bulunamadı.')
+                        return self.out({'session':session,'messages':[{'role':r[0],'text':r[1],'created':r[2]} for r in rows]})
+                    rows=c.execute('SELECT session,COUNT(*),MIN(created),MAX(created) FROM messages GROUP BY session ORDER BY MAX(created) DESC LIMIT 50').fetchall()
+                    sessions=[]
+                    for sid,count,first,last in rows:
+                        preview=c.execute("SELECT text FROM messages WHERE session=? AND role='user' ORDER BY id LIMIT 1",(sid,)).fetchone()
+                        sessions.append({'session':sid,'count':count,'first':first,'last':last,
+                                         'preview':(preview[0][:80] if preview else '')})
+                return self.out({'sessions':sessions})
             if path=='/api/telegram/updates':
-                query={'timeout':0,'limit':30,'allowed_updates':['message']}
-                if TG_OFFSET['value'] is not None: query['offset']=TG_OFFSET['value']
-                result=telegram('getUpdates',query)
-                if not result.get('ok'): raise ValueError('Telegram isteği başarısız.')
-                messages=[]
-                for u in result.get('result',[]):
-                    if type(u.get('update_id')) is int:
-                        TG_OFFSET['value']=u['update_id']+1
-                    m=u.get('message',{}); chat=m.get('chat',{})
-                    if m.get('text'):
-                        messages.append({'chat_id':chat.get('id'),'from':chat.get('first_name','Kullanıcı'),'text':m['text'],
-                                         'date':m.get('date'),'message_id':m.get('message_id')})
-                return self.out({'messages':messages,'next_offset':TG_OFFSET['value']})
+                if not BOT.configured(): raise ValueError('Telegram bot anahtarı ayarlanmamış.')
+                data=BOT.messages(50)
+                data['status']=BOT.status()
+                return self.out(data)
             return self.out({'error':'Bulunamadı'},404)
         except ValueError as e: return self.out({'error':str(e)},400)
         except Exception as e: return self.out({'error':friendly_error(e)},400)
@@ -365,12 +497,20 @@ class Handler(BaseHTTPRequestHandler):
                     info=request_json('https://api.telegram.org/bot'+candidate+'/getMe', timeout=15)
                     if not info.get('ok') or not info.get('result',{}).get('is_bot'): raise ValueError()
                 except Exception: raise ValueError('Bot doğrulanamadı. Anahtarı ve internet bağlantısını kontrol et.')
-                TOKEN=candidate; TG_OFFSET['value']=None
+                TOKEN=candidate
+                BOT.start(candidate)
                 return self.out({'ok':True,'username':info['result'].get('username','')})
             if path=='/api/telegram/disconnect':
                 TOKEN=''
-                TG_OFFSET['value']=None
+                BOT.stop()
                 return self.out({'ok':True})
+            if path=='/api/telegram/mark-read':
+                BOT.mark_read()
+                return self.out({'ok':True})
+            if path=='/api/telegram/poll':
+                if not BOT.configured(): raise ValueError('Telegram bot anahtarı ayarlanmamış.')
+                BOT.start(TOKEN)
+                return self.out({'ok':True,'status':BOT.status()})
             if path=='/api/chat':
                 messages=data.get('messages',[])
                 if not isinstance(messages,list): raise ValueError('Mesaj listesi geçersiz.')
@@ -380,16 +520,27 @@ class Handler(BaseHTTPRequestHandler):
                 selected=str(data.get('model') or MODEL).strip()
                 if len(selected)>200: raise ValueError('Model adı çok uzun.')
                 if not re.fullmatch(r'[\w.\-:/]{1,200}',selected): raise ValueError('Model adı geçersiz.')
+                last_user = next((m['content'] for m in reversed(clean) if m['role']=='user'), '')
+                session=str(data.get('session') or '').strip()[:80]
+                if session and not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',session): session=''
+                if session: store_message(session,'user',last_user)
+                def yanitla(text):
+                    if session: store_message(session,'assistant',text)
+                    return self.out({'reply':text})
+                direct=ledger_tools.create_account_from_text(last_user,db)
+                if direct is not None: return yanitla(direct)
+                # Hatırlatıcı niyeti modelden önce kural tabanlı çözülür (A1).
+                direct=hatirlatici.direct_reminder_action(last_user,db)
+                if direct is not None: return yanitla(direct)
+                direct=ledger_tools.direct_ledger_action(last_user,db)
+                if direct is not None: return yanitla(direct)
+                # Model kontrolü kural tabanlı işlemlerden SONRA yapılır: Ollama kapalıyken
+                # bile hatırlatıcı ve defter komutları çalışmaya devam eder.
                 installed={m.get('name') for m in request_json(OLLAMA+'/api/tags',timeout=5).get('models',[])}
                 if selected not in installed and selected+':latest' not in installed: raise ValueError('Seçilen model Ollama üzerinde kurulu değil.')
                 # Qwen3 supports both the API flag and an explicit no-thinking directive.
                 if selected.lower().startswith('qwen3'):
                     clean[-1]['content'] += '\n/no_think'
-                last_user = next((m['content'] for m in reversed(clean) if m['role']=='user'), '')
-                direct=ledger_tools.create_account_from_text(last_user,db)
-                if direct is not None: return self.out({'reply':direct})
-                direct=ledger_tools.direct_ledger_action(last_user,db)
-                if direct is not None: return self.out({'reply':direct})
                 system=SYSTEM+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
                 backend=data.get('backend','ollama')
                 if backend=='openjarvis':
@@ -405,21 +556,27 @@ class Handler(BaseHTTPRequestHandler):
                 else: raise ValueError('Bilinmeyen yapay zekâ bağlantısı.')
                 calls=msg.get('tool_calls') or []
                 if calls:
-                    if len(calls)!=1: return self.out({'reply':'Bir seferde tek defter işlemi yapabiliyorum; lütfen işlemleri ayrı ayrı söyle.'})
+                    if len(calls)!=1: return yanitla('Bir seferde tek işlem yapabiliyorum; lütfen işlemleri ayrı ayrı söyle.')
                     fn=calls[0].get('function',{})
                     try: reply=ledger_tools.execute(fn.get('name'),fn.get('arguments',{}),db,last_user)
                     except (ValueError,TypeError,KeyError) as err: reply='Kayıt yapılmadı: '+str(err)
-                    return self.out({'reply':reply})
+                    return yanitla(reply)
                 raw_content=msg.get('content','') or ''
                 # Never read a model-generated tool JSON aloud or mistake it for a successful action.
                 try: raw_json=json.loads(raw_content.strip())
                 except (ValueError,TypeError): raw_json=None
                 if (isinstance(raw_json,dict) and ('arguments' in raw_json or 'tool_calls' in raw_json)) or re.search(r'["\'](?:arguments|tool_calls)["\']\s*:', raw_content):
-                    return self.out({'reply':'İşlemi anlayamadım; kayıt oluşturulmadı. Hesap adını ve yapmak istediğin işlemi tekrar söyle.'})
+                    return yanitla('İşlemi anlayamadım; kayıt oluşturulmadı. Hesap adını ve yapmak istediğin işlemi tekrar söyle.')
                 reply=clean_reply(raw_content)
                 if re.search(r'(?i)kay[ıi]t (?:edildi|oluşturuldu)|kaydetti[mn]|deftere (?:ekledim|işledim)|hatırlatıcı (?:oluşturdum|ayarladım)|(?:alacak|verecek|hesap|defter|ödeme|tahsilat).{0,120}(?:gerçekleştirdim|ekledim|oluşturdum|sildim|kaydedildi|yaptım)',reply):
                     reply='Bu işlem için deftere kayıt yapılmadı. Kişiyi, tutarı ve işlem türünü açıkça belirt.'
-                return self.out({'reply':reply})
+                return yanitla(reply)
+            if path=='/api/history/delete':
+                if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
+                session=text_field(data,'session',80,label='Oturum')
+                with db() as c:
+                    cur=c.execute('DELETE FROM messages WHERE session=?',(session,)) if session else c.execute('DELETE FROM messages')
+                return self.out({'ok':True,'deleted':cur.rowcount})
             if path=='/api/accounts/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
                 name=str(data.get('name','')).strip()
@@ -473,8 +630,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/telegram/send':
                 if data.get('confirmed') is not True: raise ValueError('Gönderme onayı gerekli.')
                 chat_id=int_field(data,'chat_id',-2**53,2**53,label='Sohbet kimliği'); text=text_field(data,'text',4096,required=True,label='Mesaj')
-                result=telegram('sendMessage',{'chat_id':chat_id,'text':text})
-                if not result.get('ok'): raise ValueError('Telegram mesajı gönderemedi.')
+                BOT.send(chat_id,text)
                 return self.out({'ok':True})
             return self.out({'error':'Bulunamadı'},404)
         except urllib.error.HTTPError as e:
@@ -499,6 +655,9 @@ if __name__=='__main__':
         print('8765 portu kullanılıyor. Açık Emre penceresini kapatıp tekrar deneyin.',flush=True)
         print('Ayrıntı:',exc,flush=True)
         sys.exit(1)
+    if TOKEN:
+        BOT.start(TOKEN)
+        print('Telegram arka plan yoklaması açık.',flush=True)
     print('EMRE: http://127.0.0.1:8765 | Model:',MODEL,flush=True)
     print('Yalnızca bu bilgisayardan erişim. Durdurmak için Ctrl+C.',flush=True)
     try:

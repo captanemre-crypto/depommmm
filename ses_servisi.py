@@ -1,6 +1,9 @@
 """Long-lived local Whisper worker. One JSON request/response per line."""
-import json,sys,traceback
+import json
+import sys
+import traceback
 from pathlib import Path
+
 
 def log_error():
     try:
