@@ -1,0 +1,11 @@
+{
+  "git.autofetch": true,
+  "git.autofetchPeriod": 60,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "sync",
+  "git.showPushSuccessNotification": true,
+  "git.autorefresh": true,
+  "git.branchProtection": ["main"],
+  "scm.defaultViewMode": "tree"
+}
