@@ -115,8 +115,9 @@ document.getElementById('providerTab').onclick=async()=>{
   const body=document.getElementById('settingsBody');
   body.replaceChildren();
   body.append(element('h2','Ücretsiz API sağlayıcısı'),
-    element('p','Ollama kurmadan da çalışabilirsin: OpenAI uyumlu (/v1/chat/completions) her servis bağlanabilir. '+
-      'Anahtar yalnızca bu bilgisayarda, sunucu tarafında saklanır; tarayıcıya geri gönderilmez.'));
+    element('p','Ollama kurmadan da çalışabilirsin: OpenAI uyumlu (/v1/chat/completions) her servis bağlanabilir — '+
+      '9Router, OmniRoute, OpenRouter, Groq, Cerebras, Gemini. Anahtar yalnızca bu bilgisayarda, sunucu tarafında saklanır; '+
+      'tarayıcıya geri gönderilmez.'));
   let durum;
   try{ durum=await api('/api/provider/status'); }
   catch(e){ body.append(element('p',e.message)); return; }
@@ -145,6 +146,39 @@ document.getElementById('providerTab').onclick=async()=>{
   };
   preset.onchange();
 
+  const taramaKutusu=document.createElement('div');
+  taramaKutusu.style.cssText='display:grid;gap:8px;margin:6px 0';
+  const tara=button('Yerel geçitleri tara',async()=>{
+    taramaKutusu.replaceChildren(element('p','Yerel geçitler yoklanıyor…'));
+    try{
+      const ekPortlar=[];
+      try{
+        const u=new URL(taban.value.trim());
+        if(['127.0.0.1','localhost','[::1]'].includes(u.hostname)&&u.port) ekPortlar.push(Number(u.port));
+      }catch(e){/* adres henüz yazılmamış olabilir */}
+      const r=await api('/api/provider/scan',{ports:ekPortlar});
+      taramaKutusu.replaceChildren();
+      if(!r.total_alive){
+        const p=element('p','Kendi bilgisayarında açık bir geçit bulunamadı. 9Router için: npm i -g 9router → 9router → panel http://localhost:20128/dashboard');
+        p.className='hint'; taramaKutusu.append(p);
+      }
+      for(const g of r.gateways){
+        if(!g.alive) continue;
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #31454c;border-radius:6px;padding:8px';
+        const bilgi=element('span',g.ad+' · '+g.base_url+' · '+(g.needs_key?'anahtar istiyor':(g.models.length+' model')));
+        const kullan=button('Kullan',()=>{
+          taban.value=g.base_url;
+          bilgi.textContent=g.ad+' · '+g.base_url+' seçildi';
+          if(!g.needs_key) anahtar.value='';
+          listele.click();
+        });
+        satir.append(bilgi,kullan);
+        taramaKutusu.append(satir);
+        if(g.needs_key){const n=element('p','Anahtarı 9Router panelinden (API Keys) kopyalayıp yukarıdaki alana yapıştır.');n.className='hint';taramaKutusu.append(n)}
+      }
+    }catch(e){ taramaKutusu.replaceChildren(element('p',e.message)); }
+  });
   const listele=button('Modelleri getir',async()=>{
     try{
       bilgi.textContent='Modeller alınıyor…';
@@ -184,10 +218,11 @@ document.getElementById('providerTab').onclick=async()=>{
     : 'Henüz bağlı değil.');
   durumSatiri.className='hint';
 
-  kutu.append(durumSatiri,preset,taban,anahtar,not,modeller,listele,bilgi,baglan,kes,
+  kutu.append(durumSatiri,preset,taban,anahtar,not,tara,taramaKutusu,modeller,listele,bilgi,baglan,kes,
     (()=>{const p=element('p','Ücretsiz kotalar: OpenRouter ":free" modelleri günlük istek sınırına tabidir; '+
-      'OmniRoute kendi bilgisayarında çalışır ve birden çok sağlayıcıyı sırayla dener. Sınır dolduğunda 429 hatası alırsın, '+
-      'başka bir model seçebilir veya Ollama’ya dönebilirsin.');p.className='hint';return p})());
+      '9Router/OmniRoute kendi bilgisayarında çalışır ve birden çok sağlayıcıyı sırayla dener (combo). Sınır dolduğunda 429 '+
+      'hatası alırsın, başka bir model seçebilir veya Ollama’ya dönebilirsin. 9Router model adları kr/, if/, cc/ gibi ön ekler '+
+      'taşır; panelde oluşturduğun combo adını da model olarak yazabilirsin (ör. free-combo).');p.className='hint';return p})());
   body.append(kutu);
   if(durum.configured) listele.click();
 };

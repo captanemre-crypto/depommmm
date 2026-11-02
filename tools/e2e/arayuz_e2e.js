@@ -375,6 +375,27 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert(durum.configured === false, 'sunucuda anahtar kaldı');
   });
 
+
+  await check('ücretsiz API: yerel geçit taraması çalışıyor (9Router desteği)', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('providerTab').click();
+    await sleep(600);
+    const metin = () => $('settingsBody').textContent;
+    const inputs = [...$('settingsBody').querySelectorAll('input')];
+    inputs[0].value = 'http://127.0.0.1:8899/v1';
+
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Yerel geçitleri tara').click();
+    await sleep(2200);
+    assert(/Yerel geçit \(port 8899\)/.test(metin()), 'yazılan adresin portu taranmadı: ' + metin().slice(-200));
+    assert(/3 model/.test(metin()), 'model sayısı gösterilmedi: ' + metin().slice(-200));
+
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Kullan').click();
+    await sleep(1200);
+    assert(inputs[0].value === 'http://127.0.0.1:8899/v1', 'adres alanı dolmadı: ' + inputs[0].value);
+    assert(/3 model bulundu/.test(metin()), 'Kullan sonrası modeller gelmedi: ' + metin().slice(-200));
+  });
+
   await check('ücretsiz API: https zorunluluğu arayüzde bildiriliyor', async () => {
     $('providerTab').click();
     await sleep(500);

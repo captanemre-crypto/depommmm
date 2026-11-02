@@ -93,3 +93,23 @@ Bilinçli sınırlar:
 - Ücretsiz kotalar sağlayıcıya göre değişir; "sınırsız" iddiaları garanti değildir, kod 429'u anlaşılır biçimde bildirir.
 - Sağlayıcıya gönderilen mesajlar o servisin gizlilik politikasına tabidir; hassas veri için yerel Ollama/OmniRoute önerilir.
 - Otomatik yedekleme (bir sağlayıcı 429 verince diğerine geçme) yapılmaz; kullanıcı modeli elle seçer.
+
+## Ek tur: 9Router entegrasyonu
+
+**İstek:** "9router da entegre et."
+**Yaklaşım:** 9Router da OpenAI uyumlu `/v1` sunduğu için ayrı bir istemci yazmak yerine mevcut sağlayıcı katmanına **ön ayar + otomatik keşif** olarak eklendi.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| J1 | `HAZIR` listesine **9Router** (`http://127.0.0.1:20128/v1`) ve **9Router Go** (`http://127.0.0.1:20130/v1`) eklendi; panelden alınan `sk_...` anahtarı ve `kr/`, `if/`, combo adları açıklandı | ✅ |
+| J2 | `Saglayici.tara()`: yalnızca `127.0.0.1` üzerindeki bilinen portları (20128, 20130, 11434, 1234, 8080, 8787) paralel yoklar; açık / anahtar isteyen / kapalı ayrımı yapar | ✅ |
+| J3 | `POST /api/provider/scan` uç noktası; adres istemciden alınmaz, yalnızca ek **port numarası** verilebilir (en fazla 12) → SSRF yüzeyi yok | ✅ |
+| J4 | Arayüz: "Yerel geçitleri tara" düğmesi, bulunan geçitleri adres + model sayısı ile listeler, "Kullan" formu doldurup modelleri getirir; anahtar isteyen geçitte panel yönlendirmesi gösterilir | ✅ |
+| J5 | Aynı 20128 portunu 9Router / OmniRoute / FlagshipRouter paylaştığı için arayüz ve README'de uyarı | ✅ |
+| J6 | Testler: 5 yeni birim testi (`test_saglayici.py` → 20) + 2 uç nokta testi (`test_server.py` → 43) + 1 E2E kontrolü (33) | ✅ |
+
+Bilinçli sınırlar:
+
+- 9Router'ın OAuth ile bağladığı hesaplar (Kiro, Codex, Copilot vb.) Emre'de **yapılandırılmaz**; Emre yalnızca 9Router'ın `/v1` uç noktasını kullanır. Hesap/anahtar yönetimi 9Router panelinde kalır.
+- Tarama yalnızca bilinen portları dener; keyfi port taraması (port scanning) yapılmaz.
+- 9Router "sınırsız" iddiaları sağlayıcı politikalarına bağlıdır ve değişebilir.

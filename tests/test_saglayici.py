@@ -54,6 +54,29 @@ class SahteSaglayici(BaseHTTPRequestHandler):
         return self._json(200, {'choices': [{'message': {'role': 'assistant', 'content': 'Merhaba, nasıl yardımcı olabilirim?'}}]})
 
 
+class AnahtarIsteyenGecit(BaseHTTPRequestHandler):
+    """9Router gibi davranır: /models için geçerli anahtar (Bearer sk_test) ister."""
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        if self.headers.get('Authorization') != 'Bearer sk_test':
+            veri = b'{"error":{"message":"unauthorized"}}'
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(veri)))
+            self.end_headers()
+            self.wfile.write(veri)
+            return
+        veri = json.dumps({'data': [{'id': 'kr/claude-sonnet-4.5'}, {'id': 'free-combo'}]}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(veri)))
+        self.end_headers()
+        self.wfile.write(veri)
+
+
 class SaglayiciTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -160,6 +183,48 @@ class SaglayiciTest(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             self.sag.sohbet([{'role': 'user', 'content': 'x'}])
         self.assertIn('OmniRoute', str(ctx.exception))
+
+    # --- 9Router / yerel geçit taraması -----------------------------------
+    def test_presets_include_9router(self):
+        adlar = [p['ad'] for p in saglayici.HAZIR]
+        adresler = [p['base_url'] for p in saglayici.HAZIR]
+        self.assertTrue(any('9Router' in a for a in adlar))
+        self.assertIn('http://127.0.0.1:20128/v1', adresler)
+        self.assertIn('http://127.0.0.1:20130/v1', adresler)
+
+    def test_scan_finds_local_gateway(self):
+        sonuc = self.sag.tara(ek_portlar=[self.port], zaman=1)
+        bulunan = [g for g in sonuc if g['base_url'].endswith(f':{self.port}/v1')]
+        self.assertEqual(len(bulunan), 1)
+        self.assertTrue(bulunan[0]['alive'])
+        self.assertFalse(bulunan[0]['needs_key'])
+        self.assertEqual(len(bulunan[0]['models']), len(MODELLER))
+
+    def test_scan_marks_key_requiring_gateway(self):
+        httpd = ThreadingHTTPServer(('127.0.0.1', 0), AnahtarIsteyenGecit)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            sonuc = self.sag.tara(ek_portlar=[port], zaman=1)
+            bulunan = [g for g in sonuc if g['port'] == port][0]
+            self.assertTrue(bulunan['alive'], 'anahtar isteyen geçit de ayakta sayılmalı')
+            self.assertTrue(bulunan['needs_key'])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+    def test_scan_only_targets_loopback(self):
+        sonuc = self.sag.tara(ek_portlar=['abc', 'http://kötü.example', 70000, -1, None], zaman=0.2)
+        self.assertTrue(sonuc)
+        for g in sonuc:
+            self.assertTrue(g['base_url'].startswith('http://127.0.0.1:'), g['base_url'])
+        self.assertEqual(len(sonuc), len(saglayici.YEREL_GECITLER))
+        self.assertTrue(all(not g['alive'] for g in sonuc if g['port'] not in (self.port,)))
+
+    def test_scan_sorts_alive_first(self):
+        sonuc = self.sag.tara(ek_portlar=[self.port], zaman=1)
+        self.assertTrue(sonuc[0]['alive'])
+        self.assertTrue(all(not g['alive'] for g in sonuc[1:]))
 
     def test_missing_model_reports_clearly(self):
         self.sag.kaydet(self.base, 'test-anahtar', '')

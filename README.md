@@ -138,11 +138,16 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 1. Ayarlar → **Ücretsiz API** sekmesini aç.
 2. Hazır servislerden birini seç (adres otomatik dolar) veya kendi `/v1` adresini yaz.
 3. **Modelleri getir** ile model listesini çek (`:free` olan modeller listede başa alınır ve ★ ile işaretlenir).
+   - Emin değilsen **Yerel geçitleri tara** düğmesine bas: Emre kendi bilgisayarındaki bilinen geçit portlarını (20128, 20130, 11434, 1234, 8080, 8787) yoklar ve açık olanı "Kullan" ile forma doldurur. Anahtar isteyen geçitler "anahtar istiyor" diye ayrıca işaretlenir.
 4. Bir model seç, **Bağlan ve kaydet**'e bas. Bağlantı kesilene kadar sohbetler bu sağlayıcı üzerinden yürür.
+
+> **Not:** 9Router, OmniRoute ve FlagshipRouter varsayılan olarak aynı **20128** portunu kullanır; aynı anda yalnızca biri çalışabilir. 9Router Go 20130'u kullanır, ikisi birlikte çalışabilir.
 
 | Servis | Adres | Anahtar | Not |
 | --- | --- | --- | --- |
-| **OmniRoute** (önerilen, yerel) | `http://127.0.0.1:20128/v1` | gerekmez (yerelde `auto` modeli) | `npm i -g omniroute` ile kurulur, kendi bilgisayarında çalışır, birden çok ücretsiz sağlayıcıyı sırayla dener |
+| **9Router** (önerilen, yerel) | `http://127.0.0.1:20128/v1` | panelden alınır (`sk_...`) | `npm i -g 9router` → `9router`; panel `http://localhost:20128/dashboard`. Tek uç nokta, sağlayıcı rotasyonu + combo (yedekleme) desteği; model adları `kr/claude-sonnet-4.5`, `if/kimi-k2-thinking` gibi ön ek taşır |
+| **9Router Go** | `http://127.0.0.1:20130/v1` | panelden alınır | Tek dosyalık Go sürümü; Node.js gerekmez, portu 20130 |
+| **OmniRoute** (yerel, alternatif) | `http://127.0.0.1:20128/v1` | gerekmez (yerelde `auto` modeli) | `npm i -g omniroute` ile kurulur, kendi bilgisayarında çalışır, birden çok ücretsiz sağlayıcıyı sırayla dener |
 | OpenRouter | `https://openrouter.ai/api/v1` | gerekli | `:free` ekiyle biten modeller ücretsizdir, günlük istek sınırı vardır |
 | Groq | `https://api.groq.com/openai/v1` | gerekli | hızlı çıkarım, günlük ücretsiz kota |
 | Cerebras | `https://api.cerebras.ai/v1` | gerekli | günlük token kotası |
@@ -165,6 +170,7 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | --- | --- |
 | `GET /api/provider/status` | bağlı mı, adres, model, maskeli anahtar ve hazır servis listesi |
 | `POST /api/provider/models` | `{base_url, key}` → model listesi ve ücretsiz (`:free`) modeller ayrıca |
+| `POST /api/provider/scan` | `{ports:[...]}` → yalnız `127.0.0.1` üzerindeki bilinen geçit portlarını yoklar; açık olanları, model sayısını ve anahtar gerekip gerekmediğini döner |
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |

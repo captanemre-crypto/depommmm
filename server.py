@@ -33,7 +33,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.3'
+VERSION = '2026-11-02.4'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -504,6 +504,14 @@ class Handler(BaseHTTPRequestHandler):
                 modeller=SAG.modeller(base_url=taban or None, key=anahtar)
                 ucretsiz=[m for m in modeller if 'free' in m.lower()]
                 return self.out({'models':modeller,'free':ucretsiz,'total':len(modeller)})
+            if path=='/api/provider/scan':
+                # Yalnızca kendi bilgisayarındaki bilinen portlar denenir; adres
+                # istemciden alınmaz (yalnızca ek port numarası verilebilir).
+                ek=data.get('ports') or []
+                if not isinstance(ek,list) or len(ek)>12: raise ValueError('Port listesi geçersiz.')
+                bulunan=SAG.tara(ek_portlar=ek)
+                return self.out({'gateways':bulunan,'alive':[g for g in bulunan if g['alive']],
+                                 'total_alive':sum(1 for g in bulunan if g['alive'])})
             if path=='/api/provider/connect':
                 if data.get('confirmed') is not True: raise ValueError('Bağlantı için onay gerekli.')
                 taban=data.get('base_url'); anahtar=data.get('key'); model=data.get('model')

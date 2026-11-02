@@ -320,6 +320,19 @@ class ServerTestCase(unittest.TestCase):
         self.api('/api/provider/disconnect', {'confirmed': True})
         self.assertFalse(self.api('/api/provider/status')['configured'])
 
+    def test_provider_scan_finds_fake_gateway(self):
+        port = int(self.provider_base.rsplit(':', 1)[1].split('/')[0])
+        veri = self.api('/api/provider/scan', {'ports': [port]})
+        self.assertEqual(veri['total_alive'], 1)
+        bulunan = [g for g in veri['gateways'] if g['port'] == port][0]
+        self.assertTrue(bulunan['alive'])
+        self.assertTrue(bulunan['models'])
+        self.assertTrue(all(g['base_url'].startswith('http://127.0.0.1') for g in veri['gateways']))
+
+    def test_provider_scan_rejects_bad_port_list(self):
+        self.api('/api/provider/scan', {'ports': 'hepsi'}, expect=400)
+        self.api('/api/provider/scan', {'ports': list(range(1, 20))}, expect=400)
+
     def test_provider_rejects_plain_http_remote(self):
         error = self.api('/api/provider/models', {'base_url': 'http://kotu-site.example/v1'}, expect=400)['error']
         self.assertIn('https', error)

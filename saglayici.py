@@ -1,4 +1,4 @@
-"""OpenAI uyumlu sağlayıcı istemcisi (OmniRoute, OpenRouter, Groq, Gemini…).
+"""OpenAI uyumlu sağlayıcı istemcisi (9Router, OmniRoute, OpenRouter, Groq, Gemini…).
 
 Emre'nin yerel model zorunluluğunu kaldırır: `/v1/chat/completions` sunan her
 servis (kendi bilgisayarında çalışan OmniRoute gateway'i, OpenRouter'ın `:free`
@@ -9,6 +9,8 @@ Güvenlik notları
   ve arayüze asla tam olarak dönmez; yalnızca son 4 karakteri gösterilir.
 - Anahtar düz metin gitmesin diye `http://` yalnızca loopback adreslerinde
   (127.0.0.1 / localhost / ::1) kabul edilir; uzak adresler `https://` olmalıdır.
+- `tara()` yalnızca **kendi bilgisayarındaki** bilinen geçit portlarını yoklar
+  (adres kullanıcıdan alınmaz, hep 127.0.0.1 kullanılır).
 """
 import json
 import os
@@ -22,8 +24,25 @@ ROOT = Path(__file__).resolve().parent
 AYAR_DOSYASI = ROOT / 'saglayici_ayar.json'
 LOOPBACK = {'127.0.0.1', 'localhost', '::1', '0.0.0.0'}
 
+# `tara()` yalnızca bu portları ve yalnızca 127.0.0.1 adresini dener.
+YEREL_GECITLER = (
+    {'port': 20128, 'ad': '9Router / OmniRoute / FlagshipRouter', 'yol': '/v1',
+     'not': 'Bu portu üç geçit de varsayılan olarak kullanır; aynı anda yalnızca biri çalışabilir.'},
+    {'port': 20130, 'ad': '9Router Go', 'yol': '/v1', 'not': 'Go ile yazılmış tek dosyalık sürüm.'},
+    {'port': 11434, 'ad': 'Ollama (OpenAI uyumlu)', 'yol': '/v1', 'not': 'Yerel modeller; anahtar gerekmez.'},
+    {'port': 1234, 'ad': 'LM Studio', 'yol': '/v1', 'not': 'LM Studio sunucusu açıksa kullanılabilir.'},
+    {'port': 8080, 'ad': 'llama.cpp / vLLM', 'yol': '/v1', 'not': 'Yerel çıkarım sunucusu.'},
+    {'port': 8787, 'ad': 'Yerel yardımcı geçit', 'yol': '/v1', 'not': 'Sidecar/yardımcı sağlayıcı adaptörleri.'},
+)
+
 # Hazır seçenekler: arayüzde açılır liste olarak gösterilir.
 HAZIR = (
+    {'ad': '9Router (yerel gateway)', 'base_url': 'http://127.0.0.1:20128/v1',
+     'not': '9router.com — kendi bilgisayarında OpenAI uyumlu /v1 açar. Panelden '
+            '(http://localhost:20128/dashboard) bir API anahtarı oluşturup buraya yapıştır; '
+            'model adı kr/claude-sonnet-4.5 ya da kendi oluşturduğun combo (ör. free-combo) olabilir.'},
+    {'ad': '9Router Go (tek dosya sürüm)', 'base_url': 'http://127.0.0.1:20130/v1',
+     'not': '9router-go portu 20130; panelden aldığın anahtarı gir. 9Router ile aynı model adlarını kullanır.'},
     {'ad': 'OmniRoute (yerel gateway)', 'base_url': 'http://127.0.0.1:20128/v1',
      'not': 'npm i -g omniroute ile kurulur; kendi bilgisayarında /v1 açar. Anahtar gerekmez.'},
     {'ad': 'OpenRouter', 'base_url': 'https://openrouter.ai/api/v1',
@@ -97,6 +116,64 @@ class Saglayici:
         except FileNotFoundError:
             pass
 
+    def tara(self, ek_portlar=None, zaman=0.8):
+        """Kendi bilgisayarındaki bilinen OpenAI uyumlu geçitleri yoklar.
+
+        Adres hiçbir zaman kullanıcıdan gelmez: her deneme
+        `http://127.0.0.1:<port>/v1/models` biçimindedir. `ek_portlar` yalnızca
+        ek port numarası ekler (testler ve özel kurulumlar için).
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        hedefler = [dict(g) for g in YEREL_GECITLER]
+        for ham in (ek_portlar or []):
+            try:
+                port = int(ham)
+            except (TypeError, ValueError):
+                continue
+            if not 1 <= port <= 65535 or any(g['port'] == port for g in hedefler):
+                continue
+            hedefler.append({'port': port, 'ad': f'Yerel geçit (port {port})', 'yol': '/v1',
+                             'not': 'Elle eklenen yerel adres.'})
+
+        def _dene(hedef):
+            adres = f"http://127.0.0.1:{hedef['port']}{hedef['yol']}"
+            sonuc = {'ad': hedef['ad'], 'base_url': adres, 'port': hedef['port'],
+                     'alive': False, 'needs_key': False, 'models': [], 'note': hedef['not']}
+            istek = urllib.request.Request(adres + '/models',
+                                           headers={'Accept': 'application/json'})
+            try:
+                with urllib.request.urlopen(istek, timeout=zaman) as yanit:
+                    govde = json.loads(yanit.read().decode('utf-8', 'replace') or '{}')
+            except urllib.error.HTTPError as hata:
+                # 401/403: sunucu ayakta ama anahtar istiyor (9Router böyle davranır).
+                sonuc['alive'] = hata.code in (401, 403)
+                sonuc['needs_key'] = sonuc['alive']
+                if not sonuc['alive']:
+                    sonuc['error'] = f'HTTP {hata.code}'
+                return sonuc
+            except (urllib.error.URLError, TimeoutError, OSError):
+                return sonuc
+            except ValueError:
+                sonuc['alive'] = True
+                sonuc['error'] = '/models JSON döndürmedi'
+                return sonuc
+            sonuc['alive'] = True
+            ham = govde.get('data') if isinstance(govde, dict) else None
+            adlar = []
+            for item in (ham or []):
+                if isinstance(item, dict) and item.get('id'):
+                    adlar.append(str(item['id']))
+                elif isinstance(item, str):
+                    adlar.append(item)
+            sonuc['models'] = sorted(set(adlar), key=str.lower)[:40]
+            return sonuc
+
+        with ThreadPoolExecutor(max_workers=min(8, len(hedefler))) as havuz:
+            sonuclar = list(havuz.map(_dene, hedefler))
+        sonuclar.sort(key=lambda s: (not s['alive'], s['port']))
+        return sonuclar
+
     def durum(self):
         """Arayüze dönen özet: anahtar asla tam gönderilmez."""
         veri = self.yukle()
@@ -129,8 +206,10 @@ class Saglayici:
             raise ValueError(self._http_mesaji(hata))
         except urllib.error.URLError:
             if ayar['base_url'].startswith('http://127.0.0.1') or 'localhost' in ayar['base_url']:
-                raise ValueError('Yerel API sunucusuna ulaşılamadı. OmniRoute çalışıyor mu? '
-                                 '(npm i -g omniroute, ardından varsayılan adres http://127.0.0.1:20128/v1)')
+                raise ValueError('Yerel API sunucusuna ulaşılamadı. 9Router/OmniRoute çalışıyor mu? '
+                                 '(9Router varsayılan: http://127.0.0.1:20128/v1, 9Router Go: '
+                                 'http://127.0.0.1:20130/v1). Ayarlar > Ücretsiz API > '
+                                 '“Yerel geçitleri tara” ile açık olanı bulabilirsin.')
             raise ValueError('Sağlayıcıya ulaşılamadı. Adresi ve internet bağlantısını kontrol et.')
         except TimeoutError:
             raise ValueError('Sağlayıcı zamanında yanıt vermedi; tekrar dene.')
