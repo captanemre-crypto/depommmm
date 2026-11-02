@@ -57,7 +57,7 @@ document.getElementById('mic').onclick=()=>toggle.click();document.querySelector
 
 const apiToken=document.querySelector('meta[name="emre-token"]')?.content;let conversation=[],busy=false;try{conversation=JSON.parse(localStorage.getItem('emre-context')||'[]').slice(-12)}catch(e){conversation=[]}
 async function api(path,data){if(!apiToken)throw Error('Yerel sunucu çalışmıyor. py server.py ile başlatıp http://127.0.0.1:8765 adresini aç.');let opt={headers:{'X-Emre-Token':apiToken}};if(data!==undefined){opt.method='POST';opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(data)}let res=await fetch(path,opt);if(res.status===403){throw Error('Oturum anahtarı geçersiz. Sunucu yeniden başlatılmış olabilir; sayfayı yenile (F5).')}let j=await res.json();if(!res.ok)throw Error(j.error||'İşlem başarısız');return j}
-async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await api('/api/chat',{messages:conversation,model:localStorage.getItem('emre-model')||null,backend:localStorage.getItem('emre-backend')||'ollama',session:activeChatId||''});let answer=(r.reply||'Model boş yanıt verdi.').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';answer=answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer)}catch(e){conversation.pop();say('Ollama ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
+async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await api('/api/chat',{messages:conversation,model:localStorage.getItem('emre-model')||null,backend:localStorage.getItem('emre-backend')||'ollama',session:activeChatId||''});let answer=(r.reply||'Model boş yanıt verdi.').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';answer=answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer)}catch(e){conversation.pop();let etiket=(localStorage.getItem('emre-backend')==='api')?'Yapay zekâ sağlayıcısı':'Ollama';say(etiket+' ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
 function panel(title){returnHome();document.querySelector('main > .content').hidden=true;document.getElementById('simplePage').hidden=false;document.getElementById('simpleTitle').textContent=title;let body=document.getElementById('simpleBody');body.replaceChildren();window.scrollTo({top:0,behavior:'smooth'});return body}document.getElementById('closeFeatures').onclick=()=>document.getElementById('features').hidden=true;
 function element(tag,text){let x=document.createElement(tag);x.textContent=text;return x}function field(placeholder,type='text'){let x=document.createElement('input');x.placeholder=placeholder;x.type=type;x.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:5px;max-width:100%';return x}function button(text,cb){let b=element('button',text);b.className='iconbtn';b.style.margin='5px';b.onclick=cb;return b}
 async function showReminders(){let body=panel('Hatırlatıcılar'),text=field('Hatırlatıcı'),due=field('', 'datetime-local');body.append(text,due,button('Ekle',async()=>{try{await api('/api/reminders',{text:text.value,due:due.value});showReminders()}catch(e){notify(e.message)}}));try{let r=await api('/api/reminders');if(!r.reminders.length)body.append(element('p','Henüz hatırlatıcı yok.'));for(let item of r.reminders){let row=element('p',`${item.done?'✓':'◷'} ${item.text} — ${item.due.replace('T',' ')}`);if(!item.done)row.append(button('Tamamlandı',async()=>{await api('/api/reminders/done',{id:item.id});showReminders()}));row.append(button('Sil',async()=>{if(!confirm('Bu hatırlatıcı silinsin mi?'))return;try{await api('/api/reminders/delete',{id:item.id,confirmed:true});showReminders();notify('Hatırlatıcı silindi.')}catch(e){notify(e.message)}}));body.append(row)}if('Notification' in window&&Notification.permission==='default')body.append(button('Bildirim izni ver',()=>Notification.requestPermission()))}catch(e){body.append(element('p',e.message))}}
@@ -202,6 +202,17 @@ document.getElementById('providerTab').onclick=async()=>{
     }catch(e){ notify(e.message); }
   });
 
+  const testEt=button('Bağlantıyı test et',async()=>{
+    try{
+      bilgi.textContent='Sağlayıcıya minik bir deneme isteği gönderiliyor…';
+      const cevap=await api('/api/provider/test',{model:modeller.value||durum.model||null});
+      bilgi.textContent='Çalışıyor ✅ · model: '+(cevap.model||modeller.value||'-')+' · yanıt: “'+(cevap.reply||'')+'”';
+    }catch(e){
+      bilgi.textContent='Test başarısız: '+e.message;
+      notify(e.message.slice(0,180));
+    }
+  });
+
   const kes=button('Bağlantıyı kes',async()=>{
     if(!confirm('Saklanan API anahtarı silinsin ve bağlantı kesilsin mi?')) return;
     try{
@@ -218,11 +229,13 @@ document.getElementById('providerTab').onclick=async()=>{
     : 'Henüz bağlı değil.');
   durumSatiri.className='hint';
 
-  kutu.append(durumSatiri,preset,taban,anahtar,not,tara,taramaKutusu,modeller,listele,bilgi,baglan,kes,
+  kutu.append(durumSatiri,preset,taban,anahtar,not,tara,taramaKutusu,modeller,listele,bilgi,baglan,testEt,kes,
     (()=>{const p=element('p','Ücretsiz kotalar: OpenRouter ":free" modelleri günlük istek sınırına tabidir; '+
       '9Router/OmniRoute kendi bilgisayarında çalışır ve birden çok sağlayıcıyı sırayla dener (combo). Sınır dolduğunda 429 '+
       'hatası alırsın, başka bir model seçebilir veya Ollama’ya dönebilirsin. 9Router model adları kr/, if/, cc/ gibi ön ekler '+
-      'taşır; panelde oluşturduğun combo adını da model olarak yazabilirsin (ör. free-combo).');p.className='hint';return p})());
+      'taşır; panelde oluşturduğun combo adını da model olarak yazabilirsin (ör. free-combo). '+
+      'Liste geliyor ama sohbet “401: Missing API key” diyorsa bu geçidin bilinen bir hatasıdır: geçidi yeniden '+
+      'başlat, başka bir model seç ya da OpenRouter/Groq gibi doğrudan bir sağlayıcıya geç.');p.className='hint';return p})());
   body.append(kutu);
   if(durum.configured) listele.click();
 };

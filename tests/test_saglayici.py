@@ -77,6 +77,33 @@ class AnahtarIsteyenGecit(BaseHTTPRequestHandler):
         self.wfile.write(veri)
 
 
+class YedekBaslikGecidi(BaseHTTPRequestHandler):
+    """Bilinen 9Router/OmniRoute hatası: /models Bearer ile çalışır,
+    /chat/completions ise anahtarı yalnızca `x-api-key` başlığından okur."""
+
+    def log_message(self, *args):
+        pass
+
+    def _json(self, kod, govde):
+        veri = json.dumps(govde).encode()
+        self.send_response(kod)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(veri)))
+        self.end_headers()
+        self.wfile.write(veri)
+
+    def do_GET(self):
+        if self.headers.get('Authorization') != 'Bearer sk_test':
+            return self._json(401, {'error': {'message': 'unauthorized'}})
+        self._json(200, {'data': [{'id': 'kr/claude-sonnet-4.5'}]})
+
+    def do_POST(self):
+        if self.headers.get('x-api-key') != 'sk_test':
+            return self._json(401, {'error': {'message': '[401]: Missing API key.',
+                                              'code': 'invalid_api_key'}})
+        self._json(200, {'choices': [{'message': {'role': 'assistant', 'content': 'hazır'}}]})
+
+
 class SaglayiciTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -165,6 +192,27 @@ class SaglayiciTest(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             self.sag.sohbet([{'role': 'user', 'content': 'x'}])
         self.assertIn('401', str(ctx.exception))
+
+    def test_missing_api_key_retries_with_x_api_key(self):
+        httpd = ThreadingHTTPServer(('127.0.0.1', 0), YedekBaslikGecidi)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            self.sag.kaydet(f'http://127.0.0.1:{port}/v1', 'sk_test', 'kr/claude-sonnet-4.5')
+            cevap = self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
+            self.assertIn('hazır', cevap.get('content', ''))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+    def test_auth_error_mentions_gateway_hint(self):
+        self.sag.kaydet(self.base, 'gecersiz', 'm')
+        with self.assertRaises(ValueError) as ctx:
+            self.sag.sohbet([{'role': 'user', 'content': 'x'}])
+        mesaj = str(ctx.exception)
+        self.assertIn('401', mesaj)
+        self.assertIn('9Router', mesaj)
+        self.assertIn('Bağlantıyı test et', mesaj)
 
     def test_quota_error_explains_free_tier(self):
         self.sag.kaydet(self.base, 'test-anahtar', 'kota-dolu')

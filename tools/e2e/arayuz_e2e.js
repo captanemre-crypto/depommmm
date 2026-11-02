@@ -396,6 +396,29 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert(/3 model bulundu/.test(metin()), 'Kullan sonrası modeller gelmedi: ' + metin().slice(-200));
   });
 
+
+  await check('ücretsiz API: "Bağlantıyı test et" sağlayıcıyı doğruluyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('providerTab').click();
+    await sleep(700);
+    const inputs = [...$('settingsBody').querySelectorAll('input')];
+    inputs[0].value = 'http://127.0.0.1:8899/v1';
+    inputs[1].value = 'test-anahtar';
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Modelleri getir').click();
+    await sleep(1000);
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bağlan ve kaydet').click();
+    await sleep(1200);
+
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bağlantıyı test et').click();
+    await sleep(1500);
+    const metin = $('settingsBody').textContent;
+    assert(/Çalışıyor/.test(metin), 'test sonucu görünmedi: ' + metin.slice(-200));
+
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bağlantıyı kes').click();
+    await sleep(1000);
+  });
+
   await check('ücretsiz API: https zorunluluğu arayüzde bildiriliyor', async () => {
     $('providerTab').click();
     await sleep(500);

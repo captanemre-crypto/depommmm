@@ -76,6 +76,27 @@ def normalize_base(url):
     return temiz
 
 
+def _json_deneme(metin):
+    """Metni JSON'a çevirmeyi dener; olmazsa None döner."""
+    try:
+        return json.loads(metin)
+    except (ValueError, TypeError):
+        return None
+
+
+def _anahtar_eksik(govde, metin=''):
+    """Yanıt “anahtar yok/geçersiz” diyor mu? (geçit sürüm farkları için)"""
+    parca = ''
+    if isinstance(govde, dict):
+        hata = govde.get('error')
+        if isinstance(hata, dict):
+            parca = ' '.join(str(hata.get(k) or '') for k in ('message', 'code', 'type'))
+        elif isinstance(hata, str):
+            parca = hata
+    parca = (parca + ' ' + (metin or '')).lower()
+    return 'missing api key' in parca or 'no api key' in parca or 'invalid_api_key' in parca
+
+
 class Saglayici:
     def __init__(self, ayar_dosyasi=AYAR_DOSYASI):
         self.yol = Path(ayar_dosyasi)
@@ -198,40 +219,69 @@ class Saglayici:
             basliklar['Content-Type'] = 'application/json'
         if ayar['key']:
             basliklar['Authorization'] = 'Bearer ' + ayar['key']
-        istek = urllib.request.Request(url, data=data, headers=basliklar, method='POST' if data else 'GET')
         try:
-            with urllib.request.urlopen(istek, timeout=timeout) as yanit:
-                metin = yanit.read().decode('utf-8', 'replace')
+            return self._gonder(url, data, basliklar, timeout)
         except urllib.error.HTTPError as hata:
-            raise ValueError(self._http_mesaji(hata))
+            metin = hata.read().decode('utf-8', 'replace')
+            govde = _json_deneme(metin)
+            # Bilinen geçit hatası: bazı 9Router/OmniRoute sürümleri
+            # `/v1/chat/completions` çağrısında anahtarı yalnızca `x-api-key`
+            # başlığından okuyor ("401: Missing API key"); `/v1/models` ise
+            # `Authorization: Bearer` ile çalışıyor. Bir kez yedek başlıkla dene.
+            if ayar['key'] and 'x-api-key' not in basliklar and _anahtar_eksik(govde, metin):
+                yedek = dict(basliklar)
+                yedek['x-api-key'] = ayar['key']
+                try:
+                    return self._gonder(url, data, yedek, timeout)
+                except urllib.error.HTTPError as hata2:
+                    metin2 = hata2.read().decode('utf-8', 'replace')
+                    raise ValueError(self._http_mesaji(hata2.code, _json_deneme(metin2), metin2))
+                except urllib.error.URLError:
+                    raise ValueError(self._ulasilamadi(ayar))
+                except TimeoutError:
+                    raise ValueError('Sağlayıcı zamanında yanıt vermedi; tekrar dene.')
+            raise ValueError(self._http_mesaji(hata.code, govde, metin))
         except urllib.error.URLError:
-            if ayar['base_url'].startswith('http://127.0.0.1') or 'localhost' in ayar['base_url']:
-                raise ValueError('Yerel API sunucusuna ulaşılamadı. 9Router/OmniRoute çalışıyor mu? '
-                                 '(9Router varsayılan: http://127.0.0.1:20128/v1, 9Router Go: '
-                                 'http://127.0.0.1:20130/v1). Ayarlar > Ücretsiz API > '
-                                 '“Yerel geçitleri tara” ile açık olanı bulabilirsin.')
-            raise ValueError('Sağlayıcıya ulaşılamadı. Adresi ve internet bağlantısını kontrol et.')
+            raise ValueError(self._ulasilamadi(ayar))
         except TimeoutError:
             raise ValueError('Sağlayıcı zamanında yanıt vermedi; tekrar dene.')
+
+    def _gonder(self, url, data, basliklar, timeout):
+        """Tek HTTP denemesi; JSON döndürür (hatalar çağırana HTTPError olarak gider)."""
+        istek = urllib.request.Request(url, data=data, headers=basliklar, method='POST' if data else 'GET')
+        with urllib.request.urlopen(istek, timeout=timeout) as yanit:
+            metin = yanit.read().decode('utf-8', 'replace')
         try:
             return json.loads(metin)
         except ValueError:
             raise ValueError('Sağlayıcı JSON olmayan bir yanıt döndürdü. Adres /v1 ile bitiyor mu?')
 
     @staticmethod
-    def _http_mesaji(hata):
-        try:
-            govde = json.loads(hata.read().decode('utf-8', 'replace'))
+    def _ulasilamadi(ayar):
+        if ayar['base_url'].startswith('http://127.0.0.1') or 'localhost' in ayar['base_url']:
+            return ('Yerel API sunucusuna ulaşılamadı. 9Router/OmniRoute çalışıyor mu? '
+                    '(9Router varsayılan: http://127.0.0.1:20128/v1, 9Router Go: '
+                    'http://127.0.0.1:20130/v1). Ayarlar > Ücretsiz API > '
+                    '“Yerel geçitleri tara” ile açık olanı bulabilirsin.')
+        return 'Sağlayıcıya ulaşılamadı. Adresi ve internet bağlantısını kontrol et.'
+
+    @staticmethod
+    def _http_mesaji(kod, govde=None, metin=''):
+        ayrinti = ''
+        if isinstance(govde, dict):
+            hata_alani = govde.get('error')
+            if isinstance(hata_alani, dict):
+                ayrinti = str(hata_alani.get('message') or hata_alani.get('msg') or '')
+            elif isinstance(hata_alani, str):
+                ayrinti = hata_alani
+            elif govde.get('message'):
+                ayrinti = str(govde['message'])
+        elif isinstance(govde, list):
             ayrinti = ''
-            if isinstance(govde, dict):
-                hata_alani = govde.get('error')
-                if isinstance(hata_alani, dict):
-                    ayrinti = str(hata_alani.get('message') or '')
-                elif isinstance(hata_alani, str):
-                    ayrinti = hata_alani
-            ayrinti = ayrinti[:160]
-        except Exception:
-            ayrinti = ''
+        if not ayrinti:
+            ayrinti = (metin or '').strip()[:160]
+        ayrinti = ayrinti[:160]
+        kod = int(kod)
         temel = {401: 'API anahtarı kabul edilmedi (401).',
                  402: 'Kota veya kredi yetersiz (402).',
                  403: 'Bu anahtarın bu modele erişimi yok (403).',
@@ -241,8 +291,15 @@ class Saglayici:
                  429: 'Ücretsiz kota veya hız sınırı doldu (429). Biraz bekleyip tekrar dene ya da başka bir model seç.',
                  500: 'Sağlayıcı iç hatası (500).',
                  502: 'Sağlayıcı geçit hatası (502).',
-                 503: 'Sağlayıcı şu anda hizmet vermiyor (503).'}.get(hata.code, f'Sağlayıcı isteği başarısız (HTTP {hata.code}).')
-        return temel + ((' Ayrıntı: ' + ayrinti) if ayrinti else '')
+                 503: 'Sağlayıcı şu anda hizmet vermiyor (503).'}.get(kod, f'Sağlayıcı isteği başarısız (HTTP {kod}).')
+        ipucu = ''
+        if kod == 401:
+            ipucu = (' İpucu: anahtarı 9Router panelinden (API Keys) yeniden kopyala; anahtarın '
+                     '“tüm modeller” izni olduğundan emin ol. 9Router/OmniRoute’un bilinen bir hatasında '
+                     '“Missing API key” yalnızca sohbet ucunda çıkar: geçidi yeniden başlatmak, başka bir '
+                     'model seçmek veya OpenRouter/Groq gibi doğrudan bir sağlayıcı kullanmak çözer. '
+                     'Ayarlar > Ücretsiz API > “Bağlantıyı test et” düğmesi ayrıntıyı gösterir.')
+        return temel + ipucu + ((' Ayrıntı: ' + ayrinti) if ayrinti else '')
 
     # --- işlemler ----------------------------------------------------------
     def modeller(self, base_url=None, key=None, timeout=25):

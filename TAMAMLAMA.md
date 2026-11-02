@@ -113,3 +113,18 @@ Bilinçli sınırlar:
 - 9Router'ın OAuth ile bağladığı hesaplar (Kiro, Codex, Copilot vb.) Emre'de **yapılandırılmaz**; Emre yalnızca 9Router'ın `/v1` uç noktasını kullanır. Hesap/anahtar yönetimi 9Router panelinde kalır.
 - Tarama yalnızca bilinen portları dener; keyfi port taraması (port scanning) yapılmaz.
 - 9Router "sınırsız" iddiaları sağlayıcı politikalarına bağlıdır ve değişebilir.
+
+## Ek tur: “401 Missing API key” teşhisi ve yedeği
+
+Belirti (kullanıcı): Ücretsiz API bağlandı, model listesi geldi, ama sohbette `API anahtarı kabul edilmedi (401). Ayrıntı: Missing API key.`
+
+Kök neden: 9Router/OmniRoute ailesinde bilinen geçit hatası — `/v1/models` Bearer anahtarıyla çalışırken `/v1/chat/completions` “Missing API key” dönebiliyor.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| K1 | `_istek()`: 401 gövdesi “missing api key” ise istek bir kez `x-api-key` başlığıyla tekrarlanır (`_anahtar_eksik`, `_json_deneme`) | ✅ |
+| K2 | 401 mesajına uygulanabilir ipucu: anahtarı yeniden kopyala, izinleri kontrol et, geçidi yeniden başlat, başka model/dogrudan sağlayıcı | ✅ |
+| K3 | `POST /api/provider/test`: kayıtlı yapılandırmayla minik sohbet; hata varsa sağlayıcının kendi metni döner | ✅ |
+| K4 | Arayüz: **Bağlantıyı test et** düğmesi; sohbet hatası artık “Ollama ile…” yerine gerçek arka ucu yazar | ✅ |
+| K5 | `_http_mesaji` gövdeyi bir kez okuyacak şekilde yeniden yazıldı (HTTPError tekrar okunamıyordu), `_gonder`/`_ulasilamadi` yardımcıları | ✅ |
+| K6 | Testler: 2 yeni `test_saglayici.py` (x-api-key yedeği, 401 ipucu), 2 yeni `test_server.py` (`/api/provider/test`) → **115 test**; E2E **34/34** | ✅ |

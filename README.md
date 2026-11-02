@@ -218,3 +218,23 @@ Sonra **mutlaka**:
 | Sekme var ama eski görünüm | Tarayıcı önbelleği | Ctrl+F5 |
 | `git pull` çakışma/hata verdi | Yerelde commit edilmemiş değişiklik var | `git stash` ya da `git commit -am "notlarım"`, sonra tekrar |
 | “Bu klasör bir git deposu değil” | Yanlış klasörde çalışıyorsun | Depo klasörüne geç (`git rev-parse --show-toplevel` ile bul) |
+
+### Sorun giderme: “401 / Missing API key” (liste geliyor, sohbet çalışmıyor)
+
+9Router/OmniRoute ailesinde bilinen bir hata var: `GET /v1/models` anahtarı kabul eder ama `POST /v1/chat/completions` **“401: Missing API key”** döner ([OmniRoute #11030](https://github.com/diegosouzapw/OmniRoute/issues/11030)).
+
+Emre bunun için iki şey yapar:
+
+1. **Otomatik yedek başlık:** 401 gövdesi “missing api key” diyorsa istek bir kez de `x-api-key: <anahtar>` başlığıyla tekrarlanır. Bazı geçit sürümleri anahtarı yalnızca bu başlıktan okuyor.
+2. **Bağlantıyı test et:** Ayarlar › Ücretsiz API › *Bağlantıyı test et* düğmesi (`POST /api/provider/test`) minik bir sohbet isteği gönderir; sağlayıcının kendi hata metnini gösterir.
+
+Yine 401 alırsan sırayla dene:
+
+| Adım | Ne yapılır |
+| --- | --- |
+| 1 | 9Router panelinde **API Keys** → anahtarın *Active* ve “tüm modeller” izinli olduğunu doğrula; anahtarı yeniden kopyala (maskeli kısmı değil) |
+| 2 | **Başka model seç** — `yapay` gibi özel/combo modeller bağlı bir sağlayıcıya ihtiyaç duyar; `oc/…`, `kr/…`, `if/…` gibi hazır bir model dene |
+| 3 | Geçidi **yeniden başlat** (`9router` penceresini kapat-aç) ve panelde sağlayıcının “test” düğmesiyle çalıştığını doğrula |
+| 4 | Hâlâ 401 ise geçit hatasıdır: **OpenRouter** (`https://openrouter.ai/api/v1`, `:free` modeller) veya **Groq** (`https://api.groq.com/openai/v1`) gibi doğrudan bir sağlayıcıya geç |
+
+Hata mesajları artık hangi arka ucun kullanıldığını söyler: *“Yapay zekâ sağlayıcısı ile bağlantı kurulamadı: Ücretsiz API (<adres> · <model>): …”*. Ayrıntı, `http://127.0.0.1:8765/api/provider/test` yanıtında da görünür.

@@ -320,6 +320,16 @@ class ServerTestCase(unittest.TestCase):
         self.api('/api/provider/disconnect', {'confirmed': True})
         self.assertFalse(self.api('/api/provider/status')['configured'])
 
+    def test_provider_test_endpoint_reports_success(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        veri = self.api('/api/provider/test', {'model': 'openai/gpt-oss-20b:free'})
+        self.assertTrue(veri['ok'])
+        self.assertIn('Sağlayıcı yanıtı', veri['reply'])
+
+    def test_provider_test_endpoint_requires_configuration(self):
+        hata = self.api('/api/provider/test', {}, expect=400)
+        self.assertIn('ayarlanmamış', hata['error'])
+
     def test_provider_scan_finds_fake_gateway(self):
         port = int(self.provider_base.rsplit(':', 1)[1].split('/')[0])
         veri = self.api('/api/provider/scan', {'ports': [port]})

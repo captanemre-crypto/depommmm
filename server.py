@@ -33,7 +33,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.4'
+VERSION = '2026-11-02.5'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -504,6 +504,20 @@ class Handler(BaseHTTPRequestHandler):
                 modeller=SAG.modeller(base_url=taban or None, key=anahtar)
                 ucretsiz=[m for m in modeller if 'free' in m.lower()]
                 return self.out({'models':modeller,'free':ucretsiz,'total':len(modeller)})
+            if path=='/api/provider/test':
+                # Kayıtlı yapılandırmayla minik bir sohbet denemesi: hata varsa
+                # sağlayıcının kendi mesajını olduğu gibi gösterir.
+                if not SAG.yukle()['base_url']:
+                    raise ValueError('Ücretsiz API sağlayıcısı ayarlanmamış.')
+                model=data.get('model')
+                if model is not None and not isinstance(model,str): raise ValueError('Model adı metin olmalı.')
+                try:
+                    msg=SAG.sohbet([{'role':'user','content':'Yalnızca "hazır" yaz.'}],
+                                   model=(model or '').strip() or None, max_tokens=16, timeout=60)
+                except ValueError as hata:
+                    return self.out({'ok':False,'error':str(hata),'base_url':SAG.yukle()['base_url']},400)
+                return self.out({'ok':True,'reply':(msg.get('content') or '').strip()[:200],
+                                 'model':SAG.yukle()['model']})
             if path=='/api/provider/scan':
                 # Yalnızca kendi bilgisayarındaki bilinen portlar denenir; adres
                 # istemciden alınmaz (yalnızca ek port numarası verilebilir).
@@ -598,8 +612,11 @@ class Handler(BaseHTTPRequestHandler):
                     # OpenAI uyumlu sağlayıcı: OmniRoute, OpenRouter, Groq, Gemini…
                     # Model belirtilmemişse sağlayıcı ayarında kayıtlı model kullanılır.
                     api_model=str(data.get('model') or '').strip() or None
-                    msg=SAG.sohbet([{'role':'system','content':system}]+clean, model=api_model,
-                                   tools=ledger_tools.TOOLS, max_tokens=500, timeout=120)
+                    try:
+                        msg=SAG.sohbet([{'role':'system','content':system}]+clean, model=api_model,
+                                       tools=ledger_tools.TOOLS, max_tokens=500, timeout=120)
+                    except ValueError as hata:
+                        raise ValueError('Ücretsiz API ('+SAG.yukle()['base_url']+' · '+str(api_model or SAG.yukle()['model'])+'): '+str(hata))
                 elif backend=='ollama':
                     result=request_json(OLLAMA+'/api/chat',{'model':selected,'messages':[{'role':'system','content':system}]+clean,'tools':ledger_tools.TOOLS,'stream':False,'think':False,'options':{'num_ctx':4096,'num_predict':400,'num_gpu':0}}, timeout=300)
                     msg=result.get('message',{})
