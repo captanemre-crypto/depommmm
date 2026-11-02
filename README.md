@@ -51,3 +51,32 @@ Ayarlar > Ses ekranından Windows System.Speech tarafından sunulan Türkçe ses
 
 ## Windows masaüstü prototipi
 `masaustu_kur.bat` ile pywebview, pystray ve Pillow'u ayrı `.venv-desktop` ortamına kurun; Edge WebView2 Runtime gerekli olabilir. Önce `baslat.bat` ile çalışan eski Emre sunucusunu kapatın, ardından `masaustu_baslat.bat` çalıştırın. İlk aşamada `.exe` değil, Python tabanlı prototiptir. X düğmesi çalışan sistem tepsisi simgesi varsa pencereyi gizlemeyi dener; simge menüsünden yeniden aç veya tamamen çık seçilir. Tepsi erişilemiyorsa pencerenin kapanmasına izin verilir. Başlangıç dosyaları ve emre.sqlite3 aynı klasörde kalmalıdır. Kurulumda mevcut OpenJarvis proje klasörünü (pyproject.toml içeren klasör) seçin; EMRE kısayolu masaüstüne oluşturulur. Emre, OpenJarvis servisinin 127.0.0.1:8766 üzerinde çalıştığını algılamazsa arka planda başlatmayı dener. İlk açılış zaman alabilir; hata için openjarvis_masaustu.log dosyasını inceleyin. Ollama ve emre-cpu modeli ayrıca hazır olmalıdır. Ayarlar > OpenJarvis bölümünde OpenJarvis seçimini kaydedin. Tamamen çıkıldığında yalnız Emre tarafından başlatılan servis durdurulur; önceden açık servis kapatılmaz. Mikrofon/kamera ve bildirim izinleri WebView2'de yeniden istenebilir. Pencere gizlenince ses tanıma ve hatırlatma zamanlaması sistemin WebView2 davranışına bağlıdır; gerçek Windows üzerinde doğrulanmadı, arka planda sürekli çalışacağı garanti değildir. WebView2'nin sohbet geçmişi normal Chrome/Edge geçmişinden ayrıdır. Geliştirme sürümüdür, güvenli finansal kararlar için denetimsiz kullanmayın.
+
+## Testler ve otomatik denetim
+Projede standart kütüphaneyle çalışan bir test paketi vardır; ek paket kurmak gerekmez.
+
+```powershell
+py -m unittest discover -s tests -t .     # Windows
+testler.bat                                # Windows (çift tıkla)
+```
+```bash
+python3 -m unittest discover -s tests -t .  # Linux/macOS
+```
+
+36 test; defter araçları, HTTP yetkilendirmesi (token + Origin), defter/hatırlatıcı akışı, girdi doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` dosyasındadır.
+
+## Depoda tutulmayan dosyalar
+`.gitignore` şu yerel dosyaları dışarıda bırakır: `emre.sqlite3` ve WAL dosyaları, `.venv-ses/`, `.venv-desktop/`, `sesler/`, `kodlar/`, loglar, `openjarvis_yol.json` ve **`arena_profile/`**.
+
+`arena_profile/` Arena oturum çerezlerini içerir; hiçbir zaman commit edilmemeli, yedeklerken kişisel veri sayılmalıdır. OpenJarvis klasör ayarı kişiye özeldir; şablon `openjarvis_yol.ornek.json`, gerçek dosyayı `masaustu_ayar.py` üretir.
+
+## İsteğe bağlı bağımlılıklar
+Sunucu yalnızca standart kütüphaneyi kullanır. İsteğe bağlı özelliklerin paketleri ve sürüm aralıkları `requirements-optional.txt` dosyasında listelenir; kurulumları ilgili `.bat` dosyaları ayrı sanal ortamlara yapar.
+
+## Sürüm notları (2026-11-02)
+- SQLite bağlantıları artık her istekten sonra kapatılıyor (dosya tanıtıcısı sızıntısı giderildi) ve veritabanı WAL modunda.
+- Yerel ses işçileri zaman aşımına uğradığında öldürülüp otomatik yeniden başlatılıyor; ses özellikleri kilitlenmiyor.
+- Hata mesajları Türkçeleştirildi; bozuk istek gövdeleri ve yanlış alan tipleri 400 ile reddediliyor.
+- Telegram mesajları `update_id` imleciyle izleniyor; aynı mesaj tekrar gösterilmiyor.
+- Arayüzdeki "Sistem durumu" ve "Yaklaşan hatırlatıcılar" panelleri artık canlı veriyle güncelleniyor.
+- `/favicon.ico` sunuluyor, yanıtlara `nosniff` ve `no-referrer` başlıkları eklendi.

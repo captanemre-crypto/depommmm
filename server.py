@@ -1,5 +1,5 @@
 """EMRE local server: standard-library only. Run on Windows: py server.py"""
-import json, os, sqlite3, urllib.request, urllib.error, threading, time, webbrowser, secrets, re, subprocess, sys, tempfile, base64
+import json, os, socket, sqlite3, urllib.request, urllib.error, threading, time, webbrowser, secrets, re, subprocess, sys, tempfile, base64, contextlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, quote
 from datetime import datetime
@@ -16,14 +16,94 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
+VERSION = '2026-11-02'
+TG_OFFSET = {'value': None}  # Telegram getUpdates imleci: ayni mesaj tekrar gosterilmez.
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
+@contextlib.contextmanager
 def db():
+    """Open a short-lived connection that commits on success and always closes.
+
+    Yuvalanmis (nested) baglanti acmak dosya tanimlayicisi sizdirir; bu nedenle
+    her istek kendi baglantisini acip kapatiyor. WAL modu es zamanli okumalarda
+    'database is locked' hatasini azaltir.
+    """
     conn = sqlite3.connect(DB, timeout=10)
-    conn.execute('CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY, text TEXT NOT NULL, due TEXT NOT NULL, done INTEGER DEFAULT 0)')
-    conn.execute('CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY, person TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT NOT NULL DEFAULT \"\", due TEXT, created TEXT NOT NULL)')
-    conn.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE, note TEXT NOT NULL DEFAULT \"\")')
-    return conn
+    try:
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.execute('PRAGMA busy_timeout=10000')
+        conn.execute('CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY, text TEXT NOT NULL, due TEXT NOT NULL, done INTEGER DEFAULT 0)')
+        conn.execute('CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY, person TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT NOT NULL DEFAULT "", due TEXT, created TEXT NOT NULL)')
+        conn.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE, note TEXT NOT NULL DEFAULT "")')
+        yield conn
+        conn.commit()
+    except BaseException:
+        try: conn.rollback()
+        except sqlite3.Error: pass
+        raise
+    finally:
+        conn.close()
+
+
+def text_field(data, name, limit, required=False, default=''):
+    """Return a trimmed string field; never let a list/dict reach str operations."""
+    value = data.get(name, default)
+    if value is None: value = default
+    if not isinstance(value, str):
+        raise ValueError(f'{name} alanı metin olmalı.')
+    value = value.strip()
+    if len(value) > limit:
+        raise ValueError(f'{name} alanı en fazla {limit} karakter olabilir.')
+    if required and not value:
+        raise ValueError(f'{name} alanı gerekli.')
+    return value
+
+
+def int_field(data, name, minimum, maximum):
+    value = data.get(name)
+    if type(value) is not int:
+        raise ValueError(f'{name} alanı tam sayı olmalı.')
+    if not minimum <= value <= maximum:
+        raise ValueError(f'{name} alanı {minimum}–{maximum} aralığında olmalı.')
+    return value
+
+
+def friendly_error(exc):
+    """Translate technical exceptions into short Turkish messages for the UI."""
+    message = str(exc)
+    if isinstance(exc, urllib.error.HTTPError):
+        return f'Servis isteği başarısız (HTTP {exc.code}).'
+    if isinstance(exc, urllib.error.URLError) or 'urlopen error' in message or 'Connection refused' in message:
+        return 'Yerel servise ulaşılamadı. Ollama/OpenJarvis çalışıyor mu? Bağlantıyı ve internet erişimini kontrol et.'
+    if isinstance(exc, (TimeoutError,)) or 'timed out' in message:
+        return 'İşlem zaman aşımına uğradı; lütfen tekrar dene.'
+    if isinstance(exc, sqlite3.OperationalError) and 'locked' in message:
+        return 'Veritabanı şu anda meşgul; birkaç saniye sonra tekrar dene.'
+    if isinstance(exc, json.JSONDecodeError):
+        return 'İstek gövdesi geçerli JSON değil.'
+    if isinstance(exc, AttributeError) or "object has no attribute" in message:
+        return 'İstek biçimi beklenenden farklı; alanları kontrol et.'
+    return message or 'Beklenmeyen bir hata oluştu.'
+
+
+NET_CACHE = {'ok': False, 'at': 0.0}
+
+
+def internet_available():
+    """Cheap internet probe, cached for a minute so /api/status stays fast."""
+    now = time.monotonic()
+    if now - NET_CACHE['at'] < 60:
+        return NET_CACHE['ok']
+    ok = False
+    try:
+        with socket.create_connection(('1.1.1.1', 443), timeout=1.2):
+            ok = True
+    except OSError:
+        ok = False
+    NET_CACHE.update(ok=ok, at=now)
+    return ok
+
 
 def request_json(url, payload=None, timeout=20):
     data = json.dumps(payload).encode() if payload is not None else None
@@ -64,20 +144,29 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
     def out(self, obj, status=200):
         data=json.dumps(obj, ensure_ascii=False).encode()
-        self.send_response(status); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
+        self.send_response(status); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data)))
+        self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.end_headers(); self.wfile.write(data)
     def valid(self):
         origin=self.headers.get('Origin','')
         return self.headers.get('X-Emre-Token') == KEY and (not origin or origin in ('http://127.0.0.1:8765','http://localhost:8765'))
     def body(self):
-        n=int(self.headers.get('Content-Length','0'))
+        n=int(self.headers.get('Content-Length','0') or 0)
         limit=8_500_000 if urlparse(self.path).path=='/api/speech/transcribe' else 100000
         if n>limit: raise ValueError('İstek çok büyük.')
-        return json.loads(self.rfile.read(n) or b'{}')
+        if n<=0: return {}
+        parsed=json.loads(self.rfile.read(n) or b'{}')
+        if not isinstance(parsed,dict): raise ValueError('İstek gövdesi bir JSON nesnesi olmalı.')
+        return parsed
     def do_GET(self):
         path=urlparse(self.path).path
         if path=='/':
             html=(ROOT/'index.html').read_text(encoding='utf-8').replace('</head>', '<meta name="emre-token" content="'+KEY+'"></head>', 1).encode()
-            self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Content-Length',str(len(html))); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(html); return
+            self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Content-Length',str(len(html))); self.send_header('Cache-Control','no-store')
+            self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.end_headers(); self.wfile.write(html); return
+        if path=='/favicon.ico':
+            icon=ROOT/'emre.ico'
+            if not icon.is_file(): return self.out({'error':'Bulunamadı'},404)
+            data=icon.read_bytes(); self.send_response(200); self.send_header('Content-Type','image/x-icon'); self.send_header('Content-Length',str(len(data))); self.send_header('Cache-Control','max-age=86400'); self.end_headers(); self.wfile.write(data); return
         if not self.valid(): return self.out({'error':'Yetkisiz istek.'},403)
         try:
             if path=='/api/developer/files':
@@ -102,7 +191,14 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/status':
                 try: models=request_json(OLLAMA+'/api/tags',timeout=2); ollama=True
                 except Exception: models={'models':[]}; ollama=False
-                return self.out({'ollama':ollama,'model':MODEL,'models':[m['name'] for m in models.get('models',[])], 'telegram_configured':bool(TOKEN), 'version':'2026-10-29-fix2'})
+                try: openjarvis_online=bool(request_json(OPENJARVIS+'/health',timeout=2))
+                except Exception: openjarvis_online=False
+                return self.out({'ollama':ollama,'model':MODEL,'models':[m['name'] for m in models.get('models',[])],
+                                 'telegram_configured':bool(TOKEN),'version':VERSION,
+                                 'speech_installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file(),
+                                 'piper_installed':any(tts_piper_bridge.installed(v) for v in ('dfki','fahrettin','fettah')),
+                                 'openjarvis_online':openjarvis_online,'arena_status':arena_bridge.snapshot().get('status','stopped'),
+                                 'apps_supported':os.name=='nt','internet_access':internet_available()})
             if path=='/api/accounts':
                 with db() as c: rows=c.execute('SELECT name,note FROM accounts ORDER BY name').fetchall()
                 return self.out({'accounts':[{'name':r[0],'note':r[1]} for r in rows]})
@@ -113,15 +209,22 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c: rows=c.execute('SELECT id,text,due,done FROM reminders ORDER BY due').fetchall()
                 return self.out({'reminders':[{'id':r[0],'text':r[1],'due':r[2],'done':bool(r[3])} for r in rows]})
             if path=='/api/telegram/updates':
-                result=telegram('getUpdates',{'timeout':0,'limit':30,'allowed_updates':['message']})
+                query={'timeout':0,'limit':30,'allowed_updates':['message']}
+                if TG_OFFSET['value'] is not None: query['offset']=TG_OFFSET['value']
+                result=telegram('getUpdates',query)
                 if not result.get('ok'): raise ValueError('Telegram isteği başarısız.')
                 messages=[]
                 for u in result.get('result',[]):
+                    if type(u.get('update_id')) is int:
+                        TG_OFFSET['value']=u['update_id']+1
                     m=u.get('message',{}); chat=m.get('chat',{})
-                    if m.get('text'): messages.append({'chat_id':chat.get('id'),'from':chat.get('first_name','Kullanıcı'),'text':m['text']})
-                return self.out({'messages':messages})
+                    if m.get('text'):
+                        messages.append({'chat_id':chat.get('id'),'from':chat.get('first_name','Kullanıcı'),'text':m['text'],
+                                         'date':m.get('date'),'message_id':m.get('message_id')})
+                return self.out({'messages':messages,'next_offset':TG_OFFSET['value']})
             return self.out({'error':'Bulunamadı'},404)
-        except Exception as e: return self.out({'error':str(e)},400)
+        except ValueError as e: return self.out({'error':str(e)},400)
+        except Exception as e: return self.out({'error':friendly_error(e)},400)
     def do_POST(self):
         global TOKEN
         if not self.valid(): return self.out({'error':'Yetkisiz istek.'},403)
@@ -142,8 +245,7 @@ class Handler(BaseHTTPRequestHandler):
                 target.write_text(content,encoding='utf-8')
                 return self.out({'ok':True})
             if path=='/api/tts/speak':
-                text=str(data.get('text','')).strip();voice=str(data.get('voice','')).strip()
-                if not text or len(text)>1500 or not voice or len(voice)>200: raise ValueError('Ses veya metin geçersiz.')
+                text=text_field(data,'text',1500,required=True); voice=text_field(data,'voice',200,required=True)
                 name=None
                 try:
                     with tempfile.NamedTemporaryFile(suffix='.wav',delete=False) as f: name=f.name
@@ -157,6 +259,7 @@ class Handler(BaseHTTPRequestHandler):
                         try:os.unlink(name)
                         except OSError:pass
             if path=='/api/speech/transcribe':
+                if not isinstance(data.get('audio'),str): raise ValueError('Ses verisi gerekli.')
                 text=ses_baglanti.transcribe(data.get('audio'))
                 return self.out({'text':text})
             if path=='/api/arena/test-api':
@@ -183,7 +286,7 @@ class Handler(BaseHTTPRequestHandler):
                 if os.name != 'nt': raise ValueError('Uygulama açma şu an yalnızca Windows içindir.')
                 if data.get('confirmed') is not True: raise ValueError('Uygulama açma onayı gerekli.')
                 allowed={'notepad':'notepad.exe','calculator':'calc.exe','paint':'mspaint.exe','explorer':'explorer.exe'}
-                app=allowed.get(data.get('app'))
+                app=allowed.get(data.get('app')) if isinstance(data.get('app'),str) else None
                 if not app: raise ValueError('Bu uygulama desteklenmiyor.')
                 system=Path(os.environ.get('SystemRoot',r'C:\Windows'))
                 exe=system/'explorer.exe' if app=='explorer.exe' else system/'System32'/app
@@ -202,7 +305,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'ok':True})
             if path=='/api/arena/send':
                 if data.get('confirmed') is not True: raise ValueError('Soru göndermek için onay gerekli.')
-                arena_bridge.send(str(data.get('question','')).strip())
+                arena_bridge.send(text_field(data,'question',6000,required=True))
                 return self.out({'ok':True})
             if path=='/api/telegram/connect':
                 candidate=str(data.get('token','')).strip()
@@ -211,17 +314,21 @@ class Handler(BaseHTTPRequestHandler):
                     info=request_json('https://api.telegram.org/bot'+candidate+'/getMe', timeout=15)
                     if not info.get('ok') or not info.get('result',{}).get('is_bot'): raise ValueError()
                 except Exception: raise ValueError('Bot doğrulanamadı. Anahtarı ve internet bağlantısını kontrol et.')
-                TOKEN=candidate
+                TOKEN=candidate; TG_OFFSET['value']=None
                 return self.out({'ok':True,'username':info['result'].get('username','')})
             if path=='/api/telegram/disconnect':
                 TOKEN=''
+                TG_OFFSET['value']=None
                 return self.out({'ok':True})
             if path=='/api/chat':
-                messages=data.get('messages',[])[-12:]
-                clean=[{'role':m['role'],'content':str(m['content'])[:6000]} for m in messages if m.get('role') in ('user','assistant') and isinstance(m.get('content'),str)]
+                messages=data.get('messages',[])
+                if not isinstance(messages,list): raise ValueError('Mesaj listesi geçersiz.')
+                messages=messages[-12:]
+                clean=[{'role':m['role'],'content':str(m['content'])[:6000]} for m in messages if isinstance(m,dict) and m.get('role') in ('user','assistant') and isinstance(m.get('content'),str)]
                 if not clean: raise ValueError('Mesaj boş.')
                 selected=str(data.get('model') or MODEL).strip()
                 if len(selected)>200: raise ValueError('Model adı çok uzun.')
+                if not re.fullmatch(r'[\w.\-:/]{1,200}',selected): raise ValueError('Model adı geçersiz.')
                 installed={m.get('name') for m in request_json(OLLAMA+'/api/tags',timeout=5).get('models',[])}
                 if selected not in installed and selected+':latest' not in installed: raise ValueError('Seçilen model Ollama üzerinde kurulu değil.')
                 # Qwen3 supports both the API flag and an explicit no-thinking directive.
@@ -274,14 +381,15 @@ class Handler(BaseHTTPRequestHandler):
                     c.executemany('DELETE FROM ledger WHERE id=?',[(i,) for i in l_ids])
                 return self.out({'ok':True,'deleted_entries':len(l_ids)})
             if path=='/api/accounts':
-                name=str(data.get('name','')).strip()[:100]; note=str(data.get('note','')).strip()[:300]
-                if not name: raise ValueError('Hesap adı gerekli.')
+                name=text_field(data,'name',100,required=True); note=text_field(data,'note',300)
                 with db() as c: c.execute('INSERT INTO accounts(name,note) VALUES (?,?)',(name,note))
                 return self.out({'ok':True})
             if path=='/api/ledger':
-                person=str(data.get('person','')).strip()[:100]; kind=data.get('kind'); amount=data.get('amount'); note=str(data.get('note','')).strip()[:300]; due=str(data.get('due','')).strip()
-                if not person or kind not in ('receivable','payable','received','paid') or type(amount) is not int or not 0 < amount <= 100000000000: raise ValueError('Kişi, işlem türü ve geçerli tutar gerekli.')
-                if due: datetime.fromisoformat(due)
+                person=text_field(data,'person',100,required=True); kind=data.get('kind'); amount=data.get('amount'); note=text_field(data,'note',300); due=text_field(data,'due',40)
+                if kind not in ('receivable','payable','received','paid') or type(amount) is not int or not 0 < amount <= 100000000000: raise ValueError('Kişi, işlem türü ve geçerli tutar gerekli.')
+                if due:
+                    try: datetime.fromisoformat(due)
+                    except ValueError: raise ValueError('Tarih biçimi geçersiz; YYYY-AA-GG SS:DD kullan.')
                 if data.get('remind') and (not due or kind not in ('receivable','payable')): raise ValueError('Hatırlatıcı için alacak/verecek ve tarih gerekli.')
                 with db() as c:
                     c.execute('INSERT INTO ledger(person,kind,amount,note,due,created) VALUES (?,?,?,?,?,?)',(person,kind,amount,note,due or None,datetime.now().isoformat(timespec='seconds')))
@@ -291,21 +399,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'ok':True})
             if path=='/api/ledger/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
-                with db() as c: c.execute('DELETE FROM ledger WHERE id=?',(int(data['id']),))
+                with db() as c: c.execute('DELETE FROM ledger WHERE id=?',(int_field(data,'id',1,2**53),))
                 return self.out({'ok':True})
             if path=='/api/reminders':
-                text=str(data.get('text','')).strip()[:300]; due=str(data.get('due',''))
-                if not text: raise ValueError('Hatırlatıcı metni gerekli.')
-                datetime.fromisoformat(due)
+                text=text_field(data,'text',300,required=True); due=text_field(data,'due',40,required=True)
+                try: datetime.fromisoformat(due)
+                except ValueError: raise ValueError('Tarih biçimi geçersiz; YYYY-AA-GG SS:DD kullan.')
                 with db() as c: c.execute('INSERT INTO reminders(text,due) VALUES (?,?)',(text,due))
                 return self.out({'ok':True})
             if path=='/api/reminders/done':
-                with db() as c: c.execute('UPDATE reminders SET done=1 WHERE id=?',(int(data['id']),))
+                with db() as c: c.execute('UPDATE reminders SET done=1 WHERE id=?',(int_field(data,'id',1,2**53),))
                 return self.out({'ok':True})
             if path=='/api/telegram/send':
                 if data.get('confirmed') is not True: raise ValueError('Gönderme onayı gerekli.')
-                chat_id=int(data['chat_id']); text=str(data.get('text','')).strip()[:4096]
-                if not text: raise ValueError('Mesaj boş.')
+                chat_id=int_field(data,'chat_id',-2**53,2**53); text=text_field(data,'text',4096,required=True)
                 result=telegram('sendMessage',{'chat_id':chat_id,'text':text})
                 if not result.get('ok'): raise ValueError('Telegram mesajı gönderemedi.')
                 return self.out({'ok':True})
@@ -314,7 +421,8 @@ class Handler(BaseHTTPRequestHandler):
             try: message=json.loads(e.read()).get('error','Servis hatası')
             except Exception: message='Servis hatası'
             return self.out({'error':str(message)},502)
-        except Exception as e: return self.out({'error':str(e)},400)
+        except ValueError as e: return self.out({'error':str(e)},400)
+        except Exception as e: return self.out({'error':friendly_error(e)},400)
 
 class EmreServer(ThreadingHTTPServer):
     def handle_error(self, request, client_address):

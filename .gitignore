@@ -5,8 +5,15 @@ __pycache__/
 venv/
 env/
 
+# Sanal ortamlar (kurulum .bat dosyaları tarafından oluşturulur)
+.venv-ses/
+.venv-desktop/
+
 # Veritabanı
 *.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 *.db
 
 # Loglar
@@ -17,6 +24,15 @@ env/
 *.mp3
 sesler/
 
+# Arena otomasyon profili: oturum çerezleri içerir, asla paylaşmayın
+arena_profile/
+
+# Geliştirici çalışma alanı (kullanıcıya özel dosyalar)
+kodlar/
+
+# Yerele özel yapılandırma (şablon: openjarvis_yol.ornek.json)
+openjarvis_yol.json
+
 # Ortam değişkenleri
 .env
-*.env.venv-ses/
+*.env
