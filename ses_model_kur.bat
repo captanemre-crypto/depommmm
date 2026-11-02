@@ -13,6 +13,7 @@ if errorlevel 1 (
  exit /b 1
 )
 if not exist .venv-ses\Scripts\python.exe py -m uv venv --python 3.12 .venv-ses
+if not exist .venv-ses\Scripts\python.exe py -m uv venv .venv-ses
 if not exist .venv-ses\Scripts\python.exe goto error
 py -m uv pip install --python .venv-ses\Scripts\python.exe piper-tts
 if errorlevel 1 goto error

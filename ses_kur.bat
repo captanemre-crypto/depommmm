@@ -12,6 +12,7 @@ if errorlevel 1 (
  exit /b 1
 )
 if not exist .venv-ses\Scripts\python.exe py -m uv venv --python 3.12 .venv-ses
+if not exist .venv-ses\Scripts\python.exe py -m uv venv .venv-ses
 if errorlevel 1 goto error
 py -m uv pip install --python .venv-ses\Scripts\python.exe faster-whisper "av>=15,<19"
 if errorlevel 1 goto error

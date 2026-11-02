@@ -36,3 +36,7 @@ openjarvis_yol.json
 # Ortam değişkenleri
 .env
 *.env
+
+# Node (E2E test aracı)
+node_modules/
+package-lock.json

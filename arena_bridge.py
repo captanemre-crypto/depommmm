@@ -1,5 +1,5 @@
 """Local, opt-in Arena browser bridge. No CAPTCHA or login bypass."""
-import queue, threading, time, os
+import queue, threading, time
 from pathlib import Path
 
 jobs=queue.Queue()

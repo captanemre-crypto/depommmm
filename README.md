@@ -22,10 +22,10 @@ Sol menüde Alacak verecek bölümünden kişi, işlem türü ve TL tutarı giri
 Ayarlar bölümünden Ollama'da yüklü modelleri listeleyip seçim yapın. Seçim tarayıcıda saklanır ve model değiştirilince sohbet bağlamı sıfırlanır. Yeni modeli önce `ollama pull MODEL_ADI` ile indirin; Ayarlar'da Listeyi yenile düğmesine basın. Ollama çalışmıyorsa liste yüklenmez. Telefonda alt menüyü yana kaydırarak Ayarlar bölümüne ulaşabilirsiniz.
 
 ## Arena tarayıcı bağlantısı (deneysel)
-PowerShell'de `py -m pip install playwright` ve sonra `py -m playwright install chromium` çalıştırın. Sunucuyu yeniden başlatın. Keşfet > Arena tarayıcısını aç ile açılan tarayıcıda Arena hesabınıza giriş yapın ve güvenlik doğrulamalarını kendiniz tamamlayın. Soruyu yazıp onaylayarak gönderin. Bağlantı yalnızca tanımlanabilen asistan yanıtlarını okur; Arena arayüzü değişirse veya bu tanımlayıcıları kullanmıyorsa yanıtı bulamayabilir. CAPTCHA atlatılmaz. Yanıtın doğru ve tamamlanmış olduğunu Arena ekranında kontrol edin; kısa süreli duraklamalar tamamlanma sanılabilir. Oturum çerezleri `arena_profile` klasöründe saklanır: bu klasörü başkalarıyla paylaşmayın ve yedeklerken kişisel bilgi içerdiğini unutmayın. Profil silinirse tekrar giriş gerekir. Sorular ve cevaplar Arena servisine gönderilir; hizmet şartları ve gizlilik kuralları geçerlidir. Bu özellik otomatik ihtiyaç tespiti yapmaz; her soru kullanıcı tarafından onaylanır.
+PowerShell'de `py -m pip install playwright` çalıştırın (otomasyon yüklü Microsoft Edge kanalını kullanır, ayrıca Chromium indirilmez). Sunucuyu yeniden başlatın. Keşfet > Arena tarayıcısını aç ile açılan tarayıcıda Arena hesabınıza giriş yapın ve güvenlik doğrulamalarını kendiniz tamamlayın. Soruyu yazıp onaylayarak gönderin. Bağlantı yalnızca tanımlanabilen asistan yanıtlarını okur; Arena arayüzü değişirse veya bu tanımlayıcıları kullanmıyorsa yanıtı bulamayabilir. CAPTCHA atlatılmaz. Yanıtın doğru ve tamamlanmış olduğunu Arena ekranında kontrol edin; kısa süreli duraklamalar tamamlanma sanılabilir. Oturum çerezleri `arena_profile` klasöründe saklanır: bu klasörü başkalarıyla paylaşmayın ve yedeklerken kişisel bilgi içerdiğini unutmayın. Profil silinirse tekrar giriş gerekir. Sorular ve cevaplar Arena servisine gönderilir; hizmet şartları ve gizlilik kuralları geçerlidir. Bu özellik otomatik ihtiyaç tespiti yapmaz; her soru kullanıcı tarafından onaylanır.
 
 ## başlat.bat
-Windows'ta klasördeki `baslat.bat` dosyasına çift tıklayın. Python 3 kurulu olmalıdır. Playwright kurulu değilse Arena için kurmayı teklif eder; onay verirseniz paket ve Chromium indirilir. Kurulumu reddederseniz Emre yine açılır fakat Arena otomasyonu çalışmaz. Tarayıcıda http://127.0.0.1:8765 adresini açın. Playwright önceden kurulu ama Chromium eksikse PowerShell'de `py -3 -m playwright install chromium` çalıştırın. Açık eski sunucuyu önce Ctrl+C ile kapatın.
+Windows'ta klasördeki `baslat.bat` dosyasına çift tıklayın. Python 3 kurulu olmalıdır. Playwright kurulu değilse Arena için kurmayı teklif eder; onay verirseniz yalnızca Playwright paketi indirilir. Kurulumu reddederseniz Emre yine açılır fakat Arena otomasyonu çalışmaz. Tarayıcıda http://127.0.0.1:8765 adresini açın. Otomasyon Microsoft Edge ile çalışır; Edge kurulu değilse `py -3 -m playwright install chromium` alternatif olarak denenebilir (kod Edge kanalını istediği için önerilmez). Açık eski sunucuyu önce Ctrl+C ile kapatın.
 
 Arena otomasyonu yüklü Microsoft Edge ile açılır. Oturum ayrı arena_profile klasöründe tutulur; kişisel Edge profili otomatik kullanılmaz. Google otomasyonlu Edge girişine de izin vermeyebilir.
 
@@ -63,7 +63,17 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-36 test; defter araçları, HTTP yetkilendirmesi (token + Origin), defter/hatırlatıcı akışı, girdi doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` dosyasındadır.
+46 test; defter araçları, tutar ayrıştırma, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı akışı, girdi doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+
+### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (23 kontrol).
+
+```bash
+python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
+cd tools/e2e && npm install && npm test
+```
+
+Node yalnızca bu test aracı için gerekir; uygulamanın kendisi Node kullanmaz.
 
 ## Depoda tutulmayan dosyalar
 `.gitignore` şu yerel dosyaları dışarıda bırakır: `emre.sqlite3` ve WAL dosyaları, `.venv-ses/`, `.venv-desktop/`, `sesler/`, `kodlar/`, loglar, `openjarvis_yol.json` ve **`arena_profile/`**.
@@ -73,7 +83,16 @@ python3 -m unittest discover -s tests -t .  # Linux/macOS
 ## İsteğe bağlı bağımlılıklar
 Sunucu yalnızca standart kütüphaneyi kullanır. İsteğe bağlı özelliklerin paketleri ve sürüm aralıkları `requirements-optional.txt` dosyasında listelenir; kurulumları ilgili `.bat` dosyaları ayrı sanal ortamlara yapar.
 
-## Sürüm notları (2026-11-02)
+## Sürüm notları (2026-11-02 · ikinci tur)
+- **Tahsilat cümleleri düzeltildi:** "tahsil" kelimesi "sil" içerdiği için silme sanılıyor ve kayıt sessizce yutuluyordu.
+- Binlik ayırıcılı tutarlar (`1.000.000 TL`) artık kabul ediliyor; tek cümlede birden fazla tutar varsa kayıt yapılmıyor.
+- Mükerrer hesaplarda Türkçe uyarı; `İlker`/`ilker` aynı hesap sayılıyor.
+- **Güvenlik:** `Host` başlığı doğrulanıyor (DNS rebinding), `X-Frame-Options: DENY`, chunked gövde desteği.
+- Hatırlatıcı silme, 403 sonrası "sayfayı yenile" yönlendirmesi, port dolu mesajı.
+- `baslat.bat` gereksiz Chromium indirmiyor; sanal ortam kurulumu Python 3.12 yoksa kurulu sürüme düşüyor.
+- Arayüz E2E test paketi (`tools/e2e`) ve CI'da arayüz işi.
+
+## Sürüm notları (2026-11-02 · ilk tur)
 - SQLite bağlantıları artık her istekten sonra kapatılıyor (dosya tanıtıcısı sızıntısı giderildi) ve veritabanı WAL modunda.
 - Yerel ses işçileri zaman aşımına uğradığında öldürülüp otomatik yeniden başlatılıyor; ses özellikleri kilitlenmiyor.
 - Hata mesajları Türkçeleştirildi; bozuk istek gövdeleri ve yanlış alan tipleri 400 ile reddediliyor.

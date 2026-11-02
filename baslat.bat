@@ -23,8 +23,7 @@ if errorlevel 1 (
     if errorlevel 2 goto runserver
     py -3 -m pip install playwright
     if errorlevel 1 goto installerror
-    py -3 -m playwright install chromium
-    if errorlevel 1 goto installerror
+    echo Not: Otomasyon yüklü Microsoft Edge ile açilir; ayrica tarayici indirilmez.
 )
 
 :runserver

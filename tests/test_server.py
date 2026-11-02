@@ -73,11 +73,28 @@ class ServerTestCase(unittest.TestCase):
     def test_wrong_token_rejected(self):
         self.api('/api/ledger', token='yanlis', expect=403)
 
+    def test_foreign_host_header_rejected(self):
+        """DNS rebinding: saldırgan alan adıyla gelen istek reddedilmeli."""
+        import socket
+        raw = (b'GET /api/ledger HTTP/1.1\r\nHost: kotu-site.example\r\n'
+               b'X-Emre-Token: test-anahtar\r\nConnection: close\r\n\r\n')
+        with socket.create_connection(('127.0.0.1', self.port), timeout=10) as sock:
+            sock.sendall(raw)
+            data = sock.recv(4096)
+        self.assertIn(b' 403 ', data.split(b'\r\n')[0] + b' ')
+
+    def test_security_headers_present(self):
+        req = urllib.request.Request(self.base + '/api/ledger')
+        req.add_header('X-Emre-Token', 'test-anahtar')
+        with urllib.request.urlopen(req, timeout=10) as res:
+            self.assertEqual(res.headers.get('X-Frame-Options'), 'DENY')
+            self.assertEqual(res.headers.get('X-Content-Type-Options'), 'nosniff')
+
     def test_foreign_origin_rejected(self):
         self.api('/api/ledger', origin='http://kotu-site.example', expect=403)
 
     def test_local_origin_allowed(self):
-        self.api('/api/ledger', origin=f'http://127.0.0.1:8765')
+        self.api('/api/ledger', origin='http://127.0.0.1:8765')
 
     def test_index_page_injects_token(self):
         status, body, ctype = self.raw('/', token=None)
@@ -151,7 +168,45 @@ class ServerTestCase(unittest.TestCase):
         error = self.api('/api/reminders', {'text': 'x', 'due': 'yarın sabah'}, expect=400)
         self.assertIn('Tarih', error['error'])
 
+    def test_duplicate_account_rejected_with_turkish_message(self):
+        self.api('/api/accounts', {'name': 'İlker'})
+        error = self.api('/api/accounts', {'name': 'ilker'}, expect=400)['error']
+        self.assertIn('zaten var', error)
+        self.assertNotIn('UNIQUE', error)
+
+    def test_reminder_delete(self):
+        self.api('/api/reminders', {'text': 'Silinecek', 'due': '2030-02-02T10:00'})
+        reminder = next(r for r in self.api('/api/reminders')['reminders'] if r['text'] == 'Silinecek')
+        self.api('/api/reminders/delete', {'id': reminder['id']}, expect=400)
+        self.api('/api/reminders/delete', {'id': reminder['id'], 'confirmed': True})
+        self.assertFalse(any(r['id'] == reminder['id'] for r in self.api('/api/reminders')['reminders']))
+
     # --- istek gövdesi -----------------------------------------------------
+    def test_chunked_body_accepted(self):
+        import socket
+        body = json.dumps({'name': 'Chunk Kişi', 'note': ''}).encode()
+        request = (b'POST /api/accounts HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Emre-Token: test-anahtar\r\n'
+                   b'Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n')
+        request += f'{len(body):x}'.encode() + b'\r\n' + body + b'\r\n0\r\n\r\n'
+        with socket.create_connection(('127.0.0.1', self.port), timeout=10) as sock:
+            sock.sendall(request)
+            data = b''
+            while True:
+                part = sock.recv(4096)
+                if not part:
+                    break
+                data += part
+        self.assertIn(b' 200 ', data.split(b'\r\n')[0] + b' ', data[:120])
+        names = [a['name'] for a in self.api('/api/accounts')['accounts']]
+        self.assertIn('Chunk Kişi', names)
+
+    def test_error_messages_are_turkish_not_field_names(self):
+        error = self.api('/api/accounts', {'name': '   '}, expect=400)['error']
+        self.assertIn('Hesap adı gerekli', error)
+        self.assertNotIn('name', error)
+        error = self.api('/api/reminders', {'text': '', 'due': '2030-01-01T09:00'}, expect=400)['error']
+        self.assertIn('Hatırlatıcı metni gerekli', error)
+
     def test_non_object_body_rejected(self):
         status, payload, _ = self.raw('/api/accounts', data=[1, 2, 3])
         self.assertEqual(status, 400)

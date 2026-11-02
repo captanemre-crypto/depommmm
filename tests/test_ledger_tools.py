@@ -58,6 +58,37 @@ class LedgerToolsTest(unittest.TestCase):
                                  self.db, 'Ahmet 100 TL alacağı var mı?')
         self.assertEqual(self.rows(), [])
 
+    def test_tahsil_creates_received_entry(self):
+        """'tahsil' kelimesi 'sil' içerdiği için silme sanılıyordu (sessiz veri kaybı)."""
+        self.conn.execute("INSERT INTO accounts(name,note) VALUES ('Ahmet','')")
+        self.conn.commit()
+        reply = ledger_tools.direct_ledger_action('Ahmetten 250 TL tahsil ettim', self.db)
+        self.assertIn('tahsilat', reply.lower())
+        self.assertEqual(self.rows(), [('Ahmet', 'received', 25000)])
+
+    def test_thousand_separators_supported(self):
+        self.conn.execute("INSERT INTO accounts(name,note) VALUES ('Ahmet','')")
+        self.conn.commit()
+        reply = ledger_tools.direct_ledger_action('Ahmete 1.000.000 TL alacak ekle', self.db)
+        self.assertIn('kaydedildi', reply.lower())
+        self.assertEqual(self.rows(), [('Ahmet', 'receivable', 100000000)])
+
+    def test_multiple_amounts_refused(self):
+        self.conn.execute("INSERT INTO accounts(name,note) VALUES ('Ahmet','')")
+        self.conn.commit()
+        reply = ledger_tools.direct_ledger_action('Ahmete 100 TL alacak ekle ve 200 TL verecek ekle', self.db)
+        self.assertIn('tek tek', reply.lower())
+        self.assertEqual(self.rows(), [])
+
+    def test_parse_amount_variants(self):
+        cases = {'1.250,50': 125050, '1250,50': 125050, '1.000.000': 100000000,
+                 '1500': 150000, '1.500': 150000, '1.50': 150, '0,01': 1}
+        for raw, expected in cases.items():
+            self.assertEqual(ledger_tools.parse_amount(raw), expected, raw)
+        for bad in ('', 'abc', '-5', '0', '1.234,567'):
+            with self.assertRaises(ValueError, msg=bad):
+                ledger_tools.parse_amount(bad)
+
     def test_ledger_list_totals(self):
         self.conn.executemany(
             'INSERT INTO ledger(person,kind,amount,note,due,created) VALUES (?,?,?,?,?,?)',

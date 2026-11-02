@@ -1,7 +1,7 @@
 """EMRE local server: standard-library only. Run on Windows: py server.py"""
-import json, os, socket, sqlite3, urllib.request, urllib.error, threading, time, webbrowser, secrets, re, subprocess, sys, tempfile, base64, contextlib
+import json, os, socket, sqlite3, urllib.request, urllib.error, time, secrets, re, subprocess, sys, tempfile, base64, contextlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse
 from datetime import datetime
 from pathlib import Path
 import arena_bridge
@@ -46,26 +46,32 @@ def db():
         conn.close()
 
 
-def text_field(data, name, limit, required=False, default=''):
-    """Return a trimmed string field; never let a list/dict reach str operations."""
+def text_field(data, name, limit, required=False, default='', label=None):
+    """Return a trimmed string field; never let a list/dict reach str operations.
+
+    `label` kullanıcıya gösterilecek Türkçe alan adıdır; hata mesajı hiçbir zaman
+    iç alan adını (name/person/text) sızdırmaz.
+    """
+    etiket = label or 'Alan'
     value = data.get(name, default)
     if value is None: value = default
     if not isinstance(value, str):
-        raise ValueError(f'{name} alanı metin olmalı.')
+        raise ValueError(f'{etiket} metin olmalı.')
     value = value.strip()
     if len(value) > limit:
-        raise ValueError(f'{name} alanı en fazla {limit} karakter olabilir.')
+        raise ValueError(f'{etiket} en fazla {limit} karakter olabilir.')
     if required and not value:
-        raise ValueError(f'{name} alanı gerekli.')
+        raise ValueError(f'{etiket} gerekli.')
     return value
 
 
-def int_field(data, name, minimum, maximum):
+def int_field(data, name, minimum, maximum, label=None):
+    etiket = label or 'Alan'
     value = data.get(name)
     if type(value) is not int:
-        raise ValueError(f'{name} alanı tam sayı olmalı.')
+        raise ValueError(f'{etiket} tam sayı olmalı.')
     if not minimum <= value <= maximum:
-        raise ValueError(f'{name} alanı {minimum}–{maximum} aralığında olmalı.')
+        raise ValueError(f'{etiket} geçerli aralıkta olmalı.')
     return value
 
 
@@ -80,11 +86,22 @@ def friendly_error(exc):
         return 'İşlem zaman aşımına uğradı; lütfen tekrar dene.'
     if isinstance(exc, sqlite3.OperationalError) and 'locked' in message:
         return 'Veritabanı şu anda meşgul; birkaç saniye sonra tekrar dene.'
+    if isinstance(exc, sqlite3.IntegrityError):
+        return 'Bu isimde bir kayıt zaten var.'
     if isinstance(exc, json.JSONDecodeError):
         return 'İstek gövdesi geçerli JSON değil.'
     if isinstance(exc, AttributeError) or "object has no attribute" in message:
         return 'İstek biçimi beklenenden farklı; alanları kontrol et.'
     return message or 'Beklenmeyen bir hata oluştu.'
+
+
+def tr_key(text):
+    """İsimleri Türkçe kurallarına göre karşılaştırmak için anahtar üret.
+
+    SQLite'ın NOCASE collation'ı yalnızca ASCII'de çalışır; bu yüzden 'İlker' ve
+    'ilker' farklı kayıtlar olarak eklenebiliyordu.
+    """
+    return str(text).strip().translate(str.maketrans({'I': 'ı', 'İ': 'i'})).casefold()
 
 
 NET_CACHE = {'ok': False, 'at': 0.0}
@@ -145,24 +162,56 @@ class Handler(BaseHTTPRequestHandler):
     def out(self, obj, status=200):
         data=json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(status); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data)))
-        self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.end_headers(); self.wfile.write(data)
+        self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY'); self.end_headers(); self.wfile.write(data)
+    def valid_host(self):
+        """Yalnızca loopback adlarına yanıt ver.
+
+        Host başlığı doğrulanmazsa DNS rebinding ile saldırganın alan adı
+        127.0.0.1'e çözülebilir ve tarayıcı aynı kaynak sayıp token'ı okuyabilir.
+        """
+        host=self.headers.get('Host','')
+        if not host: return False
+        name=host.rsplit(':',1)[0].strip('[]').lower() if not host.startswith('[') else host[1:host.find(']')].lower()
+        return name in ('127.0.0.1','localhost','::1','0.0.0.0')
     def valid(self):
         origin=self.headers.get('Origin','')
-        return self.headers.get('X-Emre-Token') == KEY and (not origin or origin in ('http://127.0.0.1:8765','http://localhost:8765'))
+        return self.valid_host() and self.headers.get('X-Emre-Token') == KEY and (not origin or origin in ('http://127.0.0.1:8765','http://localhost:8765'))
     def body(self):
-        n=int(self.headers.get('Content-Length','0') or 0)
         limit=8_500_000 if urlparse(self.path).path=='/api/speech/transcribe' else 100000
-        if n>limit: raise ValueError('İstek çok büyük.')
-        if n<=0: return {}
-        parsed=json.loads(self.rfile.read(n) or b'{}')
+        if 'chunked' in self.headers.get('Transfer-Encoding','').lower():
+            raw=self.read_chunked(limit)
+        else:
+            n=int(self.headers.get('Content-Length','0') or 0)
+            if n>limit: raise ValueError('İstek çok büyük.')
+            raw=self.rfile.read(n) if n>0 else b''
+        if not raw: return {}
+        parsed=json.loads(raw)
         if not isinstance(parsed,dict): raise ValueError('İstek gövdesi bir JSON nesnesi olmalı.')
         return parsed
+    def read_chunked(self, limit):
+        """Chunked gövdeyi sınırla oku; aksi halde gövde sessizce boş kalıyordu."""
+        chunks=[]; total=0
+        while True:
+            line=self.rfile.readline(1024).strip()
+            if not line: break
+            try: size=int(line.split(b';')[0],16)
+            except ValueError: raise ValueError('Chunked istek gövdesi geçersiz.')
+            if size==0:
+                while True:
+                    trailer=self.rfile.readline(1024)
+                    if trailer in (b'\r\n', b'\n', b''): break
+                break
+            total+=size
+            if total>limit: raise ValueError('İstek çok büyük.')
+            chunks.append(self.rfile.read(size))
+            self.rfile.read(2)
+        return b''.join(chunks)
     def do_GET(self):
         path=urlparse(self.path).path
         if path=='/':
             html=(ROOT/'index.html').read_text(encoding='utf-8').replace('</head>', '<meta name="emre-token" content="'+KEY+'"></head>', 1).encode()
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Content-Length',str(len(html))); self.send_header('Cache-Control','no-store')
-            self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.end_headers(); self.wfile.write(html); return
+            self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Referrer-Policy','no-referrer'); self.send_header('X-Frame-Options','DENY'); self.end_headers(); self.wfile.write(html); return
         if path=='/favicon.ico':
             icon=ROOT/'emre.ico'
             if not icon.is_file(): return self.out({'error':'Bulunamadı'},404)
@@ -225,6 +274,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.out({'error':'Bulunamadı'},404)
         except ValueError as e: return self.out({'error':str(e)},400)
         except Exception as e: return self.out({'error':friendly_error(e)},400)
+    def do_OPTIONS(self):
+        self.out({'error':'Bu yöntem desteklenmiyor.'},405)
     def do_POST(self):
         global TOKEN
         if not self.valid(): return self.out({'error':'Yetkisiz istek.'},403)
@@ -245,7 +296,7 @@ class Handler(BaseHTTPRequestHandler):
                 target.write_text(content,encoding='utf-8')
                 return self.out({'ok':True})
             if path=='/api/tts/speak':
-                text=text_field(data,'text',1500,required=True); voice=text_field(data,'voice',200,required=True)
+                text=text_field(data,'text',1500,required=True,label='Okunacak metin'); voice=text_field(data,'voice',200,required=True,label='Ses adı')
                 name=None
                 try:
                     with tempfile.NamedTemporaryFile(suffix='.wav',delete=False) as f: name=f.name
@@ -305,7 +356,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'ok':True})
             if path=='/api/arena/send':
                 if data.get('confirmed') is not True: raise ValueError('Soru göndermek için onay gerekli.')
-                arena_bridge.send(text_field(data,'question',6000,required=True))
+                arena_bridge.send(text_field(data,'question',6000,required=True,label='Soru'))
                 return self.out({'ok':True})
             if path=='/api/telegram/connect':
                 candidate=str(data.get('token','')).strip()
@@ -374,18 +425,23 @@ class Handler(BaseHTTPRequestHandler):
                 name=str(data.get('name','')).strip()
                 if not name: raise ValueError('Hesap adı gerekli.')
                 with db() as c:
-                    a_ids=[r[0] for r in c.execute('SELECT id,name FROM accounts').fetchall() if r[1].strip().casefold()==name.casefold()]
-                    l_ids=[r[0] for r in c.execute('SELECT id,person FROM ledger').fetchall() if r[1].strip().casefold()==name.casefold()]
+                    key=tr_key(name)
+                    a_ids=[r[0] for r in c.execute('SELECT id,name FROM accounts').fetchall() if tr_key(r[1])==key]
+                    l_ids=[r[0] for r in c.execute('SELECT id,person FROM ledger').fetchall() if tr_key(r[1])==key]
                     if not a_ids and not l_ids: raise ValueError('Hesap bulunamadı.')
                     c.executemany('DELETE FROM accounts WHERE id=?',[(i,) for i in a_ids])
                     c.executemany('DELETE FROM ledger WHERE id=?',[(i,) for i in l_ids])
                 return self.out({'ok':True,'deleted_entries':len(l_ids)})
             if path=='/api/accounts':
-                name=text_field(data,'name',100,required=True); note=text_field(data,'note',300)
-                with db() as c: c.execute('INSERT INTO accounts(name,note) VALUES (?,?)',(name,note))
+                name=text_field(data,'name',100,required=True,label='Hesap adı'); note=text_field(data,'note',300,label='Açıklama')
+                with db() as c:
+                    existing=[r[0] for r in c.execute('SELECT name FROM accounts UNION SELECT DISTINCT person FROM ledger')]
+                    if any(tr_key(x)==tr_key(name) for x in existing):
+                        raise ValueError('Bu isimde bir hesap zaten var.')
+                    c.execute('INSERT INTO accounts(name,note) VALUES (?,?)',(name,note))
                 return self.out({'ok':True})
             if path=='/api/ledger':
-                person=text_field(data,'person',100,required=True); kind=data.get('kind'); amount=data.get('amount'); note=text_field(data,'note',300); due=text_field(data,'due',40)
+                person=text_field(data,'person',100,required=True,label='Kişi adı'); kind=data.get('kind'); amount=data.get('amount'); note=text_field(data,'note',300,label='Açıklama'); due=text_field(data,'due',40,label='Tarih')
                 if kind not in ('receivable','payable','received','paid') or type(amount) is not int or not 0 < amount <= 100000000000: raise ValueError('Kişi, işlem türü ve geçerli tutar gerekli.')
                 if due:
                     try: datetime.fromisoformat(due)
@@ -399,20 +455,24 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'ok':True})
             if path=='/api/ledger/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
-                with db() as c: c.execute('DELETE FROM ledger WHERE id=?',(int_field(data,'id',1,2**53),))
+                with db() as c: c.execute('DELETE FROM ledger WHERE id=?',(int_field(data,'id',1,2**53,label='Kayıt numarası'),))
                 return self.out({'ok':True})
             if path=='/api/reminders':
-                text=text_field(data,'text',300,required=True); due=text_field(data,'due',40,required=True)
+                text=text_field(data,'text',300,required=True,label='Hatırlatıcı metni'); due=text_field(data,'due',40,required=True,label='Tarih')
                 try: datetime.fromisoformat(due)
                 except ValueError: raise ValueError('Tarih biçimi geçersiz; YYYY-AA-GG SS:DD kullan.')
                 with db() as c: c.execute('INSERT INTO reminders(text,due) VALUES (?,?)',(text,due))
                 return self.out({'ok':True})
+            if path=='/api/reminders/delete':
+                if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
+                with db() as c: c.execute('DELETE FROM reminders WHERE id=?',(int_field(data,'id',1,2**53,label='Kayıt numarası'),))
+                return self.out({'ok':True})
             if path=='/api/reminders/done':
-                with db() as c: c.execute('UPDATE reminders SET done=1 WHERE id=?',(int_field(data,'id',1,2**53),))
+                with db() as c: c.execute('UPDATE reminders SET done=1 WHERE id=?',(int_field(data,'id',1,2**53,label='Kayıt numarası'),))
                 return self.out({'ok':True})
             if path=='/api/telegram/send':
                 if data.get('confirmed') is not True: raise ValueError('Gönderme onayı gerekli.')
-                chat_id=int_field(data,'chat_id',-2**53,2**53); text=text_field(data,'text',4096,required=True)
+                chat_id=int_field(data,'chat_id',-2**53,2**53,label='Sohbet kimliği'); text=text_field(data,'text',4096,required=True,label='Mesaj')
                 result=telegram('sendMessage',{'chat_id':chat_id,'text':text})
                 if not result.get('ok'): raise ValueError('Telegram mesajı gönderemedi.')
                 return self.out({'ok':True})
@@ -433,6 +493,17 @@ class EmreServer(ThreadingHTTPServer):
 
 if __name__=='__main__':
     with db(): pass
+    try:
+        httpd=EmreServer(('127.0.0.1',8765),Handler)
+    except OSError as exc:
+        print('8765 portu kullanılıyor. Açık Emre penceresini kapatıp tekrar deneyin.',flush=True)
+        print('Ayrıntı:',exc,flush=True)
+        sys.exit(1)
     print('EMRE: http://127.0.0.1:8765 | Model:',MODEL,flush=True)
     print('Yalnızca bu bilgisayardan erişim. Durdurmak için Ctrl+C.',flush=True)
-    EmreServer(('127.0.0.1',8765),Handler).serve_forever()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print('\nEMRE durduruldu.',flush=True)
+    finally:
+        httpd.server_close()
