@@ -174,3 +174,39 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Güncelleme (GitHub'daki yeni sürümü alma)
+
+`git pull` tek başına çoğu zaman yetmez; en sık iki sebep vardır: **yanlış dal** ve **eski süreç**. Kısa yol:
+
+```bat
+guncelle.bat
+```
+
+Betik sırayla: depo kontrolü → yerel değişiklik uyarısı → `git fetch` → doğru dal kontrolü (gerekirse `arena/58f60478-depommmm` dalına geçiş) → `git pull --ff-only` → `server.py` içindeki sürümü yazdırır.
+
+Elle yapmak istersen:
+
+```bat
+cd /d c:\Users\SERVER\Desktop\jarvis
+git status -sb
+git fetch origin
+git checkout arena/58f60478-depommmm     :: yoksa: git checkout -b arena/58f60478-depommmm origin/arena/58f60478-depommmm
+git pull --ff-only origin arena/58f60478-depommmm
+```
+
+Sonra **mutlaka**:
+
+1. Açık Emre penceresini kapat (Ctrl+C) — `server.py` değiştiği için eski süreç eski kodu sunmaya devam eder.
+2. `baslat.bat` ile yeniden başlat.
+3. Tarayıcıda **Ctrl+F5** (önbelleği atlayarak yenile).
+
+**Güncel sürümde olduğunu nasıl anlarsın?** Ayarlar sekmesinde `Sürüm: 2026-11-02.4` yazar ve sekmelerde **Ücretsiz API** görünür. Kontrol: `http://127.0.0.1:8765/api/status` yanıtındaki `version` alanı.
+
+| Belirti | Sebep | Çözüm |
+| --- | --- | --- |
+| `git pull` → “Already up to date” ama sayfa değişmedi | `main` dalındasın; yeni işler özellik dalında | `guncelle.bat` veya `git checkout arena/58f60478-depommmm` |
+| Sayfa güncellendi ama sekme yok | Sunucu yeniden başlatılmadı | Ctrl+C → `baslat.bat` |
+| Sekme var ama eski görünüm | Tarayıcı önbelleği | Ctrl+F5 |
+| `git pull` çakışma/hata verdi | Yerelde commit edilmemiş değişiklik var | `git stash` ya da `git commit -am "notlarım"`, sonra tekrar |
+| “Bu klasör bir git deposu değil” | Yanlış klasörde çalışıyorsun | Depo klasörüne geç (`git rev-parse --show-toplevel` ile bul) |
