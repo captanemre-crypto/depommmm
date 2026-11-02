@@ -183,6 +183,14 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 guncelle.bat
 ```
 
+PowerShell kullanıyorsan (aynı işi yapar, betik imzası sorunu olmadan):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\guncelle.ps1
+```
+
+> PowerShell'de `cd /d` **çalışmaz** (`/d` cmd.exe'ye özgüdür) — `PositionalParameterNotFound` hatası ondan gelir. PowerShell'de sadece `cd C:\Users\SERVER\Desktop\jarvis` yaz.
+
 Betik sırayla: depo kontrolü → yerel değişiklik uyarısı → `git fetch` → doğru dal kontrolü (gerekirse `arena/58f60478-depommmm` dalına geçiş) → `git pull --ff-only` → `server.py` içindeki sürümü yazdırır.
 
 Elle yapmak istersen:
