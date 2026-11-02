@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -19,6 +20,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import arena_bridge
+import dikte
+import dikte_yaz
 import hatirlatici
 import ledger_tools
 import saglayici
@@ -33,7 +36,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.6'
+VERSION = '2026-11-02.7'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -88,6 +91,39 @@ def db():
 
 BOT = telegram_bot.TelegramBot(lambda: db())
 SAG = saglayici.Saglayici()
+
+# --- Canlı dikte oturumları -------------------------------------------------
+# Her oturum: kullanıcının o ana kadar dikte ettiği metin (sunucuda tutulur ki
+# üst üste binen ses pencerelerinin tekrarı ayıklanabilsin). Bellek sınırlıdır.
+DIKTE = {}
+DIKTE_KILIT = threading.RLock()  # dikte_oturum() aynı kilidi içeriden kullanır
+DIKTE_AZAMI_OTURUM = 32
+DIKTE_AZAMI_KARAKTER = 8000
+
+
+class DikteOturum:
+    def __init__(self):
+        self.metin = ''
+        self.guncelleme = time.time()
+
+    def ekle(self, yeni):
+        """Yeni pencere metnini ekler; eklenen kısmı ve tam metni döndürür."""
+        tam, eklenen = dikte.birlesik(self.metin, yeni, bitir=False)
+        self.metin = tam[:DIKTE_AZAMI_KARAKTER]
+        self.guncelleme = time.time()
+        return eklenen, self.metin
+
+
+def dikte_oturum(ad):
+    with DIKTE_KILIT:
+        simdi = time.time()
+        # Eski oturumları temizle (30 dakika).
+        for anahtar in [k for k, v in DIKTE.items() if simdi - v.guncelleme > 1800]:
+            DIKTE.pop(anahtar, None)
+        if len(DIKTE) >= DIKTE_AZAMI_OTURUM and ad not in DIKTE:
+            en_eski = min(DIKTE, key=lambda k: DIKTE[k].guncelleme)
+            DIKTE.pop(en_eski, None)
+        return DIKTE.setdefault(ad, DikteOturum())
 
 
 def store_message(session, role, text):
@@ -452,6 +488,61 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(ipucu,str): raise ValueError('İpucu metin olmalı.')
                 text=ses_baglanti.transcribe(data.get('audio'), ipucu=ipucu[:300])
                 return self.out({'text':text,'model':ses_baglanti.model()})
+            if path=='/api/dictate/window':
+                # Canlı dikte: istemci her ~1 sn'de son birkaç saniyeyi gönderir.
+                if not isinstance(data.get('audio'),str): raise ValueError('Ses verisi gerekli.')
+                oturum=str(data.get('session') or 'varsayilan')[:64]
+                if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',oturum): oturum='varsayilan'
+                with DIKTE_KILIT:
+                    durum=dikte_oturum(oturum)
+                    ipucu=dikte.ipucu(durum.metin)
+                ham=ses_baglanti.transcribe(data.get('audio'), ipucu=ipucu)
+                with DIKTE_KILIT:
+                    durum=dikte_oturum(oturum)
+                    eklenen,tam=durum.ekle(ham)
+                return self.out({'text':dikte.temizle(ham),'added':eklenen,'full':tam,
+                                 'model':ses_baglanti.model(),'final':False})
+            if path=='/api/dictate/finish':
+                oturum=str(data.get('session') or 'varsayilan')[:64]
+                with DIKTE_KILIT:
+                    durum=DIKTE.get(oturum)
+                    metin=dikte.bicimlendir(durum.metin, bitir=True) if durum else ''
+                # İsteğe bağlı: yapay zekâ ile noktalama/yazım düzeltmesi.
+                duzeltilmis=False
+                if data.get('polish') is True and metin and SAG.yukle()['base_url']:
+                    try:
+                        cevap=SAG.sohbet([
+                            {'role':'system','content':('Sen bir Türkçe dikte düzelticisisin. Verilen metnin '
+                             'yalnızca noktalama, büyük harf ve açık yazım hatalarını düzelt. Kelime ekleme, '
+                             'özetleme veya anlam değiştirme. Yanıt olarak SADECE düzeltilmiş metni yaz.')},
+                            {'role':'user','content':metin[:2000]}], max_tokens=600, timeout=45)
+                        oneri=str(cevap.get('content') or '').strip()
+                        if oneri and abs(len(oneri)-len(metin))<=max(40,len(metin)//3):
+                            metin=oneri
+                            duzeltilmis=True
+                    except ValueError:
+                        pass  # sağlayıcı yoksa/başarısızsa kural tabanlı metin kalır
+                return self.out({'text':metin,'polished':duzeltilmis})
+            if path=='/api/dictate/reset':
+                oturum=str(data.get('session') or 'varsayilan')[:64]
+                with DIKTE_KILIT:
+                    DIKTE.pop(oturum, None)
+                return self.out({'ok':True})
+            if path=='/api/dictate/type':
+                # Metni ETKİN pencereye yazar (ör. Antigravity). Onay zorunludur.
+                if data.get('confirmed') is not True: raise ValueError('Yazma için onay gerekli.')
+                metin=data.get('text')
+                if not isinstance(metin,str): raise ValueError('Yazılacak metin gerekiyor.')
+                if not metin.strip(): raise ValueError('Yazılacak metin boş.')
+                if len(metin)>dikte_yaz.EN_UZUN: raise ValueError('Metin çok uzun; parçalara böl.')
+                hedef=data.get('target') or ''
+                if not isinstance(hedef,str) or len(hedef)>80: raise ValueError('Hedef pencere adı geçersiz.')
+                enter=bool(data.get('enter'))
+                return self.out(dikte_yaz.yaz(metin, hedef=hedef, enter=enter))
+            if path=='/api/dictate/status':
+                return self.out({'sessions':len(DIKTE),'model':ses_baglanti.model(),
+                                 'typing_supported':os.name=='nt',
+                                 'window':dikte_yaz.etkin_baslik() if os.name=='nt' else ''})
             if path=='/api/speech/model':
                 ad=str(data.get('model') or '').strip().lower()
                 if ad not in ses_baglanti.MODELLER: raise ValueError('Model base veya small olmalı.')

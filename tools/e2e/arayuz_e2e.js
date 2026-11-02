@@ -455,6 +455,33 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert($('voiceToggle').getAttribute('aria-pressed') === 'false', 'mikrofon beklenmedik şekilde açık');
   });
 
+
+  await check('canlı dikte paneli açılıyor ve metni sohbete gönderiyor', async () => {
+    $('dictateOpen').click();
+    await sleep(300);
+    assert(!$('dictation').hidden, 'dikte paneli açılmadı');
+    assert(/Canlı dikte/.test($('dictation').textContent), 'panel başlığı yok');
+    assert($('dictateToggle').textContent === 'Dikteyi başlat', 'başlat düğmesi yok');
+
+    // Panelden metin gönderimi (mikrofon donanımı olmadan da akış çalışır)
+    $('dictateText').value = 'yarın saat üçte toplantı var';
+    $('dictateSend').click();
+    await sleep(900);
+    assert(/yarın saat üçte toplantı var/i.test($('messages').textContent), 'dikte metni sohbete gitmedi');
+    assert($('dictateText').value === '', 'metin temizlenmedi');
+
+    // "Aktif pencereye yaz" bu ortamda Windows olmadığı için nazik hata vermeli
+    $('dictateText').value = 'deneme metni';
+    $('dictateType').click();
+    await sleep(700);
+    assert(/Windows|yazılamadı/i.test($('toast').textContent + $('dictateHint').textContent),
+      'yazma hatası bildirilmedi: ' + $('dictateHint').textContent);
+
+    $('dictateClose').click();
+    await sleep(200);
+    assert($('dictation').hidden, 'panel kapanmadı');
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));

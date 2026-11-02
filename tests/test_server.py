@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -319,6 +320,77 @@ class ServerTestCase(unittest.TestCase):
         self.assertTrue(self.api('/api/provider/status')['configured'])
         self.api('/api/provider/disconnect', {'confirmed': True})
         self.assertFalse(self.api('/api/provider/status')['configured'])
+
+    # --- canlı dikte -------------------------------------------------------
+    def test_dictate_window_merges_overlapping_windows(self):
+        import ses_baglanti
+        metinler = ['yarın saat üçte toplantı', 'saat üçte toplantı var', 'toplantı var ve fatura']
+        with mock.patch.object(ses_baglanti, 'transcribe', side_effect=lambda *a, **k: metinler.pop(0)):
+            ilk = self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test1'})
+            ikinci = self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test1'})
+            ucuncu = self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test1'})
+        self.assertEqual(ilk['added'], 'yarın saat üçte toplantı')
+        self.assertEqual(ikinci['added'], 'var')
+        self.assertEqual(ucuncu['added'], 've fatura')
+        self.assertIn('fatura', ucuncu['full'])
+        self.assertEqual(ucuncu['full'].count('toplantı'), 1)
+
+    def test_dictate_finish_formats_sentence(self):
+        import ses_baglanti
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='yarın toplantı var'):
+            self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test2'})
+        veri = self.api('/api/dictate/finish', {'session': 'test2'})
+        self.assertEqual(veri['text'], 'Yarın toplantı var.')
+
+    def test_dictate_reset_clears_session(self):
+        import ses_baglanti
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='bir cümle'):
+            self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test3'})
+        self.api('/api/dictate/reset', {'session': 'test3'})
+        self.assertEqual(self.api('/api/dictate/finish', {'session': 'test3'})['text'], '')
+
+    def test_dictate_window_needs_audio(self):
+        self.api('/api/dictate/window', {'session': 'x'}, expect=400)
+
+    def test_dictate_type_requires_confirmation(self):
+        hata = self.api('/api/dictate/type', {'text': 'selam'}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_dictate_type_writes_into_active_window(self):
+        import dikte_yaz
+        with mock.patch.object(dikte_yaz, 'yaz', return_value={'ok': True, 'yazilan': 5,
+                                                               'pencere': 'Antigravity', 'enter': False}) as sahte:
+            veri = self.api('/api/dictate/type', {'text': 'selam', 'confirmed': True, 'target': 'Antigravity'})
+        self.assertTrue(veri['ok'])
+        self.assertEqual(sahte.call_args.kwargs.get('hedef'), 'Antigravity')
+
+    def test_dictate_type_rejects_empty(self):
+        self.api('/api/dictate/type', {'text': '   ', 'confirmed': True}, expect=400)
+
+    def test_dictate_type_rejects_long_target(self):
+        self.api('/api/dictate/type', {'text': 'a', 'confirmed': True, 'target': 'x' * 200}, expect=400)
+
+    def test_dictate_finish_polish_uses_provider(self):
+        import ses_baglanti
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='yarın toplantı var mı'):
+            self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test4'})
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        veri = self.api('/api/dictate/finish', {'session': 'test4', 'polish': True})
+        self.assertTrue(veri['polished'])
+        self.assertTrue(veri['text'])
+
+    def test_dictate_finish_without_provider_falls_back(self):
+        import ses_baglanti
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='bir cümle'):
+            self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'test5'})
+        veri = self.api('/api/dictate/finish', {'session': 'test5', 'polish': True})
+        self.assertFalse(veri['polished'])
+        self.assertEqual(veri['text'], 'Bir cümle.')
+
+    def test_dictate_status_shape(self):
+        veri = self.api('/api/dictate/status', {})
+        self.assertIn('sessions', veri)
+        self.assertIn('typing_supported', veri)
 
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')

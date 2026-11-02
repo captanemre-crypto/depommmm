@@ -149,3 +149,24 @@ Kök nedenler ve düzeltmeler:
 | L10 | İşçi çökünce oturum boyunca ses ölü kalıyordu | `ses_baglanti` hata sonrası `worker=None` | ✅ |
 
 Testler: `tests/test_ses_baglanti.py` 9 test, `test_server.py` +2 (`/api/speech/status`, `/api/speech/model`) → **126 test**; E2E **36/36** (Ses sekmesinde tanıma ayarları ve sessizlik seçiminin kaydı).
+
+## Ek tur: canlı dikte (Antigravity'ye anında yazma)
+
+**İstek:** “Konuştuklarımı algılasın, anında yazsın ve cevap vermeye çalışsın. Belli bir süre sonra toplu yazmasını istemiyorum. Yazımı düzelt, noktalamasını yap, anlam ver — dikte olarak kullan.”
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| M1 | `dikte.py`: `kaydir()` (üst üste binen pencerelerde kelime düzeyinde tekrar ayıklama), `temizle()` (dolgu sesleri, kekeleme), `bicimlendir()` (Türkçe büyük harf, soru algılama, noktalama, kesme işareti), `ipucu()` (Whisper bağlamı) | ✅ |
+| M2 | `dikte_yaz.py`: Windows `SendInput` + `KEYEVENTF_UNICODE` ile etkin pencereye yazma; hedef pencere doğrulaması, uzunluk/satır sonu denetimi, Enter seçeneği, Windows dışında açık hata | ✅ |
+| M3 | `POST /api/dictate/{window,finish,reset,type,status}`; oturum başına metin (en fazla 32 oturum, 8000 karakter, 30 dk TTL, `RLock`) | ✅ |
+| M4 | İstemci: `ScriptProcessor` ile ham PCM → 16 kHz WAV → her 1 sn'de pencere gönderimi; sessizlikte motoru çalıştırmaz; metin panelde anında | ✅ |
+| M5 | Panel: canlı yazım / Enter / cevap ver / yapay zekâ düzeltmesi anahtarları, hedef pencere alanı, “Aktif pencereye yaz”, “Sohbete gönder”, “Temizle” | ✅ |
+| M6 | Yapay zekâ düzeltmesi: yalnızca noktalama/yazım, anlam korunur; uzunluk ±%33 dışındaysa öneri yok sayılır; sağlayıcı yoksa kural tabanlı metin kalır | ✅ |
+| M7 | Testler: `tests/test_dikte.py` (26), `tests/test_dikte_yaz.py` (11), `test_server.py` +11 dikte testi → **172 test**; E2E **37/37** | ✅ |
+
+Bilinçli sınırlar:
+
+- Yazma yalnızca Windows'ta; Linux/macOS'ta açık hata (sessiz başarısızlık yok).
+- Dikte metni **pano kullanmaz**, tuş kombinasyonu göndermez; yalnızca harf ve (istenirse) Enter.
+- Canlı yazım varsayılan olarak **kapalı**; kullanıcı açmadan başka uygulamaya yazılmaz.
+- Whisper `base` modeli 1 sn'lik pencerelerde hızlı ama Türkçede zayıf; `small` önerilir (gecikme ~1–2 sn).

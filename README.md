@@ -265,3 +265,46 @@ Sonra Ayarlar › Ses › *Tanıma modeli* → **small** → *Tanıma modelini k
 Ayrıca sunucu tarafında tanıma şu şekilde iyileştirildi: `vad_parameters(min_silence_duration_ms=700, speech_pad_ms=600)`, `no_speech_threshold=0.6`, `compression_ratio_threshold=2.4`, tekrarlanan segmentlerin atılması ve Türkçe alan sözcükleri içeren `initial_prompt`. İşçi çökerse bir sonraki istekte kendini yeniden başlatır.
 
 **Test:** `python3 -m unittest tests.test_ses_baglanti` (9 test) · `POST /api/speech/model {model:'base'|'small'}` · `GET /api/speech/status` → `{installed, model, models, hint}`
+
+## Canlı dikte: konuş → anında yaz (Antigravity ve her uygulama)
+
+Sohbet kutusunun yanındaki **⌨** düğmesi canlı dikte panelini açar. Eski mikrofon (◉) cümle bitmesini bekleyip **toplu** yazıyordu; canlı dikte ise konuşurken **~1 saniye içinde** metni üretir ve istersen doğrudan etkin pencereye yazar.
+
+| Özellik | Nasıl |
+| --- | --- |
+| Anında yazım | Ses her 1 saniyede bir “son ~4,5 saniye” penceresi olarak yerel Whisper'a gider; cümle bitmesi beklenmez |
+| Tekrar yok | Üst üste binen pencerelerin ortak kelimeleri `dikte.kaydir()` ile ayıklanır (kelime düzeyinde çakışma) |
+| Noktalama + büyük harf | `dikte.bicimlendir()`: Türkçe büyük harf (i→İ, ı→I), soru cümlesi algılama, noktalama boşlukları, “Ankara'da” kesme işareti |
+| Dolgu temizliği | “ıı, eee, hmm, öhö, ıh” gibi anlamsız sesler ve kekeleme (“ben ben ben” → “ben”) atılır; **“yani/işte/şey” korunur** (anlam taşır) |
+| Etkin pencereye yazma | `dikte_yaz.py` → Windows `SendInput` + `KEYEVENTF_UNICODE` (Türkçe karakterler bozulmaz, panoya dokunulmaz) |
+| Hedef pencere kilidi | “Hedef pencere” alanına `Antigravity` yazarsan metin **yalnızca** başlığı bu metni içeren pencereye yazılır; başka uygulama öndeyse yazmaz, uyarır |
+| Yazımı düzeltme | “Durdurduğumda yazımı yapay zekâ düzeltsin” açıksa, durdurunca metin ücretsiz API sağlayıcısına gönderilip yalnızca noktalama/yazım düzeltmesi istenir (anlam değiştirmez, uzunluk kontrolü yapılır) |
+| Emre cevaplasın | “Durdurduğumda Emre cevap versin” açıksa dikte metni sohbete gönderilir ve yanıt sesli okunur |
+
+Akış (tek yönlü, hepsi yerel):
+
+```
+mikrofon ─► ham PCM (ScriptProcessor) ─► 1 sn'de bir WAV ─► /api/dictate/window
+        ─► Whisper (yerel) ─► çakışma ayıklama ─► panelde anında metin
+        ─► (isteğe bağlı) /api/dictate/type ─► etkin pencere (Antigravity)
+```
+
+### Uç noktalar
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/dictate/window` | `{audio (wav base64), session}` → `{text, added, full, model}` |
+| `POST /api/dictate/finish` | `{session, polish?}` → biçimlendirilmiş tam metin (isteğe bağlı yapay zekâ düzeltmesi) |
+| `POST /api/dictate/reset` | oturumu temizler |
+| `POST /api/dictate/type` | `{text, confirmed:true, target?, enter?}` → etkin pencereye yazar (yalnızca Windows) |
+| `POST /api/dictate/status` | oturum sayısı, model, yazma desteği, etkin pencere başlığı |
+
+### Antigravity ile kullanım
+
+1. Ayarlar › Ses › *Tanıma modeli* → **small** (Türkçe doğruluk için, `ses_small_kur.bat` ile kurulur).
+2. ⌨ → **Hedef pencere** alanına `Antigravity` yaz → **Dikteyi başlat**.
+3. Antigravity penceresini öne getir, konuş. Metin ~1 saniye içinde hem panelde görünür hem (canlı yazım açıksa) Antigravity'nin giriş alanına yazılır.
+4. Cümle bitince Enter gönderilsin istersen *Her cümleden sonra Enter gönder* seçeneğini aç.
+5. Durdurduğunda yazım/noktalama düzeltmesi ve Emre'nin cevabı için ilgili onay kutularını kullan.
+
+> **Güvenlik:** yazma işlemi onay gerektirir (`confirmed:true`), yalnızca metin gönderir (komut çalıştırmaz, tuş kombinasyonu göndermez), satır sonu içeren metni reddeder ve hedef pencere eşleşmezse hiç yazmaz.
