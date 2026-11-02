@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Veritabanı
+*.sqlite3
+*.db
+
+# Loglar
+*.log
+
+# Ses / büyük dosyalar
+*.wav
+*.mp3
+sesler/
+
+# Ortam değişkenleri
+.env
+*.env
