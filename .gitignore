@@ -33,6 +33,10 @@ kodlar/
 # Yerele özel yapılandırma (şablon: openjarvis_yol.ornek.json)
 openjarvis_yol.json
 
+# Ücretsiz API sağlayıcı ayarı: API anahtarı içerir, asla commit edilmemeli
+saglayici_ayar.json
+saglayici_ayar.tmp
+
 # Ortam değişkenleri
 .env
 *.env

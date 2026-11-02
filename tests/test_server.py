@@ -11,12 +11,44 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import saglayici  # noqa: E402
 import server  # noqa: E402
+
+
+class SahteSaglayici(BaseHTTPRequestHandler):
+    """Testler için OpenAI uyumlu küçük sunucu."""
+
+    def log_message(self, *args):
+        pass
+
+    def _json(self, kod, govde):
+        veri = json.dumps(govde).encode()
+        self.send_response(kod)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(veri)))
+        self.end_headers()
+        self.wfile.write(veri)
+
+    def do_GET(self):
+        if self.path.endswith('/models'):
+            return self._json(200, {'data': [{'id': 'openai/gpt-oss-20b:free'}, {'id': 'tool-model'}]})
+        self._json(404, {'error': 'yok'})
+
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', '0'))
+        govde = json.loads(self.rfile.read(n) or b'{}')
+        if govde.get('model') == 'tool-model':
+            return self._json(200, {'choices': [{'message': {
+                'role': 'assistant', 'content': None,
+                'tool_calls': [{'id': '1', 'type': 'function',
+                                'function': {'name': 'ledger_list', 'arguments': '{"person": "Araç Kişi"}'}}]}}]})
+        return self._json(200, {'choices': [{'message': {'role': 'assistant', 'content': 'Sağlayıcı yanıtı: merhaba!'}}]})
 
 
 class ServerTestCase(unittest.TestCase):
@@ -29,11 +61,17 @@ class ServerTestCase(unittest.TestCase):
         cls.base = f'http://127.0.0.1:{cls.port}'
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
         cls.thread.start()
+        # Sahte OpenAI uyumlu sağlayıcı
+        cls.sag_httpd = ThreadingHTTPServer(('127.0.0.1', 0), SahteSaglayici)
+        cls.provider_base = f'http://127.0.0.1:{cls.sag_httpd.server_address[1]}/v1'
+        threading.Thread(target=cls.sag_httpd.serve_forever, daemon=True).start()
 
     @classmethod
     def tearDownClass(cls):
         cls.httpd.shutdown()
         cls.httpd.server_close()
+        cls.sag_httpd.shutdown()
+        cls.sag_httpd.server_close()
         server.KEY = cls.original_key
 
     def setUp(self):
@@ -41,10 +79,13 @@ class ServerTestCase(unittest.TestCase):
         # kayıtlarını görmez (mükerrer hesap kontrolü yüzünden önemli).
         self.tmp = tempfile.TemporaryDirectory()
         self.original_db = server.DB
+        self.original_sag = server.SAG
         server.DB = Path(self.tmp.name) / 'test.sqlite3'
+        server.SAG = saglayici.Saglayici(Path(self.tmp.name) / 'saglayici_ayar.json')
 
     def tearDown(self):
         server.DB = self.original_db
+        server.SAG = self.original_sag
         self.tmp.cleanup()
 
     def raw(self, path, data=None, token='test-anahtar', origin=None, method=None):
@@ -247,6 +288,64 @@ class ServerTestCase(unittest.TestCase):
             csp = res.headers.get('Content-Security-Policy', '')
             self.assertIn("default-src 'self'", csp)
             self.assertIn("frame-ancestors 'none'", csp)
+
+    # --- ücretsiz API sağlayıcısı -----------------------------------------
+    def test_provider_status_hides_key(self):
+        server.SAG.kaydet(self.provider_base, 'gizli-anahtar-9876', 'openai/gpt-oss-20b:free')
+        durum = self.api('/api/provider/status')
+        self.assertTrue(durum['configured'])
+        self.assertEqual(durum['key_hint'], '…9876')
+        self.assertNotIn('gizli-anahtar-9876', json.dumps(durum))
+        self.assertIn('presets', durum)
+
+    def test_provider_models_listing(self):
+        veri = self.api('/api/provider/models', {'base_url': self.provider_base, 'key': 'test'})
+        self.assertIn('openai/gpt-oss-20b:free', veri['models'])
+        self.assertTrue(all('free' in m for m in veri['free']))
+
+    def test_provider_connect_requires_confirmation(self):
+        self.api('/api/provider/connect', {'base_url': self.provider_base, 'model': 'openai/gpt-oss-20b:free'}, expect=400)
+        self.assertFalse(self.api('/api/provider/status')['configured'])
+
+    def test_provider_connect_rejects_unknown_model(self):
+        self.api('/api/provider/connect', {'base_url': self.provider_base, 'model': 'yok/boyle-model',
+                                           'confirmed': True}, expect=400)
+        self.assertFalse(self.api('/api/provider/status')['configured'])
+
+    def test_provider_connect_and_disconnect(self):
+        veri = self.api('/api/provider/connect', {'base_url': self.provider_base, 'key': 'test',
+                                                  'model': 'openai/gpt-oss-20b:free', 'confirmed': True})
+        self.assertTrue(veri['status']['configured'])
+        self.assertTrue(self.api('/api/provider/status')['configured'])
+        self.api('/api/provider/disconnect', {'confirmed': True})
+        self.assertFalse(self.api('/api/provider/status')['configured'])
+
+    def test_provider_rejects_plain_http_remote(self):
+        error = self.api('/api/provider/models', {'base_url': 'http://kotu-site.example/v1'}, expect=400)['error']
+        self.assertIn('https', error)
+
+    def test_chat_with_api_backend(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        cevap = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}],
+                                       'backend': 'api', 'session': 'api-oturum'})
+        self.assertIn('sağlayıcı yanıtı', cevap['reply'].lower())
+        # Mesaj sunucu geçmişine de yazılmalı
+        oturumlar = self.api('/api/history')['sessions']
+        self.assertTrue(any(o['session'] == 'api-oturum' for o in oturumlar))
+
+    def test_chat_with_api_backend_runs_ledger_tool(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'tool-model')
+        self.api('/api/accounts', {'name': 'Araç Kişi'})
+        self.api('/api/ledger', {'person': 'Araç Kişi', 'kind': 'receivable', 'amount': 10000})
+        cevap = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'Araç Kişi bakiyesi ne?'}],
+                                       'backend': 'api'})
+        self.assertIn('alacak', cevap['reply'].lower())
+        self.assertIn('100,00', cevap['reply'])
+
+    def test_chat_with_api_backend_not_configured(self):
+        error = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'selam'}], 'backend': 'api'},
+                         expect=400)['error']
+        self.assertIn('Ücretsiz API', error)
 
     # --- istek gövdesi -----------------------------------------------------
     def test_chunked_body_accepted(self):

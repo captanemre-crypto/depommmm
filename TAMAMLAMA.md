@@ -66,3 +66,30 @@ E2E paketi: 30 kontrol (menü, defter, hatırlatıcı, sohbetten hatırlatıcı,
 6. Telegram anahtarı ile bağlan → mesaj gönder → okunmamış sayısı artıyor, sunucuyu yeniden başlat → aynı mesaj tekrar görünmüyor.
 7. `testler.bat` → 80 test geçiyor.
 8. `ses_model_kur.bat` → indirme sonunda `sesler/*.sha256` dosyaları oluşuyor.
+
+## Ek tur: Ollama'sız ücretsiz yapay zekâ (sağlayıcı katmanı)
+
+**Soru:** "Ollama yerine ücretsiz bir yapay zekâya bağlama şansımız nedir, mesela OmniRoute'taki ücretsizleri kullanmak?"
+**Yanıt:** Evet. OmniRoute OpenAI uyumlu `http://127.0.0.1:20128/v1` sunduğu için doğrudan bağlanır; OpenRouter/Groq/Cerebras/Gemini gibi servisler de aynı protokolü konuştuğu için tek istemciyle kullanılır.
+
+Eklenenler:
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| H1 | `saglayici.py`: OpenAI uyumlu istemci (model listesi, sohbet, araç çağrıları) | ✅ |
+| H2 | Adres güvenliği: uzakta `https` zorunlu, `http` yalnız loopback, URL'de kimlik reddi, `/v1` otomatik tamamlama | ✅ |
+| H3 | Anahtar saklama: `saglayici_ayar.json`, 0600 izin, atomik yazma, arayüze maskeli (`…1234`), `.gitignore` kaydı | ✅ |
+| H4 | Türkçe hata mesajları (401/402/403/404/422/429/5xx, bağlantı yok) | ✅ |
+| H5 | Hazır servis listesi (OmniRoute, OpenRouter, Groq, Cerebras, Gemini) | ✅ |
+| H6 | `/api/chat` içinde `backend:'api'` dalı; defter/hatırlatıcı araçları sağlayıcıda da çalışır | ✅ |
+| H7 | Ayarlar → **Ücretsiz API** sekmesi: ön ayar seçimi, model getirme (`:free` ★), onay, bağlantıyı kes | ✅ |
+| H8 | Sistem durumu panelinde "Yapay zekâ" satırı (hangi arka uç etkin) | ✅ |
+| H9 | Testler: `tests/test_saglayici.py` (15) + `tests/test_server.py` içinde 9 sağlayıcı testi | ✅ (104 test) |
+| H10 | E2E: sahte OpenAI uyumlu sağlayıcı ile 2 yeni kontrol (bağlan → sohbet → kes, https uyarısı) | ✅ (32 kontrol) |
+| H11 | README bölümü + gizlilik/kota uyarıları | ✅ |
+
+Bilinçli sınırlar:
+
+- Ücretsiz kotalar sağlayıcıya göre değişir; "sınırsız" iddiaları garanti değildir, kod 429'u anlaşılır biçimde bildirir.
+- Sağlayıcıya gönderilen mesajlar o servisin gizlilik politikasına tabidir; hassas veri için yerel Ollama/OmniRoute önerilir.
+- Otomatik yedekleme (bir sağlayıcı 429 verince diğerine geçme) yapılmaz; kullanıcı modeli elle seçer.

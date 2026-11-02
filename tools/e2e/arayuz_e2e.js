@@ -110,8 +110,10 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   await check('canlı durum paneli güncellendi', async () => {
     const cells = [...d.querySelectorAll('[data-durum]')].map(el => el.textContent);
-    assert(cells.length === 4, '4 durum hücresi bekleniyordu, bulunan: ' + cells.length);
+    assert(cells.length === 5, '5 durum hücresi bekleniyordu (ses, internet, Telegram, cihaz, yapay zekâ), bulunan: ' + cells.length);
     assert(!cells.every(c => c === 'Kontrol ediliyor…'), 'panel hiç güncellenmedi');
+    const yz = d.querySelector('[data-durum="yapayzeka"]').textContent;
+    assert(yz && yz !== 'Kontrol ediliyor…', 'yapay zekâ satırı boş: ' + yz);
   });
 
   await check('yaklaşan hatırlatıcılar kartı veri çekti', () => {
@@ -328,6 +330,59 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     await sleep(600);
     const metin = $('simpleBody').textContent;
     assert(/anahtar|bağla|Yoklama|ayarlanmamış/i.test(metin), 'Telegram durumu gösterilmedi: ' + metin.slice(0, 150));
+  });
+
+
+  await check('ücretsiz API sekmesi: sağlayıcıya bağlan, sohbet et, bağlantıyı kes', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('providerTab').click();
+    await sleep(600);
+    const metin = () => $('settingsBody').textContent;
+    assert(/Ücretsiz API sağlayıcısı/.test(metin()), 'sekme içeriği yok');
+    assert(/OmniRoute/.test(metin()), 'hazır sağlayıcı listesi görünmüyor');
+
+    // Form alanlarını sahte sağlayıcıya yönlendir
+    const inputs = [...$('settingsBody').querySelectorAll('input')];
+    assert(inputs.length >= 2, 'adres/anahtar alanları yok');
+    inputs[0].value = 'http://127.0.0.1:8899/v1';
+    inputs[1].value = 'test-anahtar';
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Modelleri getir').click();
+    await sleep(900);
+    assert(/3 model bulundu/.test(metin()), 'model listesi gelmedi: ' + metin().slice(-160));
+
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bağlan ve kaydet').click();
+    await sleep(1200);
+    assert(/Bağlı:/.test(metin()), 'bağlantı durumu güncellenmedi: ' + metin().slice(-160));
+
+    // Sohbeti sağlayıcı üzerinden sür
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Sohbet').click();
+    await sleep(400);
+    $('input').value = 'merhaba';
+    $('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await sleep(1500);
+    assert(/Sahte sağlayıcı yanıtı/.test($('messages').textContent), 'sağlayıcı yanıtı görünmedi: ' + $('messages').textContent.slice(-200));
+
+    // Bağlantıyı kes → Ollama'ya dön
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('providerTab').click();
+    await sleep(500);
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bağlantıyı kes').click();
+    await sleep(1200);
+    assert(/Henüz bağlı değil/.test(metin()), 'bağlantı kesilmedi: ' + metin().slice(-160));
+    const durum = await (await request('/api/provider/status')).json();
+    assert(durum.configured === false, 'sunucuda anahtar kaldı');
+  });
+
+  await check('ücretsiz API: https zorunluluğu arayüzde bildiriliyor', async () => {
+    $('providerTab').click();
+    await sleep(500);
+    const inputs = [...$('settingsBody').querySelectorAll('input')];
+    inputs[0].value = 'http://uzak-ornek.example/v1';
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Modelleri getir').click();
+    await sleep(900);
+    assert(/https/i.test($('toast').textContent), 'https uyarısı gösterilmedi: ' + $('toast').textContent);
   });
 
   // localStorage'da token saklanmıyor mu?

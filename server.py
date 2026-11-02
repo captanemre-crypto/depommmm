@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import arena_bridge
 import hatirlatici
 import ledger_tools
+import saglayici
 import ses_baglanti
 import telegram_bot
 import tts_piper_bridge
@@ -32,7 +33,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.2'
+VERSION = '2026-11-02.3'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -86,6 +87,7 @@ def db():
 
 
 BOT = telegram_bot.TelegramBot(lambda: db())
+SAG = saglayici.Saglayici()
 
 
 def store_message(session, role, text):
@@ -343,6 +345,8 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError: pass
                 return self.out({'voices':voices,'piper_installed':any(tts_piper_bridge.installed(v) for v in ('dfki','fahrettin','fettah'))})
             if path=='/api/speech/status': return self.out({'installed':(ROOT/'.venv-ses'/'Scripts'/'python.exe').is_file()})
+            if path=='/api/provider/status':
+                return self.out(SAG.durum())
             if path=='/api/openjarvis/status':
                 try:
                     health=request_json(OPENJARVIS+'/health',timeout=3)
@@ -361,7 +365,8 @@ class Handler(BaseHTTPRequestHandler):
                                  'openjarvis_online':openjarvis_online,'arena_status':arena_bridge.snapshot().get('status','stopped'),
                                  'apps_supported':os.name=='nt','internet_access':internet_available(),
                                  'telegram':BOT.status(),'telegram_unread':BOT.messages(1).get('unread',0) if BOT.configured() else 0,
-                                 'arena_message':arena_bridge.snapshot().get('message','')})
+                                 'arena_message':arena_bridge.snapshot().get('message',''),
+                                 'provider':SAG.durum()})
             if path=='/api/accounts':
                 with db() as c: rows=c.execute('SELECT name,note FROM accounts ORDER BY name').fetchall()
                 return self.out({'accounts':[{'name':r[0],'note':r[1]} for r in rows]})
@@ -490,6 +495,32 @@ class Handler(BaseHTTPRequestHandler):
                 if data.get('confirmed') is not True: raise ValueError('Soru göndermek için onay gerekli.')
                 arena_bridge.send(text_field(data,'question',6000,required=True,label='Soru'))
                 return self.out({'ok':True})
+            if path=='/api/provider/models':
+                taban=data.get('base_url'); anahtar=data.get('key')
+                if taban is not None and not isinstance(taban,str): raise ValueError('Sunucu adresi metin olmalı.')
+                if anahtar is not None and not isinstance(anahtar,str): raise ValueError('API anahtarı metin olmalı.')
+                if taban and taban.strip():
+                    saglayici.normalize_base(taban)
+                modeller=SAG.modeller(base_url=taban or None, key=anahtar)
+                ucretsiz=[m for m in modeller if 'free' in m.lower()]
+                return self.out({'models':modeller,'free':ucretsiz,'total':len(modeller)})
+            if path=='/api/provider/connect':
+                if data.get('confirmed') is not True: raise ValueError('Bağlantı için onay gerekli.')
+                taban=data.get('base_url'); anahtar=data.get('key'); model=data.get('model')
+                for alan,deger in (('Sunucu adresi',taban),('API anahtarı',anahtar),('Model',model)):
+                    if deger is not None and not isinstance(deger,str): raise ValueError(alan+' metin olmalı.')
+                if not isinstance(taban,str) or not taban.strip(): raise ValueError('Sunucu adresi gerekli.')
+                if not isinstance(model,str) or not model.strip(): raise ValueError('Model seçilmeli.')
+                # Kaydetmeden önce doğrula: yanlış anahtar dosyaya yazılmasın.
+                modeller=SAG.modeller(base_url=taban, key=anahtar or '')
+                if model.strip() not in modeller:
+                    raise ValueError('Seçilen model sağlayıcının listesinde yok. Listeyi yenileyip tekrar seç.')
+                SAG.kaydet(taban, anahtar or '', model)
+                return self.out({'ok':True,'status':SAG.durum()})
+            if path=='/api/provider/disconnect':
+                if data.get('confirmed') is not True: raise ValueError('Bağlantıyı kesmek için onay gerekli.')
+                SAG.sil()
+                return self.out({'ok':True})
             if path=='/api/telegram/connect':
                 candidate=str(data.get('token','')).strip()
                 if not re.fullmatch(r'\d{5,15}:[A-Za-z0-9_-]{20,100}',candidate): raise ValueError('Bot anahtarı biçimi geçersiz.')
@@ -534,15 +565,20 @@ class Handler(BaseHTTPRequestHandler):
                 if direct is not None: return yanitla(direct)
                 direct=ledger_tools.direct_ledger_action(last_user,db)
                 if direct is not None: return yanitla(direct)
+                backend=str(data.get('backend') or 'ollama').strip().lower()
                 # Model kontrolü kural tabanlı işlemlerden SONRA yapılır: Ollama kapalıyken
                 # bile hatırlatıcı ve defter komutları çalışmaya devam eder.
-                installed={m.get('name') for m in request_json(OLLAMA+'/api/tags',timeout=5).get('models',[])}
-                if selected not in installed and selected+':latest' not in installed: raise ValueError('Seçilen model Ollama üzerinde kurulu değil.')
-                # Qwen3 supports both the API flag and an explicit no-thinking directive.
-                if selected.lower().startswith('qwen3'):
-                    clean[-1]['content'] += '\n/no_think'
+                if backend in ('api','openai','omnirouter','openrouter','saglayici'):
+                    backend='api'
+                    if not SAG.yukle()['base_url']:
+                        raise ValueError('Ücretsiz API sağlayıcısı ayarlanmamış. Ayarlar > Ücretsiz API bölümünden bağlan.')
+                elif backend=='ollama':
+                    installed={m.get('name') for m in request_json(OLLAMA+'/api/tags',timeout=5).get('models',[])}
+                    if selected not in installed and selected+':latest' not in installed: raise ValueError('Seçilen model Ollama üzerinde kurulu değil.')
+                    # Qwen3 supports both the API flag and an explicit no-thinking directive.
+                    if selected.lower().startswith('qwen3'):
+                        clean[-1]['content'] += '\n/no_think'
                 system=SYSTEM+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
-                backend=data.get('backend','ollama')
                 if backend=='openjarvis':
                     if selected not in ('emre-cpu','emre-cpu:latest'): return self.out({'error':'OpenJarvis için önce emre-cpu modelini oluştur ve Ayarlar’dan seç.'},400)
                     # Client-supplied tools keep tool execution under Emre's validation.
@@ -550,6 +586,12 @@ class Handler(BaseHTTPRequestHandler):
                     choices=result.get('choices') or []
                     if not choices: raise ValueError('OpenJarvis yanıt döndürmedi.')
                     msg=choices[0].get('message',{})
+                elif backend=='api':
+                    # OpenAI uyumlu sağlayıcı: OmniRoute, OpenRouter, Groq, Gemini…
+                    # Model belirtilmemişse sağlayıcı ayarında kayıtlı model kullanılır.
+                    api_model=str(data.get('model') or '').strip() or None
+                    msg=SAG.sohbet([{'role':'system','content':system}]+clean, model=api_model,
+                                   tools=ledger_tools.TOOLS, max_tokens=500, timeout=120)
                 elif backend=='ollama':
                     result=request_json(OLLAMA+'/api/chat',{'model':selected,'messages':[{'role':'system','content':system}]+clean,'tools':ledger_tools.TOOLS,'stream':False,'think':False,'options':{'num_ctx':4096,'num_predict':400,'num_gpu':0}}, timeout=300)
                     msg=result.get('message',{})
@@ -557,7 +599,8 @@ class Handler(BaseHTTPRequestHandler):
                 calls=msg.get('tool_calls') or []
                 if calls:
                     if len(calls)!=1: return yanitla('Bir seferde tek işlem yapabiliyorum; lütfen işlemleri ayrı ayrı söyle.')
-                    fn=calls[0].get('function',{})
+                    fn=calls[0].get('function',{}) if isinstance(calls[0],dict) else {}
+                    if not isinstance(fn,dict): fn={}
                     try: reply=ledger_tools.execute(fn.get('name'),fn.get('arguments',{}),db,last_user)
                     except (ValueError,TypeError,KeyError) as err: reply='Kayıt yapılmadı: '+str(err)
                     return yanitla(reply)

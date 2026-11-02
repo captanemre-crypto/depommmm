@@ -130,3 +130,41 @@ Defter kayıtlarında `source` (`manual` veya `chat`) ve `raw_text` (kaydı teti
 - **Telefon erişimi yok:** sunucu yalnızca `127.0.0.1` dinler.
 - **Windows üzerinde uçtan uca doğrulanmadı:** SAPI/Piper sesleri, WebView2, tepsi simgesi, `.bat` akışları ve OpenJarvis süreç yönetimi gerçek makinede denenmelidir.
 - **Lisans dosyası yok:** kamuya açık paylaşım öncesi lisans seçilmelidir.
+
+## Ücretsiz yapay zekâ (Ollama zorunlu değil)
+
+Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu olmasa da asistan çalışır:
+
+1. Ayarlar → **Ücretsiz API** sekmesini aç.
+2. Hazır servislerden birini seç (adres otomatik dolar) veya kendi `/v1` adresini yaz.
+3. **Modelleri getir** ile model listesini çek (`:free` olan modeller listede başa alınır ve ★ ile işaretlenir).
+4. Bir model seç, **Bağlan ve kaydet**'e bas. Bağlantı kesilene kadar sohbetler bu sağlayıcı üzerinden yürür.
+
+| Servis | Adres | Anahtar | Not |
+| --- | --- | --- | --- |
+| **OmniRoute** (önerilen, yerel) | `http://127.0.0.1:20128/v1` | gerekmez (yerelde `auto` modeli) | `npm i -g omniroute` ile kurulur, kendi bilgisayarında çalışır, birden çok ücretsiz sağlayıcıyı sırayla dener |
+| OpenRouter | `https://openrouter.ai/api/v1` | gerekli | `:free` ekiyle biten modeller ücretsizdir, günlük istek sınırı vardır |
+| Groq | `https://api.groq.com/openai/v1` | gerekli | hızlı çıkarım, günlük ücretsiz kota |
+| Cerebras | `https://api.cerebras.ai/v1` | gerekli | günlük token kotası |
+| Gemini (OpenAI uyumlu) | `https://generativelanguage.googleapis.com/v1beta/openai` | gerekli | ücretsiz katman, model adı `gemini-2.5-flash` gibi yazılır |
+
+Önerilen ücretsiz modeller: sohbet için `meta-llama/llama-3.3-70b-instruct:free`, araç (defter/hatırlatıcı) çağrıları için `openai/gpt-oss-120b:free` veya `cohere/north-mini-code:free`.
+
+### Güvenlik ve gizlilik
+
+- API anahtarı yalnızca bu bilgisayarda, `saglayici_ayar.json` dosyasında **0600** izinle saklanır; dosya `.gitignore` içindedir ve arayüze yalnızca son dört karakteri (`…1234`) döner.
+- Uzak sağlayıcılarda adres **https://** olmak zorundadır; `http://` yalnızca kendi bilgisayarındaki adresler (OmniRoute gibi) için kabul edilir. Böylece anahtar şifresiz ağda taşınmaz.
+- Adres içine kullanıcı adı/parola yazılamaz (`https://kullanici:parola@host` reddedilir).
+- Mesajlar seçtiğin sağlayıcıya gider; ücretsiz katmanlarda "gönderilen metin eğitimde kullanılabilir" maddesi bulunabilir. Gizli bilgi yazacaksan yerel Ollama veya OmniRoute (yerel ağ geçidi) kullan.
+- Kotan dolduğunda sağlayıcı `429` döner; Emre bunu Türkçe açıklar, başka model seçebilir veya Ollama'ya dönebilirsin.
+- Ücretsiz kotalar servis sağlayıcıya göre değişir; tablodaki değerler garanti değildir.
+
+### Sunucu uç noktaları
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/provider/status` | bağlı mı, adres, model, maskeli anahtar ve hazır servis listesi |
+| `POST /api/provider/models` | `{base_url, key}` → model listesi ve ücretsiz (`:free`) modeller ayrıca |
+| `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
+| `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
+| `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
