@@ -19,4 +19,4 @@ sesler/
 
 # Ortam değişkenleri
 .env
-*.env
+*.env.venv-ses/
