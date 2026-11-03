@@ -5,8 +5,15 @@ __pycache__/
 venv/
 env/
 
+# Sanal ortamlar (kurulum .bat dosyaları tarafından oluşturulur)
+.venv-ses/
+.venv-desktop/
+
 # Veritabanı
 *.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 *.db
 
 # Loglar
@@ -17,6 +24,38 @@ env/
 *.mp3
 sesler/
 
+# Arena otomasyon profili: oturum çerezleri içerir, asla paylaşmayın
+arena_profile/
+
+# Geliştirici çalışma alanı (kullanıcıya özel dosyalar)
+kodlar/
+
+# Yerele özel yapılandırma (şablon: openjarvis_yol.ornek.json)
+openjarvis_yol.json
+
+# Ücretsiz API sağlayıcı ayarı: API anahtarı içerir, asla commit edilmemeli
+saglayici_ayar.json
+saglayici_ayar.tmp
+
 # Ortam değişkenleri
 .env
-*.env.venv-ses/
+*.env
+
+# Node (E2E test aracı)
+node_modules/
+package-lock.json
+
+# Yerel Whisper (konuşma tanıma) model seçimi
+whisper_ayar.json
+ses_hata.log
+
+# Uyandırma sözcüğü ayarı (kişisel)
+uyandirma_ayar.json
+
+# MCP sunucu tanımı (kişisel yollar içerebilir; şablon: mcp_ayar.ornek.json)
+mcp_ayar.json
+
+# Otomatik başlatma betiği (otomatik_baslat.py üretir)
+emre_arkaplan.vbs
+
+# Kullanıcının kendi becerileri (örnek: beceriler/metin-analiz depoda)

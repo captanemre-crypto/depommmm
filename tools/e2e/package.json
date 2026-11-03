@@ -1,0 +1,12 @@
+{
+  "name": "emre-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "EMRE arayüzü için uçtan uca (jsdom) test koşucusu",
+  "scripts": {
+    "test": "node arayuz_e2e.js"
+  },
+  "dependencies": {
+    "jsdom": "^24.1.0"
+  }
+}

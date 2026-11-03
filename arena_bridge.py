@@ -1,6 +1,12 @@
 """Local, opt-in Arena browser bridge. No CAPTCHA or login bypass."""
-import queue, threading, time, os
+import queue
+import threading
+import time
 from pathlib import Path
+
+# Testlerde kısaltılabilmesi için modül düzeyinde sabitler.
+ANSWER_TIMEOUT_SECONDS = 120
+STABLE_SECONDS = 4
 
 jobs=queue.Queue()
 state={'status':'stopped','message':'Tarayıcı başlatılmadı.','answer':'','answer_verified':False}
@@ -56,7 +62,7 @@ def worker():
                     box.fill(text)
                     box.press('Enter')
                     update(message='Yanıt bekleniyor…')
-                    deadline=time.monotonic()+120
+                    deadline=time.monotonic()+ANSWER_TIMEOUT_SECONDS
                     previous=''; stable_since=None
                     while time.monotonic()<deadline:
                         if page.is_closed() or not page.url.startswith('https://arena.ai/'): raise ValueError('Arena sayfası kapandı veya farklı bir adrese geçildi.')
@@ -64,7 +70,7 @@ def worker():
                         value=answers.last.inner_text(timeout=2000).strip() if count>old else ''
                         if value and value==previous:
                             if stable_since is None: stable_since=time.monotonic()
-                            if time.monotonic()-stable_since>=4: break
+                            if time.monotonic()-stable_since>=STABLE_SECONDS: break
                         else: previous=value;stable_since=None
                         page.wait_for_timeout(500)
                     if not previous: raise ValueError('Yanıt güvenilir biçimde bulunamadı. Arena arayüzü bu sürümle uyumsuz olabilir; yanıtı tarayıcıdan kontrol et.')
@@ -80,4 +86,5 @@ def worker():
         update(status='error',message='Microsoft Edge başlatılamadı. Edge ve Playwright kurulumunu, açık Arena profili olup olmadığını kontrol et.',answer='')
     finally:
         started=False
-        if snapshot()['status'] not in ('error',): update(status='stopped',message='Arena tarayıcısı kapatıldı.',answer='')
+        # Son bulunan yanıt korunur: kullanıcı pencere kapandıktan sonra da okuyabilir.
+        if snapshot()['status'] not in ('error',): update(status='stopped',message='Arena tarayıcısı kapatıldı.')

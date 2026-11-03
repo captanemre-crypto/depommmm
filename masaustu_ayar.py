@@ -1,8 +1,12 @@
 """Select an existing OpenJarvis project and create a desktop shortcut."""
-import json, os, subprocess, sys
-from pathlib import Path
+import json
+import os
+import subprocess
+import sys
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox
+
 from PIL import Image, ImageDraw
 
 rootdir = Path(__file__).resolve().parent

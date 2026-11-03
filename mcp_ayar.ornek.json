@@ -1,0 +1,10 @@
+{
+  "sunucular": [
+    {
+      "ad": "dosyalar",
+      "komut": "python",
+      "argumanlar": ["-m", "mcp_server_filesystem", "C:\\Users\\SERVER\\Belgeler"],
+      "env": {}
+    }
+  ]
+}

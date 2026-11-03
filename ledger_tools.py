@@ -1,12 +1,72 @@
 """Narrow Ollama tools for the local ledger; never move actual money."""
-import re, json
+import json
+import re
 from datetime import datetime
 
-TOOLS=[{'type':'function','function':{'name':'ledger_record','description':'Kullanıcı açıkça deftere alacak, verecek, alınmış tahsilat veya yapılmış ödeme kaydetmek isterse kayıt oluştur. Para transferi yapmaz. Bilgi eksik veya belirsizse çağırma. Sadece son kullanıcı mesajındaki rakamla yazılmış tutarı kullan. Hatırlatma istenirse tam tarih ve saat olmalı; yoksa kullanıcıya sor.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kullanıcının yazdığı kişi adı'},'kind':{'type':'string','enum':['receivable','payable','received','paid'],'description':'receivable=benim alacağım; payable=benim borcum; received=aldığım tahsilat; paid=yaptığım ödeme'},'amount_kurus':{'type':'integer','description':'TL tutarı kuruş cinsinden; 1000 TL = 100000 kuruş'},'note':{'type':'string'},'remind_at':{'type':'string','description':'İstenmişse YYYY-MM-DDTHH:MM yerel tarih saat, yoksa boş'}},'required':['person','kind','amount_kurus']}}},{'type':'function','function':{'name':'ledger_list','description':'Kullanıcının alacak verecek defteri hesaplarını ve hareketlerini görüntüler.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kişi adı, tüm kayıtlar için boş bırak'}},'required':[]}}}]
+TOOLS=[{'type':'function','function':{'name':'ledger_record','description':'Kullanıcı açıkça deftere alacak, verecek, alınmış tahsilat veya yapılmış ödeme kaydetmek isterse kayıt oluştur. Para transferi yapmaz. Bilgi eksik veya belirsizse çağırma. Sadece son kullanıcı mesajındaki rakamla yazılmış tutarı kullan. Hatırlatma istenirse tam tarih ve saat olmalı; yoksa kullanıcıya sor.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kullanıcının yazdığı kişi adı'},'kind':{'type':'string','enum':['receivable','payable','received','paid'],'description':'receivable=benim alacağım; payable=benim borcum; received=aldığım tahsilat; paid=yaptığım ödeme'},'amount_kurus':{'type':'integer','description':'TL tutarı kuruş cinsinden; 1000 TL = 100000 kuruş'},'note':{'type':'string'},'remind_at':{'type':'string','description':'İstenmişse YYYY-MM-DDTHH:MM yerel tarih saat, yoksa boş'}},'required':['person','kind','amount_kurus']}}},{'type':'function','function':{'name':'ledger_list','description':'Kullanıcının alacak verecek defteri hesaplarını ve hareketlerini görüntüler.', 'parameters':{'type':'object','properties':{'person':{'type':'string','description':'Kişi adı, tüm kayıtlar için boş bırak'}},'required':[]}}},{'type':'function','function':{'name':'reminder_create','description':'Kullanıcı açıkça hatırlatıcı kurmak isterse kayıt oluştur. Tam tarih ve saat gerekir; eksikse çağırma, kullanıcıya sor. Geçmiş zaman için kayıt oluşturma.','parameters':{'type':'object','properties':{'text':{'type':'string','description':'Hatırlatılacak iş, kullanıcının söylediği biçimde'},'remind_at':{'type':'string','description':'YYYY-MM-DDTHH:MM yerel tarih saat'}},'required':['text','remind_at']}}}]
 LABELS={'receivable':'Alacak','payable':'Verecek','received':'Tahsilat','paid':'Ödeme'}
+
+
+def parse_amount(raw):
+    """'1.250,50', '1.000.000', '1500', '1,500.75' gibi Türkçe/İngilizce yazımları kuruşa çevir.
+
+    Tek bir yardımcı fonksiyon kullanmak, farklı kod yollarında farklı sonuç
+    üretilmesini (örn. '1.000.000 TL'nin reddedilmesini) engeller.
+    """
+    from decimal import Decimal, InvalidOperation
+    raw = (raw or '').strip().rstrip('.,')
+    if not raw:
+        raise ValueError('Tutar boş.')
+    if ',' in raw:
+        # Virgül ondalık ayırıcıdır; noktalar binlik ayırıcıdır.
+        raw = raw.replace('.', '').replace(',', '.')
+    elif raw.count('.') > 1:
+        raw = raw.replace('.', '')
+    elif raw.count('.') == 1:
+        integer, _, fraction = raw.partition('.')
+        # '1.500' binlik ayırıcı, '1.50' ondalık.
+        if len(fraction) == 3 and integer and integer.isdigit():
+            raw = integer + fraction
+    try:
+        amount = Decimal(raw) * 100
+    except (InvalidOperation, ValueError):
+        raise ValueError('Tutar anlaşılamadı.')
+    if amount != amount.to_integral_value():
+        raise ValueError('Tutar en fazla iki ondalık basamak içerebilir.')
+    amount = int(amount)
+    if not 0 < amount <= 100000000000:
+        raise ValueError('Tutar geçersiz.')
+    return amount
+
+
+def amount_matches(text):
+    """Metindeki 'TL/lira/₺' ile yazılmış tutarların kuruş karşılıklarını döndürür."""
+    results = []
+    for match in re.finditer(r'(?<!\w)(\d[\d.,]*)\s*(?:tl|₺|lira)(?!\w)', text.casefold()):
+        try:
+            results.append(parse_amount(match.group(1)))
+        except ValueError:
+            results.append(None)
+    return results
 def execute(name,args,db,last_user):
     if isinstance(args,str): args=json.loads(args)
     if not isinstance(args,dict): raise ValueError('İşlem bilgileri geçersiz.')
+    if name=='reminder_create':
+        from datetime import datetime as _dt
+
+        import zaman_ayristir
+        text=str(args.get('text','')).strip()[:300]
+        raw=str(args.get('remind_at','')).strip()
+        if not text: raise ValueError('Hatırlatıcı metni gerekli.')
+        try: when=_dt.fromisoformat(raw)
+        except ValueError:
+            when=zaman_ayristir.parse_when(raw)
+            if when is None: raise ValueError('Hatırlatıcı için tarih ve saati anlayamadım.')
+        if when.tzinfo is not None: raise ValueError('Tarih yerel saat olmalı.')
+        if when<=_dt.now(): raise ValueError('Hatırlatıcı zamanı geçmişte kalıyor.')
+        with db() as c:
+            cur=c.execute('INSERT INTO reminders(text,due) VALUES (?,?)',(text,when.isoformat(timespec='minutes')))
+        return f'Hatırlatıcı kuruldu: {when.strftime("%d.%m.%Y %H:%M")} — {text} (Kayıt no: {cur.lastrowid}).'
     if name=='ledger_list':
         person=str(args.get('person','')).strip()
         with db() as c:
@@ -27,17 +87,12 @@ def execute(name,args,db,last_user):
     lower=last_user.lower()
     if not re.search(r'alacağ|alacak|borç|borcum|verecek|ödedim|ödeme|tahsil|aldım|kaydet|deftere',lower) or re.search(r'var\s+m[ıi]|ne kadar|kaç lira|\?',lower): raise ValueError('Kayıt isteği net değil; kişiyi, tutarı ve işlem türünü belirt.')
     if due and not re.search(r'hatırla|hatırlat|uyar|bildir',lower): raise ValueError('Hatırlatıcı isteği açık değil.')
-    if not due and re.search(r'hatırla|hatırlat|uyar|bildir',lower): raise ValueError('Hatırlatıcı için tarih ve saati belirt.')
     if not person or len(person)>100 or person.casefold() not in last_user.casefold(): raise ValueError('Kişi adı son mesajda açıkça bulunmalı; tekrar söyle.')
     if kind not in LABELS or type(amount) is not int or not 0<amount<=100000000000: raise ValueError('İşlem türü veya tutar belirsiz.')
     # Models can misinterpret quantities: accept only a numeric amount that matches the utterance.
     nums=[]
     for m in re.finditer(r'(?<!\w)\d[\d.,]*(?!\w)',last_user):
-        raw=m.group().rstrip('.,')
-        try:
-            if ',' in raw: raw=raw.replace('.','').replace(',','.')
-            elif raw.count('.')==1 and len(raw.split('.')[1])==3: raw=raw.replace('.','')
-            nums.append(round(float(raw)*100))
+        try: nums.append(parse_amount(m.group()))
         except ValueError: pass
     if amount not in nums: raise ValueError('Hataları önlemek için tutarı rakamla ve açıkça söyle.')
     if due:
@@ -70,18 +125,11 @@ def create_account_from_text(text, db):
         elif re.search(r'verecek|borç',lower):kind='payable'
         elif re.search(r'tahsilat',lower):kind='received'
         elif re.search(r'ödeme',lower):kind='paid'
-        found=re.search(r'(?<!\w)(\d[\d.,]*)\s*(?:tl|₺|lira)',lower)
-        if not found:return 'İşlemi kaydetmek için tutarı rakamla ve TL olarak söyle.'
-        raw=found.group(1).rstrip('.,')
-        if ',' in raw:raw=raw.replace('.','').replace(',','.')
-        elif raw.count('.')==1 and len(raw.split('.')[1])==3:raw=raw.replace('.','')
-        from decimal import Decimal, InvalidOperation
-        try:
-            num=Decimal(raw)*100
-            if num!=num.to_integral_value():raise ValueError()
-            amount=int(num)
-        except (InvalidOperation,ValueError):return 'Tutarı anlayamadım; örneğin 2000 TL diye söyle.'
-        if not 0<amount<=100000000000:return 'Tutar geçersiz; kayıt yapılmadı.'
+        amounts=amount_matches(lower)
+        if not amounts:return 'İşlemi kaydetmek için tutarı rakamla ve TL olarak söyle.'
+        if len(amounts)>1:return 'Birden fazla tutar gördüm; işlemleri tek tek söyle.'
+        if amounts[0] is None:return 'Tutarı anlayamadım; örneğin 2000 TL diye söyle.'
+        amount=amounts[0]
     if re.search(r'hatırla|hatırlat|uyar|bildir',lower):return 'Hatırlatıcı eklemek için tarih ve saati ayrı bir cümlede açıkça söyle.'
     with db() as c:
         existing=[r[0] for r in c.execute('SELECT name FROM accounts UNION SELECT person FROM ledger')]
@@ -121,23 +169,16 @@ def direct_ledger_action(text, db):
     if not matches:return 'Hesabı bulamadım. Önce hesap oluştur veya kayıtlı hesap adını tam söyle.'
     person=matches[0]
     if is_query:return execute('ledger_list',{'person':person},db,text)
-    if re.search(r'sil|kaldır|iptal',lower): return None
+    if re.search(r'(?<!\w)(?:sil|silelim|kaldır|kaldıralım|iptal)(?!\w)',lower): return None
     if re.search(r'alacak|alacağ',lower):kind='receivable'
     elif re.search(r'verecek|borç',lower):kind='payable'
     elif re.search(r'tahsil',lower):kind='received'
     else:kind='paid'
-    found=re.search(r'(?<!\w)(\d[\d.,]*)\s*(?:tl|₺|lira)(?!\w)',lower)
-    if not found:return 'Kayıt yapılmadı. Tutarı rakamla ve TL olarak söyle.'
-    raw=found.group(1).rstrip('.,')
-    if ',' in raw:raw=raw.replace('.','').replace(',','.')
-    elif raw.count('.')==1 and len(raw.split('.')[1])==3:raw=raw.replace('.','')
-    from decimal import Decimal,InvalidOperation
-    try:
-        num=Decimal(raw)*100
-        if num!=num.to_integral_value():raise ValueError()
-        amount=int(num)
-    except (InvalidOperation,ValueError):return 'Tutar anlaşılamadı; kayıt yapılmadı.'
-    if not 0<amount<=100000000000:return 'Geçersiz tutar; kayıt yapılmadı.'
+    amounts=amount_matches(lower)
+    if not amounts:return 'Kayıt yapılmadı. Tutarı rakamla ve TL olarak söyle.'
+    if len(amounts)>1:return 'Birden fazla tutar gördüm; yanlış kayıt olmaması için işlemleri tek tek söyle.'
+    if amounts[0] is None:return 'Tutar anlaşılamadı; kayıt yapılmadı.'
+    amount=amounts[0]
     if re.search(r'hatırla|hatırlat|uyar|bildir',lower):return 'Hatırlatıcı isteniyorsa tarih ve saat bilgisiyle ayrı bir kayıt oluştur; bu işlem henüz yapılmadı.'
     with db() as c:
         cur=c.execute('INSERT INTO ledger(person,kind,amount,note,due,created) VALUES (?,?,?,?,?,?)',(person,kind,amount,'',None,datetime.now().isoformat(timespec='seconds')))

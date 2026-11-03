@@ -12,6 +12,7 @@ if errorlevel 1 (
  exit /b 1
 )
 if not exist .venv-desktop\Scripts\python.exe py -m uv venv --python 3.12 .venv-desktop
+if not exist .venv-desktop\Scripts\python.exe py -m uv venv .venv-desktop
 if not exist .venv-desktop\Scripts\python.exe goto error
 py -m uv pip install --python .venv-desktop\Scripts\python.exe "pywebview>=6,<7" "pystray>=0.19,<1" "Pillow>=10,<13"
 if errorlevel 1 goto error

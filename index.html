@@ -31,14 +31,63 @@
 .apps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.apps-card{text-align:left;background:#09171b;border:1px solid #243c43;border-radius:10px;padding:22px;color:#e4f5f3;cursor:pointer;min-height:160px}.apps-card:hover{border-color:#56c8bf;background:#102429}.apps-card span{display:block;color:#66e2d5;font-size:25px}.apps-card b{display:block;margin-top:14px;font-size:14px}.apps-card small{display:block;color:#809ba2;margin-top:7px}.apps-card em{display:block;color:#69d8cf;font-style:normal;font-size:11px;margin-top:18px}@media(max-width:650px){.apps-grid{grid-template-columns:1fr 1fr}.apps-card{padding:15px}}
 
 .chat-layout{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px}.chat-history{border:1px solid #20353e;border-radius:10px;padding:14px;background:#071014;align-self:start}.chat-history-head{display:flex;justify-content:space-between;align-items:center}.chat-history-head b{font-size:13px}.history-row{display:flex;align-items:center;gap:4px;margin-top:8px}.history-choice{border:0;background:transparent;color:#a9bfc4;text-align:left;border-radius:6px;padding:10px;min-width:0;flex:1;cursor:pointer}.history-choice.active{background:#103039;color:#baf9f0}.history-choice span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.history-choice small{display:block;color:#77949a;margin-top:4px}.history-delete{background:transparent;color:#7d969d;border:0;cursor:pointer;padding:8px}.history-delete:hover{color:#f18780}#chatHolder .messages{min-height:280px;max-height:55vh}@media(max-width:650px){.chat-layout{grid-template-columns:1fr}.chat-history{max-height:190px;overflow:auto}}
-</style></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-icon"></div><div>EMREE<small>KİŞİSEL ASİSTAN</small></div></div><div class="navlabel">ÇALIŞMA ALANI</div><nav class="nav"><button class="active" data-section="Ana sayfa"><span class="nav-icon">⌂</span>Ana sayfa</button><button data-section="Sohbet"><span class="nav-icon">◌</span>Sohbet</button><button data-section="Keşfet"><span class="nav-icon">⌕</span>Keşfet</button><button data-section="Hatırlatıcılar"><span class="nav-icon">◷</span>Hatırlatıcılar</button><button data-section="Defter"><span class="nav-icon">▤</span>Defter</button><button data-section="Telegram"><span class="nav-icon">➤</span>Telegram</button><button data-section="Uygulamalar"><span class="nav-icon">▦</span>Uygulamalar</button><button data-section="Geliştirici"><span class="nav-icon">⌘</span>Geliştirici</button><button data-section="Ayarlar"><span class="nav-icon">⚙</span>Ayarlar</button></nav></aside><main class="main"><div class="content"><section class="hero"><canvas id="energy" width="500" height="500" aria-label="Mercan turuncusu enerji küresi animasyonu"></canvas></section><section class="web-panel" id="features" hidden><div class="web-head"><h2 id="featureTitle"></h2><button type="button" class="iconbtn" id="closeFeatures">Kapat ✕</button></div><div id="featureBody" style="padding:16px"></div></section><section class="web-panel" id="cameraPanel" hidden><div class="web-head"><div><h2>Kamera önizlemesi</h2><span class="hint">Bu bir görüntülü arama değil; yalnızca kendi kameranı gösterir.</span></div><button type="button" class="iconbtn" id="closeCamera">Kamerayı kapat ✕</button></div><video id="video" autoplay playsinline muted style="width:100%;max-height:400px;background:#03090c"></video></section><section class="web-panel" id="arena" hidden><div class="web-head"><div><h2>Arena bağlantısı</h2><span class="hint">Tarayıcı üzerinden, onaylı soru gönderimi</span></div><button type="button" class="iconbtn" id="closeArena">Kapat ✕</button></div><div style="padding:0 16px 16px"><p class="hint">Önce Arena tarayıcısını aç; giriş ve güvenlik doğrulamasını kendin tamamla. Soru yalnızca onayından sonra gönderilir.</p><button type="button" class="iconbtn" id="arenaNormal">Normal Edge’de aç</button> <button type="button" class="iconbtn" id="arenaStart">Otomasyon penceresini aç</button><p class="hint">Normal Edge kendi oturumunu kullanır; Emre bu pencereden yanıtları otomatik okuyamaz.</p><p id="arenaStatus" class="hint">Bağlantı durumu bilinmiyor.</p><textarea id="arenaQuestion" placeholder="Arena’ya sorulacak soru" style="width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit"></textarea><button type="button" class="iconbtn" id="arenaSend" style="margin-top:10px">Onayla ve gönder</button><p class="hint">Bulunan yanıtın tamamlandığını ve doğru olduğunu Arena ekranından kontrol et. Site değişiklikleri otomasyonu bozabilir.</p><div id="arenaAnswer" style="white-space:pre-wrap;line-height:1.6;color:#d3e9e8"></div></div></section><div id="sohbet" style="height:28px"></div><div class="chat"><div class="messages" id="messages"><div class="msg"><div class="avatar">E</div><div><strong>EMRE</strong>Merhaba, ben Emre.</div></div></div><form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off">Bağlı değil</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off">Bağlı değil</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off">Bağlı değil</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off">Bağlı değil</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast"></div><script>
 
+/* ===== D1: Bugün kartı ==================================================== */
+.today-panel{margin:16px 0 10px;border:1px solid #1d343f;border-radius:14px;background:linear-gradient(180deg,#08131a,#050c11);padding:16px 18px}
+.today-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.today-head h2{font-size:15px;margin:0;color:#cfe9e6;letter-spacing:.04em}
+.today-head small{color:#7294a0;font-size:11px}
+.today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+.today-card{border:1px solid #1b2f39;border-radius:10px;padding:12px;background:#081217;min-height:100px}
+.today-card h3{margin:0 0 6px;font-size:11px;color:#6fd7d2;text-transform:uppercase;letter-spacing:.08em}
+.today-card ul{margin:0;padding-left:15px;color:#c6dde0;font-size:12.5px;line-height:1.55;max-height:132px;overflow:auto}
+.today-card .bos{color:#7e97a3;font-size:12px;margin:0}
+.today-num{font-size:21px;font-weight:700;color:#eafcfb;display:block;line-height:1.25}
+.today-num em{font-style:normal;font-size:11px;color:#7e97a3;font-weight:400}
+.today-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* ===== D2: komut paleti =================================================== */
+.palette{position:fixed;inset:0;z-index:80;background:#000000b3;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh}
+.palette[hidden]{display:none}
+.palette-box{width:min(620px,92vw);background:#071319;border:1px solid #24414d;border-radius:14px;box-shadow:0 22px 60px #000a;overflow:hidden}
+.palette-box input{width:100%;border:0;border-bottom:1px solid #1c333d;background:#08161d;color:#eafcfb;padding:16px 18px;font-size:15px;outline:none}
+.palette-list{max-height:46vh;overflow:auto;margin:0;padding:6px;list-style:none}
+.palette-list li{padding:10px 12px;border-radius:8px;color:#cfe3e6;display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px}
+.palette-list li[aria-selected="true"]{background:#0e2b33;color:#eafcfb;outline:1px solid #2d6b74}
+.palette-list small{color:#8fa7b0}
+.palette-hint{padding:8px 14px 12px;color:#7b95a1;font-size:11px}
+
+/* ===== D3: açık tema ===================================================== */
+body[data-tema="acik"]{--bg:#eef3f5;--panel:#fff;--line:#cfdde3;--muted:#4e6a76;--text:#0d1b21;background:#eef3f5;color:#0d1b21}
+body[data-tema="acik"] .app,body[data-tema="acik"] .main,body[data-tema="acik"] .content,body[data-tema="acik"] .sidebar,body[data-tema="acik"] .right,body[data-tema="acik"] .chat,body[data-tema="acik"] .sidecard,body[data-tema="acik"] .web-panel,body[data-tema="acik"] .composer,body[data-tema="acik"] .settings-card,body[data-tema="acik"] .chat-history,body[data-tema="acik"] .apps-card,body[data-tema="acik"] .ledger-page,body[data-tema="acik"] .messages,body[data-tema="acik"] .msg{background:#fff;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] input,body[data-tema="acik"] textarea,body[data-tema="acik"] select{background:#fff!important;color:#0d1b21!important;border-color:#cfdde3!important}
+body[data-tema="acik"] .settings-tabs{background:#e4ecef;border-color:#cfdde3}
+body[data-tema="acik"] .settings-tab{color:#4e6a76}
+body[data-tema="acik"] .settings-tab.active{color:#0a6a6d;border-bottom-color:#0a6a6d}
+body[data-tema="acik"] .hint,body[data-tema="acik"] .settings-card p,body[data-tema="acik"] .today-card .bos{color:#4e6a76}
+body[data-tema="acik"] .iconbtn{background:#eef4f6;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] .today-panel{background:#fff;border-color:#cfdde3}
+body[data-tema="acik"] .today-card{background:#f7fafb;border-color:#cfdde3}
+body[data-tema="acik"] .today-card ul,body[data-tema="acik"] .today-num{color:#173842}
+body[data-tema="acik"] .today-head h2,body[data-tema="acik"] .today-card h3{color:#0a6a6d}
+body[data-tema="acik"] .palette-box{background:#fff;border-color:#cfdde3}
+body[data-tema="acik"] .palette-box input{background:#f4f8f9;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] .palette-list li{color:#24404a}
+body[data-tema="acik"] .palette-list li[aria-selected="true"]{background:#dff0f1;color:#08343a}
+body[data-tema="acik"] .toast{background:#fff;color:#0d1b21;border:1px solid #cfdde3}
+/* Yazı boyutu (D3) */
+body{font-size:var(--yazi,14px)}
+</style></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-icon"></div><div>EMREE<small>KİŞİSEL ASİSTAN</small></div></div><div class="navlabel">ÇALIŞMA ALANI</div><nav class="nav"><button class="active" data-section="Ana sayfa"><span class="nav-icon">⌂</span>Ana sayfa</button><button data-section="Sohbet"><span class="nav-icon">◌</span>Sohbet</button><button data-section="Keşfet"><span class="nav-icon">⌕</span>Keşfet</button><button data-section="Hatırlatıcılar"><span class="nav-icon">◷</span>Hatırlatıcılar</button><button data-section="Defter"><span class="nav-icon">▤</span>Defter</button><button data-section="Telegram"><span class="nav-icon">➤</span>Telegram</button><button data-section="Uygulamalar"><span class="nav-icon">▦</span>Uygulamalar</button><button data-section="Geliştirici"><span class="nav-icon">⌘</span>Geliştirici</button><button data-section="Ayarlar"><span class="nav-icon">⚙</span>Ayarlar</button></nav></aside><main class="main"><div class="content"><section class="hero"><canvas id="energy" width="500" height="500" aria-label="Mercan turuncusu enerji küresi animasyonu"></canvas></section><section class="today-panel" id="todayCard" aria-labelledby="todayTitle"><div class="today-head"><div><h2 id="todayTitle">Bugün</h2><small id="todayStamp">Yükleniyor…</small></div><div class="today-actions"><button type="button" class="iconbtn" id="todayRefresh">Yenile</button><button type="button" class="iconbtn" id="todayPalette" title="Komut paleti (/)">⌘ Komutlar</button></div></div><div class="today-grid" id="todayGrid"></div></section><section class="web-panel" id="features" hidden><div class="web-head"><h2 id="featureTitle"></h2><button type="button" class="iconbtn" id="closeFeatures">Kapat ✕</button></div><div id="featureBody" style="padding:16px"></div></section><section class="web-panel" id="cameraPanel" hidden><div class="web-head"><div><h2>Kamera önizlemesi</h2><span class="hint">Bu bir görüntülü arama değil; yalnızca kendi kameranı gösterir.</span></div><button type="button" class="iconbtn" id="closeCamera">Kamerayı kapat ✕</button></div><video id="video" autoplay playsinline muted style="width:100%;max-height:400px;background:#03090c"></video></section><section class="web-panel" id="arena" hidden><div class="web-head"><div><h2>Arena bağlantısı</h2><span class="hint">Tarayıcı üzerinden, onaylı soru gönderimi</span></div><button type="button" class="iconbtn" id="closeArena">Kapat ✕</button></div><div style="padding:0 16px 16px"><p class="hint">Önce Arena tarayıcısını aç; giriş ve güvenlik doğrulamasını kendin tamamla. Soru yalnızca onayından sonra gönderilir.</p><button type="button" class="iconbtn" id="arenaNormal">Normal Edge’de aç</button> <button type="button" class="iconbtn" id="arenaStart">Otomasyon penceresini aç</button><p class="hint">Normal Edge kendi oturumunu kullanır; Emre bu pencereden yanıtları otomatik okuyamaz.</p><p id="arenaStatus" class="hint">Bağlantı durumu bilinmiyor.</p><textarea id="arenaQuestion" placeholder="Arena’ya sorulacak soru" style="width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit"></textarea><button type="button" class="iconbtn" id="arenaSend" style="margin-top:10px">Onayla ve gönder</button><p class="hint">Bulunan yanıtın tamamlandığını ve doğru olduğunu Arena ekranından kontrol et. Site değişiklikleri otomasyonu bozabilir.</p><div id="arenaAnswer" style="white-space:pre-wrap;line-height:1.6;color:#d3e9e8"></div></div></section><div id="sohbet" style="height:28px"></div><div class="chat"><div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet"><div class="msg"><div class="avatar">E</div><div><strong>EMRE</strong>Merhaba, ben Emre.</div></div></div><section class="web-panel" id="dictation" hidden><div class="web-head"><div><h2>Canlı dikte</h2><span class="hint">Konuştuklarını anında yazar · yerel Whisper, ses dışarı gitmez</span></div><button type="button" class="iconbtn" id="dictateClose">Kapat ✕</button></div><div style="padding:0 16px 16px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="iconbtn" id="dictateToggle">Dikteyi başlat</button><span class="hint" id="dictateState">Kapalı</span></div><label style="display:block;margin:10px 0 4px;color:#a6c1c3;font-size:12px">Hedef pencere (boş bırakılırsa etkin pencere)</label><input id="dictateTarget" placeholder="ör. Antigravity" style="width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px" value=""><label style="display:block;margin:10px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateLive"> Konuştukça etkin pencereye yaz (canlı yazım)</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateEnter"> Her cümleden sonra Enter gönder</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateAnswer"> Durdurduğumda Emre cevap versin</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictatePolish"> Durdurduğumda yazımı ve noktalamayı yapay zekâ düzeltsin (ücretsiz API bağlıysa)</label><textarea id="dictateText" readonly placeholder="Konuştukların burada anında belirecek…" style="width:100%;min-height:110px;margin-top:10px;background:#02090c;color:#d3e9e8;border:1px solid #29424a;border-radius:7px;padding:12px;font:inherit;resize:vertical"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="iconbtn" id="dictateType">Aktif pencereye yaz</button><button type="button" class="iconbtn" id="dictateSend">Sohbete gönder</button><button type="button" class="iconbtn" id="dictateClear">Temizle</button></div><p class="hint" id="dictateHint">Konuşurken metin ~1 saniye içinde görünür; cümle bitmesini beklemez. Yazma yalnızca “canlı yazım” açıkken veya düğmeye bastığında yapılır.</p></div></section>
+<form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button type="button" class="iconbtn" id="dictateOpen" aria-label="Canlı dikte" title="Canlı dikte: konuş, anında yaz">⌨</button><button type="button" class="iconbtn" id="screenAsk" aria-label="Ekranı sor" title="Ekranı görüntüleyip soru sor">▣</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div><div class="chat-history-head" style="margin-top:14px"><b>Sunucu geçmişi</b><button id="historyRefresh" class="iconbtn">↻</button></div><p class="hint">Bu bilgisayarda kalıcı</p><div id="serverHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="providerTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ücretsiz API</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button><button class="settings-tab" id="memoryTab" role="tab" aria-selected="false" aria-controls="settingsBody">Bellek</button><button class="settings-tab" id="mcpTab" role="tab" aria-selected="false" aria-controls="settingsBody">MCP araçları</button><button class="settings-tab" id="systemTab" role="tab" aria-selected="false" aria-controls="settingsBody">Sistem</button><button class="settings-tab" id="skillsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Beceriler</button><button class="settings-tab" id="docsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Belgeler</button><button class="settings-tab" id="calendarTab" role="tab" aria-selected="false" aria-controls="settingsBody">Takvim &amp; posta</button><button class="settings-tab" id="gorunumTab" role="tab" aria-selected="false" aria-controls="settingsBody">Görünüm</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off" data-durum="ses">Kontrol ediliyor…</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off" data-durum="internet">Kontrol ediliyor…</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off" data-durum="telegram">Kontrol ediliyor…</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off" data-durum="cihaz">Kontrol ediliyor…</b></div><div class="statusrow"><span>✧ &nbsp; Yapay zekâ</span><b class="off" data-durum="yapayzeka">Kontrol ediliyor…</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder" id="upcomingReminders"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><div class="palette" id="palette" hidden role="dialog" aria-modal="true" aria-label="Komut paleti"><div class="palette-box"><input id="paletteInput" placeholder="Komut ara… (örn. defter, belge, tema)" aria-label="Komut ara" autocomplete="off"><ul class="palette-list" id="paletteList" role="listbox" aria-label="Komutlar"></ul><div class="palette-hint">↑ ↓ gez · Enter çalıştır · Esc kapat</div></div></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
+
+let bargeSayac=0;
 let timer,stream=null,recognition=null, listening=false, pendingSearch=false, speechActive=false, lastVoiceText="", lastVoiceAt=0;
 function notify(text){const el=document.getElementById('toast');el.textContent=text;el.style.display='block';clearTimeout(timer);timer=setTimeout(()=>el.style.display='none',3500)}
-let restoringChat=false;function add(name,text,cls=''){const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),body=document.createElement('div'),strong=document.createElement('strong');row.className='msg '+cls;av.className='avatar';av.textContent=name==='Sen'?'S':'E';strong.textContent=name;body.append(strong,document.createTextNode(text));row.append(av,body);messages.append(row);messages.scrollTop=messages.scrollHeight;if(!restoringChat){try{let saved=JSON.parse(localStorage.getItem('emre-chat')||'[]');saved.push({name,text,cls});localStorage.setItem('emre-chat',JSON.stringify(saved.slice(-200)));persistActiveChat()}catch(e){notify('Sohbet geçmişi kaydedilemedi.')}}}
+let restoringChat=false;function add(name,text,cls=''){const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),body=document.createElement('div'),strong=document.createElement('strong');row.className='msg '+cls;av.className='avatar';av.textContent=name==='Sen'?'S':'E';strong.textContent=name;body.append(strong,document.createTextNode(text));row.append(av,body);messages.append(row);while(messages.children.length>300&&messages.firstElementChild){messages.firstElementChild.remove()}if(messages.children.length===300&&!document.getElementById('eskiNotu')){const not=document.createElement('div');not.id='eskiNotu';not.className='hint';not.textContent='Daha eski mesajlar bu görünümden kaldırıldı; sunucu geçmişinde duruyor (Sohbet › Sunucu geçmişi).';messages.prepend(not)}messages.scrollTop=messages.scrollHeight;if(!restoringChat){try{let saved=JSON.parse(localStorage.getItem('emre-chat')||'[]');saved.push({name,text,cls});localStorage.setItem('emre-chat',JSON.stringify(saved.slice(-200)));persistActiveChat()}catch(e){notify('Sohbet geçmişi kaydedilemedi.')}}}
 function speechPlainText(text){return String(text).replace(/```[\s\S]*?(?:```|$)/g,' ').replace(/`[^`]*`/g,' ').replace(/\{\s*"(?:name|arguments|tool_calls)"[\s\S]*?\}/gi,' ').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/gi,' ').replace(/\[\d+\]/g,' ').replace(/<[^>]+>/g,' ').replace(/(^|\n)\s{0,3}#{1,6}\s*/g,'$1').replace(/[*_~]+/g,'').replace(/\s+/g,' ').trim()}
-let ttsContext=null,ttsSource=null,ttsCancel=null,ttsGeneration=0;async function playLocalSpeech(text){text=speechPlainText(text);if(!text){notify('Okunacak düz metin yok.');return}const current=++ttsGeneration;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource){try{ttsSource.stop()}catch(e){}ttsSource=null}const voice=localStorage.getItem('emre-tts-voice');if(!voice){notify('Ayarlar > Ses bölümünden yerel Türkçe ses seç.');return}speechActive=true;try{let ctx=ttsContext||new (window.AudioContext||window.webkitAudioContext)();ttsContext=ctx;await ctx.resume();let data=await api('/api/tts/speak',{text:text.slice(0,1500),voice});if(current!==ttsGeneration)return;let bytes=Uint8Array.from(atob(data.audio),c=>c.charCodeAt(0));if(localStorage.getItem('emre-reverb')!=='1'){let url=URL.createObjectURL(new Blob([bytes],{type:'audio/wav'}));await new Promise((resolve,reject)=>{let player=new Audio(url);function cleanup(){player.onended=null;player.onerror=null;URL.revokeObjectURL(url);if(current===ttsGeneration)ttsCancel=null}ttsCancel=()=>{player.pause();cleanup();resolve()};player.onended=()=>{cleanup();resolve()};player.onerror=()=>{cleanup();reject(new Error('Ses oynatılamadı.'))};player.play().catch(err=>{cleanup();reject(err)})});return}let audio=await ctx.decodeAudioData(bytes.buffer);if(current!==ttsGeneration)return;let source=ctx.createBufferSource(),dry=ctx.createGain(),wet=ctx.createGain(),convolver=ctx.createConvolver();let length=Math.floor(ctx.sampleRate*.85),impulse=ctx.createBuffer(2,length,ctx.sampleRate);for(let ch=0;ch<2;ch++){let arr=impulse.getChannelData(ch);for(let i=Math.floor(.025*ctx.sampleRate);i<length;i++)arr[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.18))}convolver.buffer=impulse;dry.gain.value=1;wet.gain.value=localStorage.getItem('emre-reverb')==='1'?.08:0;source.buffer=audio;source.connect(dry);dry.connect(ctx.destination);if(localStorage.getItem('emre-reverb')==='1'){source.connect(convolver);convolver.connect(wet);wet.connect(ctx.destination)}ttsSource=source;await new Promise(resolve=>{source.onended=resolve;source.start()});if(current===ttsGeneration)ttsSource=null}catch(e){if(current===ttsGeneration)notify('Yerel ses: '+e.message)}finally{if(current===ttsGeneration)speechActive=false}}
-function say(text){add('EMRE',text);if(listening)playLocalSpeech(text)}
+let ttsContext=null,ttsSource=null,ttsCancel=null,ttsGeneration=0;async function playLocalSpeech(text,kuyruk){text=speechPlainText(text);if(!text){notify('Okunacak düz metin yok.');return}const current=++ttsGeneration;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource){try{ttsSource.stop()}catch(e){}ttsSource=null}const voice=localStorage.getItem('emre-tts-voice');if(!voice){notify('Ayarlar > Ses bölümünden yerel Türkçe ses seç.');return}speechActive=true;try{let ctx=ttsContext||new (window.AudioContext||window.webkitAudioContext)();ttsContext=ctx;await ctx.resume();let data=await api('/api/tts/speak',{text:text.slice(0,1500),voice});if(current!==ttsGeneration)return;let bytes=Uint8Array.from(atob(data.audio),c=>c.charCodeAt(0));if(localStorage.getItem('emre-reverb')!=='1'){let url=URL.createObjectURL(new Blob([bytes],{type:'audio/wav'}));await new Promise((resolve,reject)=>{let player=new Audio(url);function cleanup(){player.onended=null;player.onerror=null;URL.revokeObjectURL(url);if(current===ttsGeneration)ttsCancel=null}ttsCancel=()=>{player.pause();cleanup();resolve()};player.onended=()=>{cleanup();resolve()};player.onerror=()=>{cleanup();reject(new Error('Ses oynatılamadı.'))};player.play().catch(err=>{cleanup();reject(err)})});return}let audio=await ctx.decodeAudioData(bytes.buffer);if(current!==ttsGeneration)return;let source=ctx.createBufferSource(),dry=ctx.createGain(),wet=ctx.createGain(),convolver=ctx.createConvolver();let length=Math.floor(ctx.sampleRate*.85),impulse=ctx.createBuffer(2,length,ctx.sampleRate);for(let ch=0;ch<2;ch++){let arr=impulse.getChannelData(ch);for(let i=Math.floor(.025*ctx.sampleRate);i<length;i++)arr[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.18))}convolver.buffer=impulse;dry.gain.value=1;wet.gain.value=localStorage.getItem('emre-reverb')==='1'?.08:0;source.buffer=audio;source.connect(dry);dry.connect(ctx.destination);if(localStorage.getItem('emre-reverb')==='1'){source.connect(convolver);convolver.connect(wet);wet.connect(ctx.destination)}ttsSource=source;await new Promise(resolve=>{source.onended=resolve;source.start()});if(current===ttsGeneration)ttsSource=null}catch(e){if(current===ttsGeneration)notify('Yerel ses: '+e.message)}finally{if(current===ttsGeneration&&!kuyruk)speechActive=false}}
+let akisSeslendi=false;
+function say(text){add('EMRE',text);if(listening&&!akisSeslendi)playLocalSpeech(text);akisSeslendi=false}
 function openArena(){returnHome();document.querySelector('main > .content').hidden=true;document.getElementById('discoverPage').hidden=false;const panel=document.getElementById('arena');document.getElementById('arenaHolder').append(panel);panel.hidden=false;window.scrollTo({top:0,behavior:'smooth'});arenaRefresh()}document.getElementById('closeArena').onclick=()=>{document.getElementById('arena').hidden=true;returnHome()};
 async function camera(){try{if(!navigator.mediaDevices?.getUserMedia)throw Error();stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});document.getElementById('video').srcObject=stream;document.getElementById('cameraPanel').hidden=false;document.getElementById('cameraPanel').scrollIntoView({behavior:'smooth'});say('Kamera önizlemesini açtım. Bu henüz bir görüntülü görüşme değil.')}catch(e){say('Kamerayı açamadım. Tarayıcı izinlerini ve güvenli bağlantıyı kontrol et.')}}
 document.getElementById('closeCamera').onclick=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;document.getElementById('video').srcObject=null;document.getElementById('cameraPanel').hidden=true};
@@ -49,26 +98,419 @@ const toggle=document.getElementById('voiceToggle');let localStream=null,audioCo
 function setToggle(on){listening=on;try{localStorage.setItem('emre-voice-enabled',on?'1':'0')}catch(e){}toggle.setAttribute('aria-pressed',String(on));toggle.innerHTML=on?'◉ &nbsp; Dinliyor':'◉ &nbsp; Ses kapalı';toggle.style.borderColor=on?'#5be5bf':'#37747a'}
 function stopLocalVoice(){setToggle(false);discardClip=true;cancelAnimationFrame(raf);if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch(e){};if(localStream)localStream.getTracks().forEach(t=>t.stop());localStream=null;if(audioContext)audioContext.close().catch(()=>{});audioContext=null;analyser=null;recorder=null;noiseSince=0;localPending=false}
 function acceptLocalText(text){let normalized=text.toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü0-9 ]/gi,' ').replace(/\s+/g,' ').trim();if(normalized.length<3||!/[a-zçğıöşü]/i.test(normalized)||/^(ı+|i+|e+|a+|h+|hı+|hmm+|hımm+|şş+|eee+|aaa+|ııı+|ıh|öhöm|of|ah|uh|mm+|heh|ya|ha|altyazı|abone ol)$/.test(normalized))return;if(normalized===lastVoiceText&&Date.now()-lastVoiceAt<6000)return;lastVoiceText=normalized;lastVoiceAt=Date.now();command(text)}
-async function processClip(blob){if(!listening||discardClip||blob.size<500){localPending=false;return}localPending=true;try{let data=await new Promise((resolve,reject)=>{let reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob)});let r=await api('/api/speech/transcribe',{audio:data});if(listening&&!speechActive&&!busy&&r.text)acceptLocalText(r.text)}catch(e){notify(e.message)}finally{localPending=false}}
-function monitorVoice(){if(!listening||!analyser)return;let values=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(values);let sum=0;for(let x of values)sum+=x*x;let loud=Math.sqrt(sum/values.length)>.008,now=performance.now();if(!speechActive&&!busy&&!localPending){if(!recorder){try{let clipChunks=[],heard=false,started=now,lastVoice=now,drop=false;let r=new MediaRecorder(localStream,{mimeType:'audio/webm;codecs=opus'});recorder=r;r.ondataavailable=e=>{if(e.data.size)clipChunks.push(e.data)};r.onstop=()=>{if(recorder===r)recorder=null;noiseSince=0;if(heard&&!drop&&listening&&!discardClip){processClip(new Blob(clipChunks,{type:'audio/webm'}))}else{localPending=false}};r._voiceUpdate=(isLoud,time)=>{if(isLoud){heard=true;lastVoice=time}if((heard&&time-lastVoice>1200&&time-started>400)||time-started>16000||(!heard&&time-started>8000)){if(!heard)drop=true;localPending=true;r.stop()}};discardClip=false;r.start()}catch(e){notify('Bu tarayıcı yerel ses kaydını desteklemiyor.');stopLocalVoice();return}}if(recorder&&recorder.state==='recording')recorder._voiceUpdate(loud,now)}else if(recorder&&recorder.state==='recording'){discardClip=true;recorder.stop()}raf=requestAnimationFrame(monitorVoice)}
-toggle.onclick=async()=>{if(listening){stopLocalVoice();ttsGeneration++;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource)try{ttsSource.stop()}catch(e){};ttsSource=null;speechActive=false;return}if(!apiToken){notify('Yerel sunucuyu başlatıp sayfayı aç.');return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder||!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){notify('Yerel ses için mikrofon ve WebM destekli bir tarayıcı gerekli.');return}try{let speechStatus=await api('/api/speech/status');if(!speechStatus.installed){notify('Önce ses_kur.bat ile yerel ses modelini kur.');return}localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=2048;audioContext.createMediaStreamSource(localStream).connect(analyser);setToggle(true);discardClip=false;notify('Yerel mikrofon açık. Ses CPU ile işlenecek.');monitorVoice()}catch(e){stopLocalVoice();notify('Yerel ses veya mikrofon açılamadı. Sunucu ve mikrofon iznini kontrol et.')}};
-document.getElementById('mic').onclick=()=>toggle.click();document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{if(b.dataset.section==='Keşfet')openArena();else if(b.dataset.section==='Sohbet'){showChatPage()}else if(b.dataset.section==='Telegram')showTelegram();else if(b.dataset.section==='Hatırlatıcılar')showReminders();else if(b.dataset.section==='Defter')showLedger();else if(b.dataset.section==='Ayarlar')showSettings();else if(b.dataset.section==='Geliştirici')showDeveloper();else if(b.dataset.section==='Uygulamalar')showApps();else if(b.dataset.section!=='Ana sayfa')notify(b.dataset.section+' bölümü henüz hazırlanmadı.');else window.scrollTo({top:0,behavior:'smooth'})});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>b.dataset.action==='Hatırlatıcı ekle'?showReminders():notify(b.dataset.action+' özelliği henüz bağlı değil.'));
+let birikim='',birikimZaman=0;
+function sesSayi(ad,varsayilan,enAz,enCok){let v=Number(localStorage.getItem(ad));if(!Number.isFinite(v)||v<=0)return varsayilan;return Math.min(enCok,Math.max(enAz,v))}
+function sessizlikSuresi(){return sesSayi('emre-vad-sessizlik',2200,800,6000)}
+function enUzunKayit(){return sesSayi('emre-vad-uzun',30000,5000,90000)}
+function birlestirGonder(text,deneme=0){birikim=(birikim?birikim+' ':'')+text;clearTimeout(birikimZaman);birikimZaman=setTimeout(()=>{if(busy&&deneme<8){birlestirGonder('',deneme+1);return}const t=birikim.trim();birikim='';if(t&&!speechActive)acceptLocalText(t)},Math.max(250,sesSayi('emre-vad-birlestir',900,250,2500)))}
+async function processClip(blob){if(!listening||discardClip||blob.size<500){localPending=false;return}localPending=true;try{let data=await new Promise((resolve,reject)=>{let reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob)});let r=await api('/api/speech/transcribe',{audio:data,ipucu:lastVoiceText||''});let duyulan=String(r.text||'').trim();if(listening&&!speechActive&&duyulan){if(localStorage.getItem('emre-voice-echo')!=='0')notify('Duyduğum: '+(duyulan.length>140?duyulan.slice(0,140)+'…':duyulan));birlestirGonder(duyulan)}}catch(e){notify(e.message)}finally{localPending=false}}
+let zemin=0.004;
+function startClip(){
+  if(!listening||recorder||!localStream)return null;
+  try{
+    let clipChunks=[],heard=false,started=performance.now(),lastVoice=started,drop=false;
+    let r=new MediaRecorder(localStream,{mimeType:'audio/webm;codecs=opus'});
+    recorder=r;
+    r.ondataavailable=e=>{if(e.data.size)clipChunks.push(e.data)};
+    r.onstop=()=>{
+      if(recorder===r)recorder=null;
+      localPending=false;
+      if(heard&&!drop&&listening&&!discardClip&&clipChunks.length)processClip(new Blob(clipChunks,{type:'audio/webm'}));
+      // Kayıt bitince hemen yenisini başlat: cümlenin başı kaçmasın.
+      if(listening&&!speechActive&&!busy)setTimeout(()=>startClip(),0);
+    };
+    r._voiceUpdate=(isLoud,time)=>{
+      if(isLoud){heard=true;lastVoice=time}
+      let sessizlik=sessizlikSuresi();
+      let bitti=(heard&&time-lastVoice>sessizlik&&time-started>700)||(heard&&time-started>enUzunKayit())||(!heard&&time-started>8000);
+      if(bitti){
+        if(!heard)drop=true;
+        localPending=true;
+        try{r.stop()}catch(e){recorder=null;localPending=false}
+      }
+    };
+    discardClip=false;
+    r.start();
+    return r;
+  }catch(e){notify('Bu tarayıcı yerel ses kaydını desteklemiyor.');stopLocalVoice();return null}
+}
+function monitorVoice(){
+  if(!listening||!analyser)return;
+  let values=new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(values);
+  let sum=0;for(let x of values)sum+=x*x;
+  let rms=Math.sqrt(sum/values.length);
+  let esik=Math.max(0.005,zemin*3),cokYuksek=rms>esik*2.4;
+  let loud=rms>esik,now=performance.now();
+  if(!loud)zemin=zemin*0.97+rms*0.03;
+  // Kullanıcı asistan konuşurken araya girerse okumayı kes ve dinlemeye geç.
+  // B2 söz kesme: eşik üstü 3 ardışık ölçüm gerekir (tek tık seslendirmeyi kesmez).
+  if(speechActive&&(localStorage.getItem('emre-barge-in')!=='0')&&cokYuksek)bargeSayac++;
+  else bargeSayac=0;
+  if(speechActive&&bargeSayac>=3){
+    bargeSayac=0;ttsKuyruk=[];
+    ttsGeneration++;
+    if(ttsCancel){ttsCancel();ttsCancel=null}
+    if(ttsSource){try{ttsSource.stop()}catch(e){}ttsSource=null}
+    speechActive=false;discardClip=false;
+  }
+  if(!localPending&&!speechActive&&!busy){
+    if(!recorder)startClip();
+    if(recorder&&recorder.state==='recording')recorder._voiceUpdate(loud,now);
+  }else if(recorder&&recorder.state==='recording'&&(speechActive||discardClip)){
+    discardClip=true;try{recorder.stop()}catch(e){recorder=null}
+  }
+  raf=requestAnimationFrame(monitorVoice);
+}
+
+toggle.onclick=async()=>{if(listening){birikim='';clearTimeout(birikimZaman);stopLocalVoice();ttsGeneration++;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource)try{ttsSource.stop()}catch(e){};ttsSource=null;speechActive=false;return}if(!apiToken){notify('Yerel sunucuyu başlatıp sayfayı aç.');return}if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder||!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){notify('Yerel ses için mikrofon ve WebM destekli bir tarayıcı gerekli.');return}try{let speechStatus=await api('/api/speech/status');if(!speechStatus.installed){notify('Önce ses_kur.bat ile yerel ses modelini kur.');return}localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});audioContext=new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();analyser=audioContext.createAnalyser();analyser.fftSize=2048;audioContext.createMediaStreamSource(localStream).connect(analyser);setToggle(true);discardClip=false;zemin=0.004;birikim='';notify('Yerel mikrofon açık. Ses CPU ile işlenecek.');monitorVoice()}catch(e){stopLocalVoice();notify('Yerel ses veya mikrofon açılamadı. Sunucu ve mikrofon iznini kontrol et.')}};
+
+/* ======================= CANLI DİKTE ======================================
+   Akış: mikrofon → ham PCM (AudioWorklet yerine ScriptProcessor) → her ~1 sn'de
+   son ~4,5 saniyelik pencereyi WAV olarak sunucuya gönder → sunucu Whisper ile
+   yazar, üst üste binen pencerelerin tekrarını ayıklar → metin ANINDA ekranda.
+   Cümle bitmesini beklemez; "toplu yazma" yok.
+   ========================================================================= */
+const dk={ctx:null,stream:null,proc:null,kaynak:null,parcalar:[],ornek:0,hz:48000,zamanlayici:0,
+  calisiyor:false,mesgul:false,metin:'',sonSes:0,oturum:'d'+Date.now().toString(36),sonGonderi:0,yazilan:''};
+
+function dkAc(){
+  document.getElementById('dictation').hidden=false;
+  document.getElementById('dictation').scrollIntoView({behavior:'smooth'});
+  dkDurum();
+  // Hedef pencereyi ve dikte desteğini sunucudan oku (yalnızca bilgi amaçlı).
+  api('/api/dictate/status').then(d=>{
+    const alan=document.getElementById('dictateTarget');
+    if(alan&&!alan.value&&d.window)alan.placeholder='Şu an etkin: '+d.window;
+    const ipucu=document.getElementById('dictateHint');
+    if(ipucu&&d.typing_supported===false&&!/Bu sistemde/.test(ipucu.textContent)){
+      ipucu.textContent+=' Bu sistemde etkin pencereye yazma desteklenmiyor (yalnızca Windows).';
+    }
+  }).catch(()=>{});
+}
+function dkDurum(mesaj){document.getElementById('dictateState').textContent=mesaj||(dk.calisiyor?'Dinliyor · canlı':'Kapalı')}
+function dkHedef(){return (document.getElementById('dictateTarget').value||'').trim()}
+function dkMetinYaz(t){dk.metin=t||'';document.getElementById('dictateText').value=dk.metin}
+function dkAktifMetin(){const alan=document.getElementById('dictateText');return String((alan&&alan.value)||dk.metin||'').trim()}
+function dkSifirla(){dkMetinYaz('');dk.yazilan='';api('/api/dictate/reset',{session:dk.oturum}).catch(()=>{})}
+
+function dkWav(oranc,ornek){
+  // Float32 → 16 bit PCM mono WAV (base64)
+  const n=ornek.length,buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
+  const yaz=(o,metin)=>{for(let i=0;i<metin.length;i++)v.setUint8(o+i,metin.charCodeAt(i))};
+  yaz(0,'RIFF');v.setUint32(4,36+n*2,true);yaz(8,'WAVE');yaz(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,oranc,true);v.setUint32(28,oranc*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  yaz(36,'data');v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,ornek[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true)}
+  let ikili='';const bayt=new Uint8Array(buf);
+  for(let i=0;i<bayt.length;i+=8192)ikili+=String.fromCharCode.apply(null,bayt.subarray(i,i+8192));
+  return btoa(ikili);
+}
+function dkYenidenOrnekle(veri,kaynakHz,hedefHz){
+  if(kaynakHz===hedefHz)return veri;
+  const oran=kaynakHz/hedefHz,uzunluk=Math.floor(veri.length/oran),cikti=new Float32Array(uzunluk);
+  for(let i=0;i<uzunluk;i++){const x=i*oran,taban=Math.floor(x),kalan=x-taban;
+    cikti[i]=(veri[taban]||0)*(1-kalan)+(veri[taban+1]!==undefined?veri[taban+1]:veri[taban]||0)*kalan}
+  return cikti;
+}
+function dkPencere(){
+  // Son ~4,5 saniyelik sesi tek bir diziye kopyalar.
+  const hedef=Math.floor(dk.hz*4.5);let toplam=0;
+  const secili=[];
+  for(let i=dk.parcalar.length-1;i>=0&&toplam<hedef;i--){const p=dk.parcalar[i];secili.unshift(p);toplam+=p.length}
+  if(!toplam)return null;
+  const hepsi=new Float32Array(toplam);let konum=0;
+  for(const p of secili){hepsi.set(p,konum);konum+=p.length}
+  return hepsi;
+}
+function dkKes(parca){
+  dk.parcalar.push(parca);
+  const sinir=Math.floor(dk.hz*9);let toplam=0;
+  for(const p of dk.parcalar)toplam+=p.length;
+  while(dk.parcalar.length&&toplam>sinir){toplam-=dk.parcalar[0].length;dk.parcalar.shift()}
+}
+async function dkGonder(){
+  if(!dk.calisiyor||dk.mesgul)return;
+  if(performance.now()-dk.sonSes>2500)return;   // sessizlikte motoru boşuna çalıştırma
+  const pencere=dkPencere();
+  if(!pencere||pencere.length<dk.hz*0.8)return;
+  dk.mesgul=true;
+  try{
+    const veri=dkWav(16000,dkYenidenOrnekle(pencere,dk.hz,16000));
+    const yanit=await api('/api/dictate/window',{audio:veri,session:dk.oturum});
+    if(yanit.full!==undefined)dkMetinYaz(yanit.full);
+    const eklenen=(yanit.added||'').trim();
+    if(eklenen){
+      dk.sonGonderi=performance.now();
+      if(document.getElementById('dictateLive').checked) dkYaz(eklenen);
+    }
+  }catch(e){
+    dkDurum('Hata: '+e.message);notify('Dikte: '+e.message);
+  }finally{dk.mesgul=false}
+}
+async function dkYaz(metin,enter){
+  const parca=String(metin||'').trim();
+  if(!parca)return false;
+  try{
+    const r=await api('/api/dictate/type',{text:dk.yazilan?(' '+parca):parca,confirmed:true,
+      target:dkHedef(),enter:!!enter});
+    dk.yazilan=(dk.yazilan?dk.yazilan+' ':'')+parca;
+    document.getElementById('dictateHint').textContent='Yazıldı ('+r.yazilan+' karakter) · '+(r.pencere||'etkin pencere');
+    return true;
+  }catch(e){
+    notify('Pencereye yazılamadı: '+e.message);
+    document.getElementById('dictateHint').textContent=e.message;
+    return false;
+  }
+}
+async function dkBaslat(){
+  if(!apiToken){notify('Yerel sunucuyu başlatıp sayfayı aç.');return}
+  if(!navigator.mediaDevices?.getUserMedia){notify('Bu tarayıcı mikrofonu desteklemiyor.');return}
+  try{
+    const saglik=await api('/api/speech/status');
+    if(!saglik.installed){notify('Önce ses_kur.bat ile yerel ses modelini kur.');return}
+  }catch(e){notify(e.message);return}
+  try{
+    dk.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+    dk.ctx=new (window.AudioContext||window.webkitAudioContext)();
+    await dk.ctx.resume();
+    dk.hz=dk.ctx.sampleRate;
+    dk.kaynak=dk.ctx.createMediaStreamSource(dk.stream);
+    dk.proc=dk.ctx.createScriptProcessor(4096,1,1);
+    dk.parcalar=[];dk.sonSes=0;
+    dk.proc.onaudioprocess=(olay)=>{
+      if(!dk.calisiyor)return;
+      const giris=olay.inputBuffer.getChannelData(0);
+      let kare=0;for(let i=0;i<giris.length;i+=8)kare+=giris[i]*giris[i];
+      if(Math.sqrt(kare/(giris.length/8))>0.006)dk.sonSes=performance.now();
+      dkKes(new Float32Array(giris));
+    };
+    const sessiz=dk.ctx.createGain();sessiz.gain.value=0;
+    dk.kaynak.connect(dk.proc);dk.proc.connect(sessiz);sessiz.connect(dk.ctx.destination);
+    dk.calisiyor=true;
+    document.getElementById('dictateToggle').textContent='Dikteyi durdur';
+    document.getElementById('dictateToggle').classList.add('active');
+    await api('/api/dictate/reset',{session:dk.oturum});
+    dk.zamanlayici=setInterval(dkGonder,1000);
+    dkDurum('Dinliyor · canlı');
+  }catch(e){dkDurdur();notify('Mikrofon açılamadı: '+e.message)}
+}
+async function dkDurdur(){
+  dk.calisiyor=false;
+  clearInterval(dk.zamanlayici);dk.zamanlayici=0;
+  if(dk.proc){try{dk.proc.disconnect()}catch(e){};dk.proc.onaudioprocess=null;dk.proc=null}
+  if(dk.kaynak){try{dk.kaynak.disconnect()}catch(e){};dk.kaynak=null}
+  if(dk.stream){dk.stream.getTracks().forEach(t=>t.stop());dk.stream=null}
+  if(dk.ctx){try{await dk.ctx.close()}catch(e){};dk.ctx=null}
+  dk.parcalar=[];
+  document.getElementById('dictateToggle').textContent='Dikteyi başlat';
+  document.getElementById('dictateToggle').classList.remove('active');
+  try{
+    const duzelt=document.getElementById('dictatePolish').checked;
+    const son=await api('/api/dictate/finish',{session:dk.oturum,polish:duzelt});
+    if(son.text)dkMetinYaz(son.text);
+    if(son.polished)dkDurum('Durdu · yazım düzeltildi');
+  }catch(e){}
+  dkDurum('Durdu');
+  const sonMetin=dkAktifMetin();
+  if(document.getElementById('dictateAnswer').checked&&sonMetin){dkSifirla();command(sonMetin)}
+}
+document.getElementById('dictateOpen').onclick=()=>{const p=document.getElementById('dictation');if(p.hidden){dkAc()}else{p.hidden=true}};
+/* Global kısayol tarayıcıyı ?dikte=1 ile açtıysa dikte kendiliğinden başlar. */
+if(new URLSearchParams(location.search).get('dikte')==='1'){dkAc();setTimeout(()=>{if(!dk.calisiyor)dkBaslat().catch(()=>{})},600)}
+document.getElementById('dictateClose').onclick=()=>{if(dk.calisiyor)dkDurdur();document.getElementById('dictation').hidden=true};
+document.getElementById('dictateToggle').onclick=()=>{dk.calisiyor?dkDurdur():dkBaslat()};
+document.getElementById('dictateType').onclick=async()=>{
+  const t=dkAktifMetin();if(!t){notify('Yazılacak metin yok.');return}
+  dk.yazilan='';
+  await dkYaz(t,document.getElementById('dictateEnter').checked);
+};
+document.getElementById('dictateSend').onclick=()=>{
+  const t=dkAktifMetin();if(!t){notify('Gönderilecek metin yok.');return}
+  dkSifirla();command(t);
+};
+document.getElementById('dictateClear').onclick=()=>{dkSifirla();dkDurum(dk.calisiyor?'Dinliyor · canlı':'Kapalı')};
+document.getElementById('dictateTarget').value=localStorage.getItem('emre-dictate-target')||'';
+document.getElementById('dictateLive').checked=localStorage.getItem('emre-dictate-live')==='1';
+document.getElementById('dictateEnter').checked=localStorage.getItem('emre-dictate-enter')==='1';
+document.getElementById('dictateAnswer').checked=localStorage.getItem('emre-dictate-answer')==='1';
+document.getElementById('dictateTarget').onchange=()=>localStorage.setItem('emre-dictate-target',dkHedef());
+document.getElementById('dictateLive').onchange=(e)=>localStorage.setItem('emre-dictate-live',e.target.checked?'1':'0');
+document.getElementById('dictateEnter').onchange=(e)=>localStorage.setItem('emre-dictate-enter',e.target.checked?'1':'0');
+document.getElementById('dictateAnswer').onchange=(e)=>localStorage.setItem('emre-dictate-answer',e.target.checked?'1':'0');
+document.getElementById('dictatePolish').checked=localStorage.getItem('emre-dictate-polish')==='1';
+document.getElementById('dictatePolish').onchange=(e)=>localStorage.setItem('emre-dictate-polish',e.target.checked?'1':'0');
+window.addEventListener('beforeunload',()=>{if(dk.ctx)try{dk.ctx.close()}catch(e){}});
+
+document.getElementById('mic').onclick=()=>toggle.click();document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{if(b.dataset.section==='Keşfet')openArena();else if(b.dataset.section==='Sohbet'){showChatPage()}else if(b.dataset.section==='Telegram')showTelegram();else if(b.dataset.section==='Hatırlatıcılar')showReminders();else if(b.dataset.section==='Defter')showLedger();else if(b.dataset.section==='Ayarlar')showSettings();else if(b.dataset.section==='Geliştirici')showDeveloper();else if(b.dataset.section==='Uygulamalar')showApps();else window.scrollTo({top:0,behavior:'smooth'})});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>b.dataset.action==='Hatırlatıcı ekle'?showReminders():showChatPage());
 
 
 const apiToken=document.querySelector('meta[name="emre-token"]')?.content;let conversation=[],busy=false;try{conversation=JSON.parse(localStorage.getItem('emre-context')||'[]').slice(-12)}catch(e){conversation=[]}
-async function api(path,data){if(!apiToken)throw Error('Yerel sunucu çalışmıyor. py server.py ile başlatıp http://127.0.0.1:8765 adresini aç.');let opt={headers:{'X-Emre-Token':apiToken}};if(data!==undefined){opt.method='POST';opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(data)}let res=await fetch(path,opt);let j=await res.json();if(!res.ok)throw Error(j.error||'İşlem başarısız');return j}
-async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await api('/api/chat',{messages:conversation,model:localStorage.getItem('emre-model')||null,backend:localStorage.getItem('emre-backend')||'ollama'});let answer=(r.reply||'Model boş yanıt verdi.').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';answer=answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer)}catch(e){conversation.pop();say('Ollama ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
+async function api(path,data){if(!apiToken)throw Error('Yerel sunucu çalışmıyor. py server.py ile başlatıp http://127.0.0.1:8765 adresini aç.');let opt={headers:{'X-Emre-Token':apiToken}};if(data!==undefined){opt.method='POST';opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(data)}let res=await fetch(path,opt);if(res.status===403){throw Error('Oturum anahtarı geçersiz. Sunucu yeniden başlatılmış olabilir; sayfayı yenile (F5).')}let j=await res.json();if(!res.ok)throw Error(j.error||'İşlem başarısız');return j}
+function cevapTemizle(answer){
+  answer=(answer||'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+  if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))
+    answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';
+  return answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';
+}
+function kaynaklarGoster(kaynaklar){
+  if(!kaynaklar||!kaynaklar.length)return;
+  const messages=document.getElementById('messages'),row=document.createElement('div');
+  row.className='msg hint';row.style.fontSize='12px';row.style.opacity='.8';
+  row.append(document.createTextNode('Kaynaklar: '));
+  kaynaklar.slice(0,5).forEach((k,i)=>{
+    if(i)row.append(document.createTextNode(' · '));
+    let url='';try{url=new URL(k.url);}catch(e){}
+    if(!url.origin)return;
+    const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';
+    a.textContent=(i+1)+'. '+(k.baslik||url.hostname).slice(0,60);a.style.color='#8fd';
+    row.append(a);
+  });
+  messages.append(row);messages.scrollTop=messages.scrollHeight;
+}
+function canliSatir(){
+  const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),
+    body=document.createElement('div'),strong=document.createElement('strong'),span=document.createElement('span');
+  row.className='msg';av.className='avatar';av.textContent='E';strong.textContent='EMRE';
+  body.append(strong,span);row.append(av,body);messages.append(row);messages.scrollTop=messages.scrollHeight;
+  return {yaz(t){span.textContent=t;messages.scrollTop=messages.scrollHeight},sil(){row.remove()}};
+}
+function baytCoz(baytlar){
+  if(typeof TextDecoder!=='undefined')return new TextDecoder().decode(new Uint8Array(baytlar));
+  let s='';
+  for(let i=0;i<baytlar.length;i++){
+    const b=baytlar[i];
+    if(b<0x80){s+=String.fromCharCode(b);continue}
+    let n=0,cp=0;
+    if((b&0xE0)===0xC0){n=1;cp=b&0x1F}
+    else if((b&0xF0)===0xE0){n=2;cp=b&0x0F}
+    else if((b&0xF8)===0xF0){n=3;cp=b&0x07}
+    else continue;
+    if(i+n>=baytlar.length)break;
+    for(let k=1;k<=n;k++)cp=(cp<<6)|(baytlar[i+k]&0x3F);
+    s+=String.fromCodePoint(cp);i+=n;
+  }
+  return s;
+}
+/* --- B2: akışlı seslendirme ------------------------------------------------ */
+let ttsKuyruk=[],ttsKuyrukCalisiyor=false;
+function cumleAyir(metin){
+  // Noktalama + boşluk görülen yerde cümle biter; kalan parça bir sonraki turda gelir.
+  const parcalar=[];let son=0;const re=/[.!?…]\s+/g;let m;
+  while((m=re.exec(metin))){
+    const aday=metin.slice(son,m.index+1).trim();
+    if(aday.length>=2)parcalar.push(aday);
+    son=m.index+m[0].length;
+  }
+  return {hazir:parcalar,kalan:metin.slice(son)};
+}
+function ttsKuyrukEkle(liste){
+  if(!listening||!liste.length)return;
+  ttsKuyruk.push(...liste);speechActive=true;akisSeslendi=true;ttsKuyrukCalistir();
+}
+async function ttsKuyrukCalistir(){
+  if(ttsKuyrukCalisiyor)return;
+  ttsKuyrukCalisiyor=true;
+  try{
+    while(ttsKuyruk.length&&speechActive){
+      const cumle=ttsKuyruk.shift();
+      await playLocalSpeech(cumle,true);
+    }
+  }finally{
+    ttsKuyrukCalisiyor=false;
+    if(!ttsKuyruk.length)speechActive=false;
+  }
+}
+function akisSesAcik(){
+  return listening&&localStorage.getItem('emre-tts-akis')!=='0';
+}
+
+async function akisOku(veri,canli){
+  const res=await fetch('/api/chat/stream',{method:'POST',
+    headers:{'X-Emre-Token':apiToken,'Content-Type':'application/json'},body:JSON.stringify(veri)});
+  if(!res.ok){let j={};try{j=await res.json()}catch(e){}
+    throw Error(j.error||'Akış başlatılamadı ('+res.status+')')}
+  if(!res.body||!res.body.getReader)throw Error('Tarayıcı akışı desteklemiyor');
+  const okuyucu=res.body.getReader(),ham=[];
+  let islenen=0,metin='',sonuc=null,sesTampon='';
+  const sesli=akisSesAcik();
+  ttsKuyruk=[];
+  for(;;){
+    const {done,value}=await okuyucu.read();
+    if(done)break;
+    if(value)for(const b of value)ham.push(b);
+    const tam=baytCoz(ham);
+    let i;
+    while((i=tam.indexOf('\n\n',islenen))>=0){
+      const blok=tam.slice(islenen,i);islenen=i+2;
+      for(const satir of blok.split('\n')){
+        if(!satir.startsWith('data:'))continue;
+        let olay;try{olay=JSON.parse(satir.slice(5).trim())}catch(e){continue}
+        if(olay.type==='delta'){
+          metin+=olay.text;canli.yaz(metin);
+          if(sesli){
+            sesTampon+=olay.text;
+            const {hazir,kalan}=cumleAyir(sesTampon);
+            sesTampon=kalan;
+            if(hazir.length)ttsKuyrukEkle(hazir);
+          }
+        }
+        else if(olay.type==='done'){sonuc=olay}
+        else if(olay.type==='error'){throw Error(olay.message||'Akış hatası')}
+      }
+    }
+  }
+  if(!sonuc)sonuc={reply:metin,sources:[]};
+  if(!sonuc.reply)sonuc.reply=metin;
+  if(sesli&&sesTampon.trim().length>1)ttsKuyrukEkle([sesTampon.trim()]);
+  return sonuc;
+}
+async function sohbetGonder(text){
+  const veri={messages:conversation,model:localStorage.getItem('emre-model')||null,
+    backend:localStorage.getItem('emre-backend')||'ollama',session:activeChatId||''};
+  if(localStorage.getItem('emre-akis')!=='0'){
+    const canli=canliSatir();
+    try{const r=await akisOku(veri,canli);canli.sil();return r}
+    catch(e){canli.sil();if(/Oturum|Yetkisiz|403/.test(e.message))throw e}
+  }
+  return api('/api/chat',veri);
+}
+async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await sohbetGonder(text);let answer=cevapTemizle((r.reply||'Model boş yanıt verdi.'));conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer);kaynaklarGoster(r.sources)}catch(e){conversation.pop();let etiket=(localStorage.getItem('emre-backend')==='api')?'Yapay zekâ sağlayıcısı':'Ollama';say(etiket+' ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
 function panel(title){returnHome();document.querySelector('main > .content').hidden=true;document.getElementById('simplePage').hidden=false;document.getElementById('simpleTitle').textContent=title;let body=document.getElementById('simpleBody');body.replaceChildren();window.scrollTo({top:0,behavior:'smooth'});return body}document.getElementById('closeFeatures').onclick=()=>document.getElementById('features').hidden=true;
 function element(tag,text){let x=document.createElement(tag);x.textContent=text;return x}function field(placeholder,type='text'){let x=document.createElement('input');x.placeholder=placeholder;x.type=type;x.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:5px;max-width:100%';return x}function button(text,cb){let b=element('button',text);b.className='iconbtn';b.style.margin='5px';b.onclick=cb;return b}
-async function showReminders(){let body=panel('Hatırlatıcılar'),text=field('Hatırlatıcı'),due=field('', 'datetime-local');body.append(text,due,button('Ekle',async()=>{try{await api('/api/reminders',{text:text.value,due:due.value});showReminders()}catch(e){notify(e.message)}}));try{let r=await api('/api/reminders');if(!r.reminders.length)body.append(element('p','Henüz hatırlatıcı yok.'));for(let item of r.reminders){let row=element('p',`${item.done?'✓':'◷'} ${item.text} — ${item.due.replace('T',' ')}`);if(!item.done)row.append(button('Tamamlandı',async()=>{await api('/api/reminders/done',{id:item.id});showReminders()}));body.append(row)}if('Notification' in window&&Notification.permission==='default')body.append(button('Bildirim izni ver',()=>Notification.requestPermission()))}catch(e){body.append(element('p',e.message))}}
-async function showTelegram(){let body=panel('Telegram botu');body.append(element('p','Bota gelen mesajlar. Bir mesaj seçip yanıt yazabilirsin.'));try{let r=await api('/api/telegram/updates');if(!r.messages.length)body.append(element('p','Henüz mesaj yok. Önce botuna Telegram üzerinden mesaj gönder.'));for(let m of r.messages){let row=element('p',`${m.from}: ${m.text} `);row.append(button('Yanıtla',async()=>{let text=prompt(m.from+' kişisine mesaj:');if(!text)return;if(!confirm('Bu mesajı Telegram üzerinden göndermek istiyor musun?\n\n'+text))return;try{await api('/api/telegram/send',{chat_id:m.chat_id,text,confirmed:true});notify('Mesaj gönderildi.')}catch(e){notify(e.message)}}));body.append(row)}}catch(e){body.append(element('p',e.message))}}
+async function showReminders(){let body=panel('Hatırlatıcılar'),text=field('Hatırlatıcı'),due=field('', 'datetime-local');body.append(text,due,button('Ekle',async()=>{try{await api('/api/reminders',{text:text.value,due:due.value});showReminders()}catch(e){notify(e.message)}}));try{let r=await api('/api/reminders');if(!r.reminders.length)body.append(element('p','Henüz hatırlatıcı yok.'));for(let item of r.reminders){let row=element('p',`${item.done?'✓':'◷'} ${item.text} — ${item.due.replace('T',' ')}`);if(!item.done)row.append(button('Tamamlandı',async()=>{await api('/api/reminders/done',{id:item.id});showReminders()}));row.append(button('Sil',async()=>{if(!confirm('Bu hatırlatıcı silinsin mi?'))return;try{await api('/api/reminders/delete',{id:item.id,confirmed:true});showReminders();notify('Hatırlatıcı silindi.')}catch(e){notify(e.message)}}));body.append(row)}if('Notification' in window&&Notification.permission==='default')body.append(button('Bildirim izni ver',()=>Notification.requestPermission()))}catch(e){body.append(element('p',e.message))}}
+async function showTelegram(){
+  let body=panel('Telegram botu');
+  body.append(element('p','Bota gelen mesajlar sunucuda saklanır; arka plan yoklaması sayesinde sayfa kapalıyken gelen mesajlar da görünür.'));
+  try{
+    let r=await api('/api/telegram/updates');
+    let durum=element('p',r.status&&r.status.running?'Arka plan yoklaması açık.':'Arka plan yoklaması kapalı.');
+    durum.className='hint';
+    let okunmamis=element('p','Okunmamış mesaj: '+(r.unread||0));
+    body.append(okunmamis,durum);
+    if(!r.status||!r.status.running) body.append(button('Yoklamayı başlat',async()=>{try{await api('/api/telegram/poll',{});showTelegram();notify('Yoklama başlatıldı.')}catch(e){notify(e.message)}}));
+    if(r.unread) body.append(button('Tümünü okundu işaretle',async()=>{try{await api('/api/telegram/mark-read',{});showTelegram()}catch(e){notify(e.message)}}));
+    if(!r.messages.length)body.append(element('p','Henüz mesaj yok. Önce botuna Telegram üzerinden mesaj gönder.'));
+    for(let m of r.messages){
+      let row=element('p',(m.read?'':'● ')+`${m.from}: ${m.text} `);
+      row.append(button('Yanıtla',async()=>{
+        let text=prompt(m.from+' kişisine mesaj:');
+        if(!text)return;
+        if(!confirm('Bu mesajı Telegram üzerinden göndermek istiyor musun?\n\n'+text))return;
+        try{await api('/api/telegram/send',{chat_id:m.chat_id,text,confirmed:true});notify('Mesaj gönderildi.')}catch(e){notify(e.message)}
+      }));
+      body.append(row);
+    }
+  }catch(e){body.append(element('p',e.message))}
+}
 const notified=new Set();async function reminderCheck(){if(!apiToken)return;try{let r=await api('/api/reminders');for(let x of r.reminders){if(!x.done&&!notified.has(x.id)&&new Date(x.due)<=new Date()){notified.add(x.id);notify('Hatırlatıcı: '+x.text);if('Notification' in window&&Notification.permission==='granted')new Notification('Emre hatırlatıyor',{body:x.text})}}}catch(e){}}setInterval(reminderCheck,30000);reminderCheck();
 const kindNames={receivable:'Alacak',payable:'Verecek',received:'Tahsilat',paid:'Ödeme'};
 function money(n){return new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(n/100)}
 function parseMoney(v){v=v.trim().replace(/\s/g,'');if(v.includes(',')){if(v.includes('.'))v=v.replace(/\./g,'');v=v.replace(',','.')}if(!/^\d+(\.\d{1,2})?$/.test(v))throw Error('Tutarı 1250,50 gibi gir.');let [a,b='']=v.split('.');let amount=Number(a)*100+Number((b+'00').slice(0,2));if(!Number.isSafeInteger(amount)||amount<=0)throw Error('Geçerli bir tutar gir.');return amount}
-function showLedger(){document.getElementById('appsPage').hidden=true;document.getElementById('developerPage').hidden=true;document.querySelector('main > .content').hidden=true;document.getElementById('settingsPage').hidden=true;const page=document.getElementById('ledgerPage');page.hidden=false;page.innerHTML=`<div class="ledger-top"><div><span class="ledger-badge">DEFTER</span><h1>Hesaplar</h1><p>Alacak, verecek ve hareketlerini takip et.</p></div><div class="ledger-controls"><input id="ledgerSearch" placeholder="⌕  Hesap ara"><button id="ledgerNew" class="ledger-primary">＋ Yeni hesap</button><button id="ledgerAdd" class="ledger-outline">＋ Yeni işlem</button></div></div><div class="ledger-demo">Kayıtlar bu bilgisayarda saklanır. Emre açık talimatlarını deftere işleyebilir.</div><div class="ledger-layout"><aside class="ledger-list"><div class="ledger-list-head">HESAPLAR <span>☰ &nbsp; ＋</span></div><div class="ledger-group">CARİ HESAPLAR <span id="accountCount"></span></div><div id="ledgerAccounts"></div></aside><section class="ledger-main"><div class="ledger-account-head"><div><b id="accountTitle"></b><small>Cari hesap · TRY ₺</small></div><button id="ledgerDeleteAccount" class="ledger-outline" type="button">Hesabı sil</button></div><div class="ledger-summary"><div><small>TOPLAM ALACAK</small><strong id="sumIn"></strong></div><div><small>TOPLAM VERECEK</small><strong id="sumOut"></strong></div><div><small>NET BAKİYE</small><strong id="sumNet"></strong></div></div><div class="ledger-history"><div class="ledger-history-title"><b>Hesap hareketleri</b><span>İşlem geçmişi</span></div><div class="ledger-row ledger-row-head"><span>AÇIKLAMA</span><span>İŞLEM</span><span>TARİH</span><span>TUTAR</span></div><div id="ledgerRows"></div></div><div class="ledger-compose"><div><b>Hızlı işlem</b><p>Seçili hesaba yeni hareket ekle.</p></div><button class="ledger-outline" id="quickAdd">＋ İşlem ekle</button></div></section></div><div id="ledgerDialog"></div>`;initLedgerReal()}
+function showLedger(){document.getElementById('appsPage').hidden=true;document.getElementById('developerPage').hidden=true;document.querySelector('main > .content').hidden=true;document.getElementById('settingsPage').hidden=true;const page=document.getElementById('ledgerPage');page.hidden=false;page.innerHTML=`<div class="ledger-top"><div><span class="ledger-badge">DEFTER</span><h1>Hesaplar</h1><p>Alacak, verecek ve hareketlerini takip et.</p></div><div class="ledger-controls"><input id="ledgerSearch" placeholder="⌕  Hesap ara"><button id="ledgerNew" class="ledger-primary">＋ Yeni hesap</button><button id="ledgerAdd" class="ledger-outline">＋ Yeni işlem</button><button id="ledgerExport" class="ledger-outline" title="Defteri CSV olarak indir">⤓ CSV</button><button id="ledgerBackup" class="ledger-outline" title="Tüm verilerin JSON yedeğini indir">⤓ Yedek</button></div></div><div class="ledger-demo">Kayıtlar bu bilgisayarda saklanır. Emre açık talimatlarını deftere işleyebilir.</div><div class="ledger-layout"><aside class="ledger-list"><div class="ledger-list-head">HESAPLAR <span>☰ &nbsp; ＋</span></div><div class="ledger-group">CARİ HESAPLAR <span id="accountCount"></span></div><div id="ledgerAccounts"></div></aside><section class="ledger-main"><div class="ledger-account-head"><div><b id="accountTitle"></b><small>Cari hesap · TRY ₺</small></div><button id="ledgerDeleteAccount" class="ledger-outline" type="button">Hesabı sil</button></div><div class="ledger-summary"><div><small>TOPLAM ALACAK</small><strong id="sumIn"></strong></div><div><small>TOPLAM VERECEK</small><strong id="sumOut"></strong></div><div><small>NET BAKİYE</small><strong id="sumNet"></strong></div></div><div class="ledger-history"><div class="ledger-history-title"><b>Hesap hareketleri</b><span>İşlem geçmişi</span></div><div class="ledger-row ledger-row-head"><span>AÇIKLAMA</span><span>İŞLEM</span><span>TARİH</span><span>TUTAR</span></div><div id="ledgerRows"></div></div><div class="ledger-compose"><div><b>Hızlı işlem</b><p>Seçili hesaba yeni hareket ekle.</p></div><button class="ledger-outline" id="quickAdd">＋ İşlem ekle</button></div></section></div><div id="ledgerDialog"></div>`;initLedgerReal()}
 function returnHome(){document.getElementById('simplePage').hidden=true;document.getElementById('chatPage').hidden=true;document.getElementById('discoverPage').hidden=true;const chat=document.querySelector('.chat');if(chat&&chat.parentElement.id==='chatHolder')document.getElementById('sohbet').after(chat);document.getElementById('appsPage').hidden=true;document.getElementById('developerPage').hidden=true;document.getElementById('ledgerPage').hidden=true;document.getElementById('settingsPage').hidden=true;document.querySelector('main > .content').hidden=false}document.getElementById('settingsBack').onclick=()=>{returnHome();document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.section==='Ana sayfa'))};document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.section!=='Ayarlar')returnHome();document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active')},true));
-async function showSettings(){document.getElementById('appsPage').hidden=true;document.getElementById('developerPage').hidden=true;document.getElementById('ledgerPage').hidden=true;selectSettingsTab('ollamaTab');document.querySelector('main > .content').hidden=true;document.getElementById('settingsPage').hidden=false;window.scrollTo({top:0,behavior:'smooth'});let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Ollama modeli'));let intro=element('p','Ollama üzerinde yüklü modellerden Emre’nin kullanacağı modeli seç.'),select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';body.append(intro);try{let status=await api('/api/status');if(!status.ollama){body.append(element('p','Ollama çalışmıyor veya bağlantı kurulamadı. Ollama’yı başlatıp tekrar dene.'));return}if(!status.models.length){body.append(element('p','Yüklü model bulunamadı. Önce Ollama üzerinden bir model indir.'));return}for(let model of status.models){let opt=element('option',model);opt.value=model;select.append(opt)}let saved=localStorage.getItem('emre-model')||status.model;select.value=status.models.includes(saved)?saved:status.models.find(m=>m===saved+':latest')||status.models[0];let msg=element('p','Seçim bu tarayıcıda saklanır. Model değiştiğinde mevcut sohbet bağlamı temizlenir.');msg.className='hint';body.append(select,button('Modeli kaydet',()=>{localStorage.setItem('emre-model',select.value);conversation=[];localStorage.removeItem('emre-context');persistActiveChat();notify('Model seçildi: '+select.value)}),button('Listeyi yenile',showSettings),msg)}catch(e){body.append(element('p',e.message))}}
+async function showSettings(){document.getElementById('appsPage').hidden=true;document.getElementById('developerPage').hidden=true;document.getElementById('ledgerPage').hidden=true;selectSettingsTab('ollamaTab');document.querySelector('main > .content').hidden=true;document.getElementById('settingsPage').hidden=false;window.scrollTo({top:0,behavior:'smooth'});let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Ollama modeli'));let intro=element('p','Ollama üzerinde yüklü modellerden Emre’nin kullanacağı modeli seç.'),select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';body.append(intro);try{let status=await api('/api/status');body.append(element('p','Sürüm: '+status.version+(status.telegram_unread?' · Okunmamış Telegram: '+status.telegram_unread:'')));let arkaUc=localStorage.getItem('emre-backend')||'ollama';if(arkaUc==='api'){let p=element('p','Şu an Ücretsiz API kullanılıyor: '+((status.provider&&status.provider.model)||'model seçilmedi')+'. Ollama’ya dönmek için Ayarlar > Ücretsiz API bölümünden bağlantıyı kes.');p.className='hint';body.append(p);}if(!status.ollama&&arkaUc==='api'){return}if(!status.ollama){body.append(element('p','Ollama çalışmıyor veya bağlantı kurulamadı. Ollama’yı başlatıp tekrar dene.'));return}if(!status.models.length){body.append(element('p','Yüklü model bulunamadı. Önce Ollama üzerinden bir model indir.'));return}for(let model of status.models){let opt=element('option',model);opt.value=model;select.append(opt)}let saved=localStorage.getItem('emre-model')||status.model;select.value=status.models.includes(saved)?saved:status.models.find(m=>m===saved+':latest')||status.models[0];let msg=element('p','Seçim bu tarayıcıda saklanır. Model değiştiğinde mevcut sohbet bağlamı temizlenir.');msg.className='hint';body.append(select,button('Modeli kaydet',()=>{localStorage.setItem('emre-model',select.value);conversation=[];localStorage.removeItem('emre-context');persistActiveChat();notify('Model seçildi: '+select.value)}),button('Listeyi yenile',showSettings),msg)}catch(e){body.append(element('p',e.message))}}
 function selectSettingsTab(id){document.querySelectorAll('.settings-tab').forEach(b=>{let active=b.id===id;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))});document.getElementById('settingsBody').setAttribute('aria-labelledby',id)}
 document.getElementById('ollamaTab').onclick=showSettings;
 document.getElementById('telegramTab').onclick=async()=>{selectSettingsTab('telegramTab');const body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Telegram bot bağlantısı'),element('p','BotFather ile oluşturduğun botun anahtarını girerek bağlantıyı kurabilirsin.'));const info=element('p','Bağlantı durumu kontrol ediliyor…');info.className='hint';body.append(info);let token=field('Bot anahtarı','password');token.autocomplete='off';token.style.width='min(440px, 100%)';body.append(token,button('Bağlan',async()=>{try{let r=await api('/api/telegram/connect',{token:token.value});token.value='';info.textContent='Bağlı: @'+r.username;notify('Telegram botu bağlandı.')}catch(e){info.textContent=e.message}}),button('Bağlantıyı kes',async()=>{try{await api('/api/telegram/disconnect',{});token.value='';info.textContent='Bağlı değil';notify('Telegram bağlantısı kesildi.')}catch(e){info.textContent=e.message}}));let note=element('p','Anahtar yalnızca çalışan sunucunun belleğinde tutulur; sunucu yeniden başlayınca tekrar girmen gerekir. Anahtarı kimseyle paylaşma. Bot, yalnızca kendisine gelen mesajları görebilir.');note.className='hint';body.append(note);try{let status=await api('/api/status');info.textContent=status.telegram_configured?'Bot anahtarı ayarlı':'Bağlı değil'}catch(e){info.textContent=e.message}};
@@ -85,9 +527,863 @@ async function refreshDevFiles(){const select=document.getElementById('devFiles'
 function showApps(){document.querySelector('main > .content').hidden=true;document.getElementById('developerPage').hidden=true;document.getElementById('settingsPage').hidden=true;document.getElementById('ledgerPage').hidden=true;document.getElementById('appsPage').hidden=false;window.scrollTo({top:0,behavior:'smooth'})}document.getElementById('appsBack').onclick=()=>{returnHome();document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.section==='Ana sayfa'))};document.querySelectorAll('.apps-card').forEach(b=>b.onclick=async()=>{let name=b.querySelector('b').textContent;if(!confirm(name+' uygulaması bu bilgisayarda açılsın mı?'))return;try{await api('/api/apps/open',{app:b.dataset.app,confirmed:true});notify(name+' açıldı.')}catch(e){notify(e.message)}});
 function showChatPage(){returnHome();document.querySelector('main > .content').hidden=true;document.getElementById('chatPage').hidden=false;document.getElementById('chatHolder').append(document.querySelector('.chat'));document.getElementById('input').focus();window.scrollTo({top:0,behavior:'smooth'})}for(const id of ['simpleBack','chatBack','discoverBack'])document.getElementById(id).onclick=()=>{returnHome();document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.section==='Ana sayfa'))};
 document.getElementById('arenaApiTab').onclick=()=>{selectSettingsTab('arenaApiTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Arena API bağlantı testi'),element('p','API anahtarın ve hesabında izinli bir model ile tek bir test isteği gönder. Bu alan Arena web oturumundan ayrıdır.'));let key=field('Arena API anahtarı','password');key.autocomplete='off';key.style.width='min(480px,100%)';let model=field('Model kimliği');model.value='coding-router-preview';model.style.width='min(480px,100%)';let prompt=document.createElement('textarea');prompt.value='Merhaba, Türkçe olarak kısaca kendini tanıt.';prompt.maxLength=3000;prompt.style.cssText='display:block;width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit;margin:10px 0';let status=element('p','Henüz test yapılmadı.');status.className='hint';let result=document.createElement('div');result.style.cssText='white-space:pre-wrap;color:#d7eeeb;line-height:1.6';let note=element('p','Anahtar kaydedilmez; yalnızca bu istek sırasında kullanılır. Kullanım ücretli olabilir. Ücretsiz yönlendirici anahtarları bazı istemcilerle sınırlı olabilir.');note.className='hint';let send=button('Test isteği gönder',async()=>{if(!key.value.trim()||!model.value.trim()||!prompt.value.trim()){notify('Anahtar, model ve test mesajını gir.');return}if(!confirm('Bu mesaj Arena API’ye gönderilecek ve hesabında ücret veya kota kullanımı oluşabilir. Devam edilsin mi?'))return;send.disabled=true;status.textContent='Arena yanıtı bekleniyor…';result.textContent='';try{let r=await api('/api/arena/test-api',{key:key.value,model:model.value,prompt:prompt.value,confirmed:true});result.textContent=r.reply;status.textContent='Bağlantı başarılı. Kullanım: '+JSON.stringify(r.usage||{});key.value=''}catch(e){status.textContent=e.message}finally{send.disabled=false}});body.append(element('p','API anahtarı'),key,element('p','Model kimliği'),model,element('p','Test mesajı'),prompt,send,status,result,note)};
+
+/* --- Ücretsiz API sağlayıcısı (OmniRoute / OpenRouter / Groq / Gemini) ------ */
+document.getElementById('providerTab').onclick=async()=>{
+  selectSettingsTab('providerTab');
+  const body=document.getElementById('settingsBody');
+  body.replaceChildren();
+  body.append(element('h2','Ücretsiz API sağlayıcısı'),
+    element('p','Ollama kurmadan da çalışabilirsin: OpenAI uyumlu (/v1/chat/completions) her servis bağlanabilir — '+
+      '9Router, OmniRoute, OpenRouter, Groq, Cerebras, Gemini. Anahtar yalnızca bu bilgisayarda, sunucu tarafında saklanır; '+
+      'tarayıcıya geri gönderilmez.'));
+  let durum;
+  try{ durum=await api('/api/provider/status'); }
+  catch(e){ body.append(element('p',e.message)); return; }
+
+  const kutu=document.createElement('div');
+  kutu.style.cssText='display:grid;gap:8px;margin:14px 0';
+  const preset=document.createElement('select');
+  preset.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px';
+  for(const [i,p] of (durum.presets||[]).entries()){
+    const o=element('option',p.ad); o.value=String(i); preset.append(o);
+  }
+  const ozel=element('option','Özel adres…'); ozel.value='ozel'; preset.append(ozel);
+
+  const taban=field('Sunucu adresi (örn. http://127.0.0.1:20128/v1)');
+  const anahtar=field('API anahtarı (OmniRoute için boş bırakılabilir)','password');
+  taban.value=durum.base_url||'';
+  const not=element('p',''); not.className='hint';
+  const modeller=document.createElement('select');
+  modeller.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';
+  const bilgi=element('p',''); bilgi.className='hint';
+
+  preset.onchange=()=>{
+    const i=preset.value;
+    if(i!=='ozel' && durum.presets[i]){ taban.value=durum.presets[i].base_url; not.textContent=durum.presets[i].not; }
+    else not.textContent='Kendi /v1 uç noktanı yaz. Uzak adresler https:// olmalıdır.';
+  };
+  preset.onchange();
+
+  const taramaKutusu=document.createElement('div');
+  taramaKutusu.style.cssText='display:grid;gap:8px;margin:6px 0';
+  const tara=button('Yerel geçitleri tara',async()=>{
+    taramaKutusu.replaceChildren(element('p','Yerel geçitler yoklanıyor…'));
+    try{
+      const ekPortlar=[];
+      try{
+        const u=new URL(taban.value.trim());
+        if(['127.0.0.1','localhost','[::1]'].includes(u.hostname)&&u.port) ekPortlar.push(Number(u.port));
+      }catch(e){/* adres henüz yazılmamış olabilir */}
+      const r=await api('/api/provider/scan',{ports:ekPortlar});
+      taramaKutusu.replaceChildren();
+      if(!r.total_alive){
+        const p=element('p','Kendi bilgisayarında açık bir geçit bulunamadı. 9Router için: npm i -g 9router → 9router → panel http://localhost:20128/dashboard');
+        p.className='hint'; taramaKutusu.append(p);
+      }
+      for(const g of r.gateways){
+        if(!g.alive) continue;
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #31454c;border-radius:6px;padding:8px';
+        const bilgi=element('span',g.ad+' · '+g.base_url+' · '+(g.needs_key?'anahtar istiyor':(g.models.length+' model')));
+        const kullan=button('Kullan',()=>{
+          taban.value=g.base_url;
+          bilgi.textContent=g.ad+' · '+g.base_url+' seçildi';
+          if(!g.needs_key) anahtar.value='';
+          listele.click();
+        });
+        satir.append(bilgi,kullan);
+        taramaKutusu.append(satir);
+        if(g.needs_key){const n=element('p','Anahtarı 9Router panelinden (API Keys) kopyalayıp yukarıdaki alana yapıştır.');n.className='hint';taramaKutusu.append(n)}
+      }
+    }catch(e){ taramaKutusu.replaceChildren(element('p',e.message)); }
+  });
+  const listele=button('Modelleri getir',async()=>{
+    try{
+      bilgi.textContent='Modeller alınıyor…';
+      const r=await api('/api/provider/models',{base_url:taban.value.trim(),key:anahtar.value});
+      modeller.replaceChildren();
+      for(const m of r.models){ const o=element('option',(m.toLowerCase().includes('free')?'★ ücretsiz · ':'')+m); o.value=m; modeller.append(o); }
+      if(durum.model && r.models.includes(durum.model)) modeller.value=durum.model;
+      bilgi.textContent=r.total+' model bulundu, '+r.free.length+' tanesi ücretsiz. ★ işaretli modeller önce gelir.';
+    }catch(e){ bilgi.textContent=''; notify(e.message); }
+  });
+
+  const baglan=button('Bağlan ve kaydet',async()=>{
+    try{
+      await api('/api/provider/connect',{base_url:taban.value.trim(),key:anahtar.value,
+        model:modeller.value||durum.model,confirmed:true});
+      localStorage.setItem('emre-backend','api');
+      if(modeller.value) localStorage.setItem('emre-model',modeller.value);
+      conversation=[]; localStorage.removeItem('emre-context'); persistActiveChat();
+      notify('Ücretsiz API bağlandı: '+(modeller.value||durum.model));
+      showProviderTab();
+    }catch(e){ notify(e.message); }
+  });
+
+  const testEt=button('Bağlantıyı test et',async()=>{
+    try{
+      bilgi.textContent='Sağlayıcıya minik bir deneme isteği gönderiliyor…';
+      const cevap=await api('/api/provider/test',{model:modeller.value||durum.model||null});
+      bilgi.textContent='Çalışıyor ✅ · model: '+(cevap.model||modeller.value||'-')+' · yanıt: “'+(cevap.reply||'')+'”';
+    }catch(e){
+      bilgi.textContent='Test başarısız: '+e.message;
+      notify(e.message.slice(0,180));
+    }
+  });
+
+  const kes=button('Bağlantıyı kes',async()=>{
+    if(!confirm('Saklanan API anahtarı silinsin ve bağlantı kesilsin mi?')) return;
+    try{
+      await api('/api/provider/disconnect',{confirmed:true});
+      localStorage.setItem('emre-backend','ollama');
+      localStorage.removeItem('emre-model');
+      notify('Bağlantı kesildi. Ollama kullanılacak.');
+      showProviderTab();
+    }catch(e){ notify(e.message); }
+  });
+
+  const durumSatiri=element('p', durum.configured
+    ? `Bağlı: ${durum.base_url} · model: ${durum.model||'seçilmedi'} · anahtar: ${durum.key_hint||'yok'}`
+    : 'Henüz bağlı değil.');
+  durumSatiri.className='hint';
+
+  kutu.append(durumSatiri,preset,taban,anahtar,not,tara,taramaKutusu,modeller,listele,bilgi,baglan,testEt,kes,
+    (()=>{const p=element('p','Ücretsiz kotalar: OpenRouter ":free" modelleri günlük istek sınırına tabidir; '+
+      '9Router/OmniRoute kendi bilgisayarında çalışır ve birden çok sağlayıcıyı sırayla dener (combo). Sınır dolduğunda 429 '+
+      'hatası alırsın, başka bir model seçebilir veya Ollama’ya dönebilirsin. 9Router model adları kr/, if/, cc/ gibi ön ekler '+
+      'taşır; panelde oluşturduğun combo adını da model olarak yazabilirsin (ör. free-combo). '+
+      'Liste geliyor ama sohbet “401: Missing API key” diyorsa bu geçidin bilinen bir hatasıdır: geçidi yeniden '+
+      'başlat, başka bir model seç ya da OpenRouter/Groq gibi doğrudan bir sağlayıcıya geç.');p.className='hint';return p})());
+  body.append(kutu);
+  if(durum.configured) listele.click();
+};
+function showProviderTab(){document.getElementById('providerTab').click()}
+
+/* --- Konuşma tanıma (mikrofon) ayarları: model + cümle bitişi ------------------ */
+async function sesTanimaAyarlari(body){
+  body.append(element('h2','Konuşma tanıma (mikrofon)'));
+  const bilgi=element('p','Durum okunuyor…');bilgi.className='hint';body.append(bilgi);
+  const kutuStil='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';
+  const etiket=(t,ilk)=>{const l=element('p',t);l.className='hint';l.style.margin=(ilk?'16px':'12px')+' 0 4px';return l};
+
+  let durum=null;
+  try{ durum=await api('/api/speech/status'); bilgi.textContent='Kurulu model: '+durum.model+'. '+(durum.hint||''); }
+  catch(e){ bilgi.textContent='Ses modeli durumu alınamadı: '+e.message; }
+
+  if(durum&&durum.installed){
+    const modelSec=document.createElement('select');
+    modelSec.style.cssText=kutuStil;
+    for(const m of (durum.models||['base','small'])){
+      const o=element('option', m==='small'?'small · daha doğru, yavaş':'base · hızlı, kelime kaçırabilir');
+      o.value=m;modelSec.append(o);
+    }
+    modelSec.value=durum.model;
+    const modelKaydet=button('Tanıma modelini kaydet',async()=>{
+      try{
+        const r=await api('/api/speech/model',{model:modelSec.value});
+        notify('Tanıma modeli: '+r.status.model+'. Bir sonraki konuşmada geçerli olur.');
+        bilgi.textContent='Kurulu model: '+r.status.model+'. '+(r.status.hint||'');
+      }catch(e){notify(e.message)}
+    });
+    body.append(etiket('Tanıma modeli',true),modelSec,modelKaydet);
+  }else if(durum){
+    bilgi.textContent='Yerel ses modeli kurulu değil. Mikrofon için önce ses_kur.bat dosyasını çalıştır.';
+  }
+
+  const sessizlik=document.createElement('select');
+  sessizlik.style.cssText=kutuStil;
+  for(const ms of [[1200,'1,2 sn · hızlı yanıt (cümleyi bölebilir)'],[1800,'1,8 sn · dengeli'],[2200,'2,2 sn · önerilen'],[2800,'2,8 sn · yavaş konuşanlar'],[3500,'3,5 sn · çok uzun cümleler']]){
+    const o=element('option',ms[1]);o.value=String(ms[0]);sessizlik.append(o);
+  }
+  sessizlik.value=String(sesSayisiYerel('emre-vad-sessizlik',2200));
+  sessizlik.onchange=()=>{localStorage.setItem('emre-vad-sessizlik',sessizlik.value);notify('Cümle bitiş sessizliği güncellendi.')};
+
+  const uzun=document.createElement('select');
+  uzun.style.cssText=kutuStil;
+  for(const ms of [[15000,'15 sn'],[30000,'30 sn · önerilen'],[45000,'45 sn'],[60000,'60 sn']]){
+    const o=element('option',ms[1]);o.value=String(ms[0]);uzun.append(o);
+  }
+  uzun.value=String(sesSayisiYerel('emre-vad-uzun',30000));
+  uzun.onchange=()=>{localStorage.setItem('emre-vad-uzun',uzun.value);notify('En uzun cümle süresi güncellendi.')};
+
+  const yankiLabel=document.createElement('label');
+  yankiLabel.style.cssText='display:block;margin:10px 5px;color:#a6c1c3;font-size:12px';
+  const yanki=document.createElement('input');
+  yanki.type='checkbox';yanki.checked=localStorage.getItem('emre-voice-echo')!=='0';
+  yanki.onchange=()=>localStorage.setItem('emre-voice-echo',yanki.checked?'1':'0');
+  yankiLabel.append(yanki,document.createTextNode(' Duyduğum metni ekranda göster (ne anladığımı görürsün)'));
+
+  body.append(etiket('Cümle bitiş sessizliği — bir cümleyi kaçırmamak için artır',true),
+    sessizlik,etiket('En uzun cümle'),uzun,yankiLabel,
+    (()=>{const p=element('p','Kısa duraklamalar artık cümleyi bölmüyor; mikrofon cümlenin başından itibaren kaydediyor ve '+
+      'asistan konuşurken sözünü kesersen okuma durup dinlemeye geçiyor. Türkçe doğruluk için small modeli önerilir; '+
+      'kurmak için ses_small_kur.bat dosyasını çalıştır (internet gerekir).');p.className='hint';return p})());
+}
+function sesSayisiYerel(ad,varsayilan){const v=Number(localStorage.getItem(ad));return Number.isFinite(v)&&v>0?v:varsayilan}
+
+
+/* ===================== BELLEK (kişisel hafıza) =========================== */
+document.getElementById('memoryTab').onclick=async()=>{
+  selectSettingsTab('memoryTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Kişisel bellek'),
+    element('p','Emre’nin senin hakkında hatırladıkları bu bilgisayarda saklanır. '+
+      '“hatırla: …”, “not al: …”, “benim adım …”, “X’in telefonu …” gibi açık cümleler otomatik kaydedilir.'));
+  const arama=document.createElement('input');
+  arama.placeholder='Ara: ahmet, proje, telefon…';
+  arama.style.cssText='width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px';
+  const ekleMetin=document.createElement('input');
+  ekleMetin.placeholder='Yeni kayıt: ör. Ahmet 5000 TL borçlu';
+  ekleMetin.style.cssText=arama.style.cssText;
+  const konu=document.createElement('input');
+  konu.placeholder='Konu (isteğe bağlı): Ahmet / Delta projesi';
+  konu.style.cssText=arama.style.cssText;
+  const liste=document.createElement('div');liste.style.cssText='display:grid;gap:6px;margin-top:12px';
+  const bilgi=element('p','');bilgi.className='hint';
+
+  async function yukle(q){
+    liste.replaceChildren();
+    try{
+      const r=await api('/api/memory',{q:q||'',limit:50});
+      bilgi.textContent=r.total+(q?' eşleşme':' kayıt');
+      if(!r.items.length){liste.append(element('p','Kayıt yok.'));return}
+      for(const k of r.items){
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid #31454c;border-radius:6px;padding:8px';
+        const metin=element('span',(k.subject?k.subject+': ':'')+k.text+'  ·  '+String(k.created).slice(0,10));
+        const sil=button('Sil',async()=>{
+          if(!confirm('Bu bellek kaydı silinsin mi?'))return;
+          try{await api('/api/memory/delete',{id:k.id,confirmed:true});yukle(arama.value.trim())}catch(e){notify(e.message)}
+        });
+        satir.append(metin,sil);liste.append(satir);
+      }
+    }catch(e){bilgi.textContent=e.message}
+  }
+  let zaman=0;
+  arama.oninput=()=>{clearTimeout(zaman);zaman=setTimeout(()=>yukle(arama.value.trim()),250)};
+  const kaydet=button('Belleğe ekle',async()=>{
+    try{
+      await api('/api/memory/add',{text:ekleMetin.value.trim(),subject:konu.value.trim()});
+      ekleMetin.value='';konu.value='';notify('Belleğe eklendi.');yukle(arama.value.trim());
+    }catch(e){notify(e.message)}
+  });
+  body.append(arama,liste,bilgi,ekleMetin,konu,kaydet,
+    (()=>{const p=element('p','Bellek yalnızca bu bilgisayarda, Emre veritabanında tutulur; '+
+      'dış servise gönderilmez. Sohbet sırasında yalnızca konuyla ilgili birkaç kayıt bağlama eklenir.');p.className='hint';return p})());
+
+  /* --- yedekleme / geri yükleme / unutma --- */
+  body.append(element('h3','Yedekleme ve temizlik'));
+  const yedekBilgi=element('p','');yedekBilgi.className='hint';
+  const dosyaSec=document.createElement('input');
+  dosyaSec.type='file';dosyaSec.accept='application/json,.json';dosyaSec.style.display='none';
+  dosyaSec.onchange=async()=>{
+    const dosya=dosyaSec.files&&dosyaSec.files[0];
+    if(!dosya)return;
+    try{
+      const metin=await dosya.text();
+      if(!confirm('“'+dosya.name+'” dosyasındaki kayıtlar belleğe eklensin mi? (Aynı metinler atlanır.)'))return;
+      const r=await api('/api/memory/import',{backup:metin,mode:'birlestir',confirmed:true});
+      yedekBilgi.textContent=r.eklenen+' kayıt eklendi, '+r.atlanan+' kayıt atlandı.';
+      yukle(arama.value.trim());
+    }catch(e){yedekBilgi.textContent='Geri yükleme hatası: '+e.message}
+    finally{dosyaSec.value=''}
+  };
+  const indir=button('Yedeği indir (JSON)',async()=>{
+    try{
+      const veri=await api('/api/memory/export');
+      const metin=JSON.stringify(veri,null,2);
+      const adres=URL.createObjectURL(new Blob([metin],{type:'application/json'}));
+      const a=document.createElement('a');
+      a.href=adres;a.download='emre-bellek-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.append(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(adres),4000);
+      yedekBilgi.textContent=veri.kayitlar.length+' kayıt yedeklendi.';
+    }catch(e){yedekBilgi.textContent='Yedek hatası: '+e.message}
+  });
+  const geri=button('Yedekten geri yükle',()=>dosyaSec.click());
+  const arsiv=button('Eski kayıtları temizle',async()=>{
+    if(!confirm('Hiç kullanılmamış ve 6 aydan eski kayıtlar silinsin mi?'))return;
+    try{
+      const r=await api('/api/memory/archive',{confirmed:true,gun:180});
+      yedekBilgi.textContent=r.silinen+' kayıt silindi.';yukle(arama.value.trim());
+    }catch(e){yedekBilgi.textContent=e.message}
+  });
+  body.append(indir,geri,arsiv,dosyaSec,yedekBilgi,
+    (()=>{const p=element('p','Yedek dosyası yalnızca senin bilgisayarına iner; içinde kişisel notların olur, '+
+      'paylaşırken dikkat et. Geri yükleme aynı metinleri iki kez eklemez.');p.className='hint';return p})());
+  yukle('');
+
+  /* --- eşleşenleri unut (sohbetteki `unut:` komutunun düğmeli hâli) --- */
+  body.append(element('h2','Eşleşenleri unut'));
+  const unutGirdi=field('Unutulacak metin veya kişi: ör. Ahmet telefon');
+  unutGirdi.style.width='min(520px,100%)';
+  const unutBilgi=element('p','');unutBilgi.className='hint';
+  const unutBtn=button('Eşleşen kayıtları unut',async()=>{
+    const q=unutGirdi.value.trim();
+    if(!q){notify('Unutulacak metni yaz.');return}
+    if(!confirm('“'+q+'” ile eşleşen bellek kayıtları silinsin mi?\n\nBu işlem geri alınamaz; '+
+      'önce yedek almak istersen “Yedeği indir” düğmesini kullan.'))return;
+    try{
+      const r=await api('/api/memory/forget',{q,confirmed:true});
+      unutBilgi.textContent=r.deleted+' kayıt silindi.';
+      unutGirdi.value='';yukle(arama.value.trim());
+    }catch(e){unutBilgi.textContent=e.message}
+  });
+  body.append(unutGirdi,unutBtn,unutBilgi);
+
+  /* --- uyandırma sözcüğü --- */
+  body.append(element('h2','Uyandırma sözcüğü'));
+  const uyandirmaAciklama=element('p','Açıkken canlı dikte yalnızca “Emre” ile başlayan cümleleri yazar. '+
+    'Sözcükten sonra 12 saniye boyunca söylediklerin normal dikte gibi akar. Kapalıyken her şey yazılır.');
+  uyandirmaAciklama.className='hint';
+  const uyandirmaKutu=document.createElement('input');uyandirmaKutu.type='checkbox';
+  uyandirmaKutu.id='wakeToggle';
+  const uyandirmaEtiket=document.createElement('label');
+  uyandirmaEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:10px 0';
+  uyandirmaEtiket.append(uyandirmaKutu,document.createTextNode(' Uyandırma sözcüğü açık'));
+  const kelimeGirdi=field('Kelimeler, virgülle: emre, hey emre');
+  kelimeGirdi.value='emre, hey emre';
+  kelimeGirdi.style.width='min(420px,100%)';
+  const uyandirmaDurum=element('p','');uyandirmaDurum.className='hint';
+  function uyandirmaYaz(d){
+    uyandirmaKutu.checked=!!d.aktif;
+    kelimeGirdi.value=(d.kelimeler||[]).join(', ');
+    uyandirmaDurum.textContent=d.aktif?'Açık: “'+(d.kelimeler||[]).join('” veya “')+'” ile başlayan cümleler yazılır.':'Kapalı: mikrofon metni olduğu gibi yazılır.';
+  }
+  uyandirmaKutu.onchange=async()=>{
+    try{uyandirmaYaz(await api('/api/wake/settings',{aktif:uyandirmaKutu.checked}));notify('Uyandırma ayarı kaydedildi.')}
+    catch(e){uyandirmaKutu.checked=!uyandirmaKutu.checked;notify(e.message)}
+  };
+  const kelimeKaydet=button('Kelimeleri kaydet',async()=>{
+    const kelimeler=kelimeGirdi.value.split(',').map(k=>k.trim()).filter(Boolean);
+    if(!kelimeler.length){notify('En az bir kelime yaz.');return}
+    try{uyandirmaYaz(await api('/api/wake/settings',{kelimeler}));notify('Kelimeler kaydedildi.')}
+    catch(e){notify(e.message)}
+  });
+  body.append(uyandirmaAciklama,uyandirmaEtiket,kelimeGirdi,kelimeKaydet,uyandirmaDurum);
+  api('/api/wake/status',{}).then(uyandirmaYaz).catch(e=>{uyandirmaDurum.textContent=e.message});
+};
+
+/* ===================== MCP ARAÇLARI ====================================== */
+document.getElementById('mcpTab').onclick=async()=>{
+  selectSettingsTab('mcpTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','MCP araçları'),
+    element('p','Model Context Protocol sunucuları, proje kökündeki mcp_ayar.json dosyasından okunur. '+
+      'Her araç çağrısı onay ister; yalnızca senin tanımladığın komutlar çalıştırılır.'));
+  const durum=element('p','Durum okunuyor…');durum.className='hint';
+  const aracKutusu=document.createElement('div');aracKutusu.style.cssText='display:grid;gap:6px;margin-top:10px';
+  const sonuc=element('p','');sonuc.className='hint';
+  const tara=button('Sunucuları ve araçları getir',async()=>{
+    aracKutusu.replaceChildren();durum.textContent='Aranıyor…';
+    try{
+      const st=await api('/api/mcp/status',{});
+      durum.textContent=st.configured+' sunucu tanımlı.';
+      if(!st.configured){
+        aracKutusu.append(element('p','Tanımlı sunucu yok. Proje köküne mcp_ayar.json ekle (örnek: README › MCP araçları).'));
+        return;
+      }
+      const r=await api('/api/mcp/tools',{});
+      if(!r.tools.length){aracKutusu.append(element('p','Araç bulunamadı.'));return}
+      for(const a of r.tools){
+        if(a.hata){aracKutusu.append(element('p',a.sunucu+': '+a.hata));continue}
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid #31454c;border-radius:6px;padding:8px';
+        const metin=element('span',a.sunucu+' · '+a.ad+(a.aciklama?' — '+a.aciklama:''));
+        const calistir=button('Çalıştır',async()=>{
+          const giris=prompt('Argümanlar (JSON):','{}');
+          if(giris===null)return;
+          let argumanlar;
+          try{argumanlar=JSON.parse(giris||'{}')}catch(e){notify('Geçerli JSON yaz.');return}
+          if(!confirm(a.ad+' aracı çalıştırılsın mı?'))return;
+          try{
+            const c=await api('/api/mcp/call',{server:a.sunucu,tool:a.ad,arguments:argumanlar,confirmed:true});
+            sonuc.textContent=(c.ok?'Sonuç: ':'Araç hatası: ')+(c.result||'(boş)');
+          }catch(e){sonuc.textContent='Hata: '+e.message}
+        });
+        satir.append(metin,calistir);aracKutusu.append(satir);
+      }
+    }catch(e){durum.textContent='Hata: '+e.message}
+  });
+  body.append(durum,tara,aracKutusu,sonuc);
+  tara.click();
+};
+
+
+/* ===================== SİSTEM (otomatik başlatma · kısayol · bildirim) == */
+document.getElementById('systemTab').onclick=async()=>{
+  selectSettingsTab('systemTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Sistem'),
+    element('p','Emre’yi bilgisayar açılınca arka planda başlat, dikteyi klavye kısayoluyla yönet ve '+
+      'hatırlatıcıları tarayıcı kapalıyken de al.'));
+  const durum=element('p','Durum okunuyor…');durum.className='hint';
+  body.append(durum);
+
+  /* --- otomatik başlatma --- */
+  const acilisKutu=document.createElement('input');acilisKutu.type='checkbox';acilisKutu.id='autostartToggle';
+  const acilisEtiket=document.createElement('label');
+  acilisEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  acilisEtiket.append(acilisKutu,document.createTextNode(' Bilgisayar açılınca Emre arka planda başlasın'));
+  const acilisBilgi=element('p','');acilisBilgi.className='hint';
+  body.append(element('h3','Otomatik başlatma'),acilisEtiket,acilisBilgi);
+  acilisKutu.onchange=async()=>{
+    try{
+      const r=await api('/api/system/autostart',{aktif:acilisKutu.checked,confirmed:true});
+      acilisKutu.checked=!!r.kurulu;
+      acilisBilgi.textContent=r.kurulu?'Kuruldu: '+r.yol:'Otomatik başlatma kapalı.';
+      notify(r.kurulu?'Bilgisayar açılınca Emre başlayacak.':'Otomatik başlatma kapatıldı.');
+    }catch(e){acilisKutu.checked=!acilisKutu.checked;acilisBilgi.textContent=e.message;notify(e.message)}
+  };
+
+  /* --- global kısayol --- */
+  const kisayolKutu=document.createElement('input');kisayolKutu.type='checkbox';kisayolKutu.id='hotkeyToggle';
+  const kisayolEtiket=document.createElement('label');
+  kisayolEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  kisayolEtiket.append(kisayolKutu,document.createTextNode(' Global kısayol ile dikteyi aç/kapat'));
+  const tusGirdi=field('Kısayol: ctrl+alt+d');
+  tusGirdi.id='hotkeyInput';tusGirdi.style.width='min(260px,100%)';
+  const tarayiciKutu=document.createElement('input');tarayiciKutu.type='checkbox';tarayiciKutu.id='hotkeyBrowser';
+  const tarayiciEtiket=document.createElement('label');
+  tarayiciEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';
+  tarayiciEtiket.append(tarayiciKutu,document.createTextNode(' Sayfa kapalıysa kısayol tarayıcıyı açsın'));
+  const kisayolBilgi=element('p','');kisayolBilgi.className='hint';
+  const kaydet=button('Kısayolu kaydet',async()=>{
+    try{
+      const r=await api('/api/system/hotkey',{aktif:kisayolKutu.checked,kisayol:tusGirdi.value.trim(),
+        tarayici:tarayiciKutu.checked});
+      kisayolBilgi.textContent=r.aktif?('Etkin: '+r.gorunen):'Kısayol kapalı.';
+      notify('Kısayol ayarı kaydedildi.');
+    }catch(e){notify(e.message);kisayolBilgi.textContent=e.message}
+  });
+  body.append(element('h3','Global kısayol'),kisayolEtiket,tusGirdi,tarayiciEtiket,kaydet,kisayolBilgi,
+    (()=>{const p=element('p','Kısayol yalnızca Windows’ta çalışır ve yalnızca dikteyi başlatır/durdurur; '+
+      'hiçbir komut çalıştırmaz. Bu sayfa açıkken ~1 saniye içinde tepki verir.');p.className='hint';return p})());
+
+  /* --- hatırlatıcı bildirimleri --- */
+  const bildirimKutu=document.createElement('input');bildirimKutu.type='checkbox';bildirimKutu.id='notifyToggle';
+  const bildirimEtiket=document.createElement('label');
+  bildirimEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  bildirimEtiket.append(bildirimKutu,document.createTextNode(' Hatırlatıcı zamanı gelince masaüstü bildirimi göster'));
+  const bildirimBilgi=element('p','');bildirimBilgi.className='hint';
+  bildirimKutu.onchange=async()=>{
+    try{
+      const r=await api('/api/system/notifications',{aktif:bildirimKutu.checked});
+      bildirimBilgi.textContent=r.aktif?'Masaüstü bildirimi açık.':'Yalnızca sayfa içinde gösterilir.';
+    }catch(e){bildirimKutu.checked=!bildirimKutu.checked;notify(e.message)}
+  };
+  /* --- web araması --- */
+  const webKutu=document.createElement('input');webKutu.type='checkbox';webKutu.id='webToggle';
+  const webEtiket=document.createElement('label');
+  webEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  webEtiket.append(webKutu,document.createTextNode(' Güncel sorularda web’de ara (kaynaklı yanıt)'));
+  const webBilgi=element('p','');webBilgi.className='hint';
+  webKutu.onchange=async()=>{
+    try{const r=await api('/api/system/web',{aktif:webKutu.checked});
+      webBilgi.textContent=r.aktif?'Web araması açık; yanıtların altında kaynaklar gösterilir.':'Web araması kapalı.'}
+    catch(e){webKutu.checked=!webKutu.checked;notify(e.message)}
+  };
+  body.append(element('h3','Web araması'),webEtiket,webBilgi,
+    (()=>{const p=element('p','Arama yalnızca “bugün, güncel, hava, fiyat, kimdir, internette ara” gibi '+
+      'sorularda ve senin yazdığın cümleyle yapılır. Sayfalar açılmaz, form gönderilmez, giriş yapılmaz. '+
+      'Kaynaklar yanıtın altında bağlantı olarak listelenir.');p.className='hint';return p})());
+
+  /* --- akışlı yanıt --- */
+  const akisKutu=document.createElement('input');akisKutu.type='checkbox';akisKutu.id='streamToggle';
+  const akisEtiket=document.createElement('label');
+  akisEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  akisEtiket.append(akisKutu,document.createTextNode(' Yanıtı yazarken göster (akışlı)'));
+  const akisBilgi=element('p','');akisBilgi.className='hint';
+  akisKutu.checked=localStorage.getItem('emre-akis')!=='0';
+  akisKutu.onchange=()=>{localStorage.setItem('emre-akis',akisKutu.checked?'1':'0');
+    akisBilgi.textContent=akisKutu.checked?'Akış açık: yanıt yazıldıkça görünür.':'Akış kapalı: yanıt tamamlanınca görünür.'};
+  body.append(element('h3','Yanıt biçimi'),akisEtiket,akisBilgi);
+
+  body.append(element('h3','Hatırlatıcı bildirimleri'),bildirimEtiket,bildirimBilgi,
+    (()=>{const p=element('p','Hatırlatıcıları sunucu kontrol eder: tarayıcı kapalı olsa da süresi gelen '+
+      'hatırlatıcı kaydedilir ve bir sonraki açılışta gösterilir. Bildirim yalnızca bilgisayarında görünür.');p.className='hint';return p})());
+
+  /* --- sağlayıcı kotası ve yedek model --- */
+  body.append(element('h3','Yapay zekâ kotası'));
+  const kotaKutu=element('p','');kotaKutu.id='quotaBox';kotaKutu.className='hint';
+  const yedekGirdi=field('Yedek model (ör. meta-llama/llama-3.3-70b-instruct:free)');
+  yedekGirdi.id='fallbackInput';yedekGirdi.style.width='min(460px,100%)';
+  const yedekBilgi2=element('p','');yedekBilgi2.className='hint';
+  const yedekKaydet=button('Yedek modeli kaydet',async()=>{
+    try{
+      const r=await api('/api/provider/fallback',{model:yedekGirdi.value.trim()});
+      yedekBilgi2.textContent=r.status.yedek?('Yedek model: '+r.status.yedek):'Yedek model kaldırıldı.';
+      notify('Yedek model kaydedildi.');
+    }catch(e){yedekBilgi2.textContent=e.message}
+  });
+  async function kotaYukle(){
+    try{
+      const r=await api('/api/provider/usage?days=7');
+      const gunler=(r.gunler||[]).map(g=>g.gun.slice(5)+': '+g.requests+(g.errors?' ('+g.errors+' hata)':'')).join(' · ');
+      kotaKutu.textContent='Bugün '+r.bugun.requests+' istek'+
+        (r.bugun.errors?', '+r.bugun.errors+' hata':'')+
+        (r.bugun.fallback?', '+r.bugun.fallback+' yedek model':'')+
+        (gunler?' — '+gunler:'');
+    }catch(e){kotaKutu.textContent=e.message}
+  }
+  body.append(kotaKutu,yedekGirdi,yedekKaydet,yedekBilgi2,
+    (()=>{const p=element('p','Kota veya hız sınırı (429) alındığında Emre bir kez yedek modelle dener. '+
+      'Sayaç yalnızca bu bilgisayarda tutulur; ücretsiz servislerin kotası değişebilir.');p.className='hint';return p})());
+
+  /* --- tanılama --- */
+  const taniKutu=document.createElement('div');taniKutu.id='diagnoseBox';
+  taniKutu.style.cssText='margin:8px 0 4px;font-size:13px;line-height:1.5';
+  body.append(element('h3','Kendi kendini kontrol'),
+    button('Kontrolleri çalıştır',()=>tanilamaYukle()),taniKutu,
+    (()=>{const p=element('p','Python sürümü, disk, yazma izni, veritabanı, port, Ollama, ses ortamı, '+
+      'beceriler ve MCP ayarı denetlenir. Hiçbir dosya değiştirilmez; yazma testi için geçici bir dosya '+
+      'oluşturulup hemen silinir.');p.className='hint';return p})());
+
+  /* --- denetim izi --- */
+  const denetimKutu=document.createElement('div');denetimKutu.id='auditBox';
+  denetimKutu.style.cssText='margin:8px 0 4px;max-height:260px;overflow:auto';
+  body.append(element('h3','Denetim izi'),
+    (()=>{const d=document.createElement('div');
+      d.append(button('Yenile',()=>denetimYukle()),
+        button('Kayıtları temizle',async()=>{
+          if(!confirm('Tüm denetim kayıtları silinsin mi?'))return;
+          try{await api('/api/audit/clear',{confirmed:true});denetimYukle();notify('Denetim kayıtları silindi.')}
+          catch(e){notify(e.message)}
+        }));
+      return d})(),
+    denetimKutu,
+    (()=>{const p=element('p','MCP araç çağrıları, beceriler, ekran görüntüsü, dikte yazımı, defter/bellek '+
+      'değişiklikleri ve sistem ayarları burada listelenir. Anahtarlar ve parolalar maskelenir; kayıtlar '+
+      'yalnızca bu bilgisayarda tutulur (en fazla 2000 satır).');p.className='hint';return p})());
+  tanilamaYukle();
+  denetimYukle();
+
+  try{
+    const r=await api('/api/system/status');
+    acilisKutu.checked=!!r.autostart.kurulu;
+    acilisKutu.disabled=!r.autostart.destekli;
+    acilisBilgi.textContent=r.autostart.destekli
+      ? (r.autostart.kurulu?'Kurulu: '+r.autostart.yol:'Kurulu değil.')
+      : 'Bu platformda desteklenmiyor (yalnızca Windows).';
+    kisayolKutu.checked=!!r.hotkey.acik;
+    kisayolKutu.disabled=!r.hotkey.destekli;
+    tusGirdi.value=r.hotkey.kisayol||'ctrl+alt+d';
+    tarayiciKutu.checked=r.hotkey_tarayici!==false;
+    kisayolBilgi.textContent=r.hotkey.destekli
+      ? (r.hotkey.aktif?'Etkin: '+r.hotkey.gorunen:(r.hotkey.hata||'Kısayol kapalı.'))
+      : 'Global kısayol yalnızca Windows’ta çalışır.';
+    if(r.web)webKutu.checked=!!r.web.aktif;
+    try{
+      const p=await api('/api/provider/status');
+      yedekGirdi.value=p.yedek||'';yedekGirdi.disabled=!p.configured;
+      yedekBilgi2.textContent=p.configured
+        ? (p.yedek?('Yedek model: '+p.yedek):'Yedek model tanımlı değil.')
+        : 'Önce Ayarlar › Ücretsiz API bölümünden bir sağlayıcıya bağlan.';
+    }catch(e){yedekBilgi2.textContent=e.message}
+    kotaYukle();
+    webBilgi.textContent=webKutu.checked?'Web araması açık; yanıtların altında kaynaklar gösterilir.':'Web araması kapalı.';
+    bildirimKutu.checked=!!r.notifications.aktif;
+    bildirimBilgi.textContent=r.notifications.aktif
+      ? 'Masaüstü bildirimi açık'+(r.notifications.bekleyen?' · okunmamış '+r.notifications.bekleyen+' bildirim':'')
+      : 'Yalnızca sayfa içinde gösterilir.';
+    durum.textContent='Sürüm '+r.version;
+  }catch(e){durum.textContent=e.message}
+};
+
+/* Global kısayol: sunucudaki sıra numarası artınca dikteyi aç/kapat. */
+let kisayolSeq=-1;
+async function kisayolYokla(){
+  if(!apiToken)return;
+  try{
+    const r=await api('/api/hotkey/poll?since='+Math.max(kisayolSeq,0));
+    if(kisayolSeq<0){kisayolSeq=r.seq;return}
+    if(r.basildi){
+      kisayolSeq=r.seq;
+      if(typeof dk==='undefined')return;
+      dkAc();
+      if(dk.calisiyor){await dkDurdur();notify('Dikte durduruldu (kısayol).')}
+      else{await dkBaslat();notify('Dikte başladı (kısayol).')}
+    }
+  }catch(e){}
+}
+setInterval(kisayolYokla,1500);
+
+/* Sunucu tarafı hatırlatıcı bildirimleri (tarayıcı kapalıyken birikenler dâhil). */
+let bildirimSeq=0;
+async function bildirimYokla(){
+  if(!apiToken)return;
+  try{
+    const r=await api('/api/notifications?since=0');
+    if(!r.items.length)return;
+    const yeniler=r.items.filter(x=>x.id>bildirimSeq).sort((a,b)=>a.id-b.id);
+    if(!yeniler.length)return;
+    bildirimSeq=Math.max(...r.items.map(x=>x.id));
+    for(const n of yeniler){
+      notify(n.title+': '+n.text);
+      if('Notification' in window&&Notification.permission==='granted')new Notification(n.title,{body:n.text,tag:'emre-'+n.id});
+    }
+    await api('/api/notifications/seen',{ids:yeniler.map(n=>n.id)});
+  }catch(e){}
+}
+setInterval(bildirimYokla,15000);
+bildirimYokla();
+
+
+
+/* ===================== BELGELER (B3) ===================================== */
+function dosyaBase64(dosya){
+  return new Promise((resolve,reject)=>{
+    const okuyucu=new FileReader();
+    okuyucu.onload=()=>resolve(String(okuyucu.result||'').split(',')[1]||'');
+    okuyucu.onerror=()=>reject(new Error('Dosya okunamadı.'));
+    okuyucu.readAsDataURL(dosya);
+  });
+}
+document.getElementById('docsTab').onclick=async()=>{
+  selectSettingsTab('docsTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Belgeler'),
+    element('p','PDF, Word (.docx), metin, Markdown, CSV, JSON veya HTML belgesi ekle; sonra belgeye soru sor. '+
+      'Belgeler yalnızca bu bilgisayardaki Emre klasöründe saklanır, hiçbir yere yüklenmez.'));
+  const secim=document.createElement('input');
+  secim.type='file';secim.accept='.txt,.md,.markdown,.csv,.json,.log,.html,.htm,.docx,.pdf';
+  secim.style.cssText='display:block;margin:10px 0;color:#a6c1c3;font-size:12px';
+  const durum=element('p','');durum.className='hint';
+  const liste=document.createElement('div');liste.style.cssText='display:grid;gap:8px;margin-top:12px';
+  let seciliBelge='';
+  async function yukle(){
+    liste.replaceChildren();
+    durum.textContent='Belgeler yükleniyor…';
+    try{
+      const r=await api('/api/docs');
+      if(!r.docs.length){durum.textContent='Henüz belge eklenmedi.';return}
+      durum.textContent=r.docs.length+' belge · toplam '+r.docs.reduce((t,d)=>t+d.chars,0).toLocaleString('tr-TR')+' karakter';
+      for(const belge of r.docs){
+        const satir=element('div','');
+        satir.style.cssText='border:1px solid #24383f;border-radius:8px;padding:10px;background:#0d181d';
+        satir.append(element('b',belge.name+' '),
+          element('small',`(${belge.kind||'belge'} · ${belge.pages} sayfa · ${belge.chunks} parça)`));
+        satir.append(button('Sor',()=>{seciliBelge=String(belge.id);soruKutusu.value=belge.name+' hakkında soru yaz…';soruKutusu.focus()}));
+        satir.append(button('Sil',async()=>{
+          if(!confirm(belge.name+' belgesi silinsin mi?'))return;
+          try{await api('/api/docs/delete',{id:belge.id,confirmed:true});notify('Belge silindi.');yukle()}
+          catch(e){notify(e.message)}
+        }));
+        liste.append(satir);
+      }
+    }catch(e){durum.textContent=e.message}
+  }
+  body.append(secim,button('Seçilen dosyayı ekle',async()=>{
+    const dosya=secim.files&&secim.files[0];
+    if(!dosya){notify('Önce bir dosya seç.');return}
+    if(!confirm(dosya.name+' belgesi eklensin mi?'))return;
+    try{
+      durum.textContent='Belge okunuyor…';
+      const icerik=await dosyaBase64(dosya);
+      const r=await api('/api/docs/import',{confirmed:true,name:dosya.name,content:icerik});
+      notify('Eklendi: '+r.name+' · '+r.pages+' sayfa');
+      secim.value='';yukle();
+    }catch(e){durum.textContent=e.message;notify(e.message)}
+  }),button('Yenile',yukle),durum);
+  const soruKutusu=document.createElement('input');
+  soruKutusu.placeholder='Belgeye soru yaz… (örn. sözleşme kaç ay?)';
+  soruKutusu.style.cssText='width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin-top:14px';
+  const cevap=element('div','');cevap.style.cssText='margin-top:10px;white-space:pre-wrap;color:#cfe9e6';
+  const kaynaklar=element('p','');kaynaklar.className='hint';
+  body.append(soruKutusu,button('Belgeye sor',async()=>{
+    const soru=soruKutusu.value.trim();
+    if(!soru){notify('Bir soru yaz.');return}
+    cevap.textContent='Belge okunuyor…';kaynaklar.textContent='';
+    try{
+      const veri={question:soru};if(seciliBelge)veri.id=Number(seciliBelge);
+      if(localStorage.getItem('emre-backend')==='api')veri.backend='api';
+      const r=await api('/api/docs/ask',veri);
+      cevap.textContent=r.reply||'';
+      kaynaklar.textContent=r.sources&&r.sources.length?('Kaynaklar: '+r.sources.map((x,i)=>`[${i+1}] ${x.name} · sayfa ${x.sayfa}`).join(' · ')):'';
+    }catch(e){cevap.textContent=e.message}
+  }),cevap,kaynaklar,liste);
+  yukle();
+};
+
+/* ===================== TAKVİM & POSTA (B4) ============================== */
+document.getElementById('calendarTab').onclick=async()=>{
+  selectSettingsTab('calendarTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Takvim ve posta'),
+    element('p','Yerel takvim (.ics) ve posta (.eml/.mbox veya klasör) dosyalarını salt okunur kullan. '+
+      'Emre hesabına bağlanmaz, e-posta göndermez, dosyaları değiştirmez.'));
+  const takvimGirdi=field('Takvim yolu: C:\\Users\\SERVER\\Desktop\\takvim.ics');
+  const postaGirdi=field('Posta yolu: C:\\Users\\SERVER\\Desktop\\mail.mbox veya klasör');
+  const takvimSonuc=element('p','');takvimSonuc.className='hint';
+  const postaSonuc=element('p','');postaSonuc.className='hint';
+  async function durumYukle(){
+    try{
+      const d=await api('/api/system/status');
+      if(!takvimGirdi.value&&d.calendar)takvimGirdi.value=d.calendar.path||'';
+      if(!postaGirdi.value&&d.mail)postaGirdi.value=d.mail.path||'';
+    }catch(e){}
+  }
+  body.append(takvimGirdi,button('Takvim yolunu kaydet',async()=>{
+    try{const r=await api('/api/calendar/path',{path:takvimGirdi.value.trim()});notify(r.path?'Takvim yolu kaydedildi.':'Takvim yolu kaldırıldı.')}
+    catch(e){notify(e.message)}
+  }),button('Bu haftayı göster',async()=>{
+    takvimSonuc.textContent='Okunuyor…';
+    try{
+      const r=await api('/api/calendar?days=7');
+      if(r.error)takvimSonuc.textContent=r.error;
+      else if(r.message)takvimSonuc.textContent=r.message;
+      else if(!r.events.length)takvimSonuc.textContent='Önümüzdeki 7 günde etkinlik yok.';
+      else takvimSonuc.textContent=r.events.map(e=>`${e.basla.replace('T',' ')} · ${e.baslik}${e.yer?' ('+e.yer+')':''}${e.tekrarli?' ⟳':''}`).join('\n');
+      takvimSonuc.style.whiteSpace='pre-wrap';
+    }catch(e){takvimSonuc.textContent=e.message}
+  }),takvimSonuc);
+  body.append(postaGirdi,button('Posta yolunu kaydet',async()=>{
+    try{const r=await api('/api/mail/path',{path:postaGirdi.value.trim()});notify(r.path?'Posta yolu kaydedildi.':'Posta yolu kaldırıldı.')}
+    catch(e){notify(e.message)}
+  }),button('Son 5 iletiyi göster',async()=>{
+    postaSonuc.textContent='Okunuyor…';
+    try{
+      const r=await api('/api/mail?limit=5');
+      if(r.error)postaSonuc.textContent=r.error;
+      else if(r.message)postaSonuc.textContent=r.message;
+      else if(!r.messages.length)postaSonuc.textContent='Posta kaynağında ileti bulunamadı.';
+      else postaSonuc.textContent=r.messages.map(m=>`${m.tarih?m.tarih.replace('T',' '):'—'} · ${m.konu} · ${m.kimden}${m.ek_var?' 📎':''}`).join('\n');
+      postaSonuc.style.whiteSpace='pre-wrap';
+    }catch(e){postaSonuc.textContent=e.message}
+  }),postaSonuc,
+    element('p','Sohbette "bu hafta takvimde ne var" veya "son mailleri özetle" yazman yeterli. Emre yolu bir kez kaydettikten sonra kendi okur.'));
+  durumYukle();
+};
+
+/* ===================== BECERİLER ========================================= */
+document.getElementById('skillsTab').onclick=async()=>{
+  selectSettingsTab('skillsTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Beceriler'),
+    element('p','Kendi yeteneklerini ekle: beceriler/<ad>/SKILL.md dosyasına ad, açıklama, tetik '+
+      'kelimeleri ve (isteğe bağlı) komut yaz. Emre bu becerileri yalnızca sen istersen çalıştırır.'));
+  const durum=element('p','Yükleniyor…');durum.className='hint';
+  const liste=document.createElement('div');liste.style.cssText='display:grid;gap:8px;margin-top:12px';
+  const girdi=document.createElement('input');
+  girdi.placeholder='Beceriye gönderilecek metin (isteğe bağlı)';
+  girdi.style.cssText='width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin-top:10px';
+  const sonuc=element('p','');sonuc.className='hint';
+  let ko=null;
+  async function yukle(){
+    liste.replaceChildren();
+    try{
+      const r=await api('/api/skills');
+      ko=r.folder;
+      durum.textContent=r.skills.length+' beceri · klasör: '+r.folder;
+      if(!r.skills.length){
+        liste.append(element('p','Henüz beceri yok. beceriler/ klasörüne bir alt klasör ve SKILL.md ekle.'));
+        return;
+      }
+      for(const b of r.skills){
+        const satir=document.createElement('div');
+        satir.style.cssText='border:1px solid #31454c;border-radius:6px;padding:10px;display:grid;gap:4px';
+        const baslik=element('b','!'+b.klasor+' — '+(b.aciklama||'(açıklama yok)'));
+        satir.append(baslik);
+        if(b.tetik&&b.tetik.length){const t=element('small','Tetikler: '+b.tetik.join(', '));t.className='hint';satir.append(t)}
+        if(b.hata){const h=element('small','Hata: '+b.hata);h.style.color='#f88';satir.append(h)}
+        const dugmeler=document.createElement('div');
+        if(b.calistirilabilir){
+          dugmeler.append(button('Çalıştır',async()=>{
+            if(!confirm('“'+b.klasor+'” becerisi çalıştırılsın mı?'))return;
+            try{
+              const c=await api('/api/skills/run',{ad:b.klasor,metin:girdi.value,confirmed:true});
+              sonuc.textContent='Sonuç ('+c.sure+' sn): '+c.reply;
+              add('Sen','!'+b.klasor+' '+(girdi.value||''),'user');say(c.reply);
+            }catch(e){sonuc.textContent='Hata: '+e.message}
+          }));
+        } else {
+          const not=element('small','Yalnızca açıklama (komut yok)');not.className='hint';dugmeler.append(not);
+        }
+        satir.append(dugmeler);liste.append(satir);
+      }
+    }catch(e){durum.textContent='Hata: '+e.message}
+  }
+  body.append(durum,girdi,
+    (()=>{const d=document.createElement('div');
+      d.append(button('Listeyi yenile',yukle),button('Klasörü aç',()=>{navigator.clipboard&&navigator.clipboard.writeText(ko||'');notify('Klasör yolu: '+(ko||'bilinmiyor'))}));
+      return d})(),
+    liste,sonuc,
+    (()=>{const p=element('p','Sohbette !'+'beceri-adı şeklinde yazarak da çalıştırabilirsin. '+
+      'Beceriler senin yazdığın komutlarla, kabuk kullanılmadan ve 20 saniye zaman aşımıyla çalışır; '+
+      'her çalıştırma denetim izine kaydedilir.');p.className='hint';return p})());
+  yukle();
+};
+
+/* ===================== TANILAMA + DENETİM İZİ ============================ */
+async function tanilamaYukle(){
+  const kutu=document.getElementById('diagnoseBox');
+  if(!kutu)return;
+  kutu.replaceChildren(element('p','Kontroller çalışıyor…'));
+  try{
+    const r=await api('/api/diagnose');
+    kutu.replaceChildren();
+    const ozet=element('p',r.ozet.mesaj);ozet.style.color=r.ozet.hata?'#f88':(r.ozet.uyari?'#fd8':'#8fd');
+    kutu.append(ozet);
+    for(const k of r.checks){
+      const satir=document.createElement('div');
+      satir.style.cssText='display:flex;gap:8px;align-items:baseline;padding:3px 0';
+      const im=k.durum==='ok'?'✓':(k.durum==='uyari'?'!':'✕');
+      const renk=k.durum==='ok'?'#8fd':(k.durum==='uyari'?'#fd8':'#f88');
+      const ik=element('span',im);ik.style.color=renk;ik.style.width='14px';
+      satir.append(ik,element('b',k.ad+': '),element('span',k.mesaj));
+      kutu.append(satir);
+    }
+  }catch(e){kutu.replaceChildren(element('p','Tanılama hatası: '+e.message))}
+}
+async function denetimYukle(){
+  const kutu=document.getElementById('auditBox');
+  if(!kutu)return;
+  kutu.replaceChildren(element('p','Yükleniyor…'));
+  try{
+    const r=await api('/api/audit?limit=30');
+    kutu.replaceChildren();
+    if(!r.items.length){kutu.append(element('p','Henüz kayıt yok.'));return}
+    for(const k of r.items){
+      const satir=element('div','· '+String(k.created).replace('T',' ')+' · ['+k.kind+'] '+k.action+
+        (k.detail?' — '+k.detail:''));
+      satir.style.cssText='padding:3px 0;font-size:12px;opacity:'+(k.status==='hata'?.95:.8);
+      if(k.status==='hata')satir.style.color='#f88';
+      kutu.append(satir);
+    }
+  }catch(e){kutu.replaceChildren(element('p','Denetim hatası: '+e.message))}
+}
+
+/* ===================== EKRANI SOR ======================================== */
+document.getElementById('screenAsk').onclick=async()=>{
+  try{
+    if(!confirm('Ekran görüntüsü alınıp bağlı yapay zekâ sağlayıcısına gönderilsin mi?'))return;
+    const soru=prompt('Ekranla ilgili sorun (boş bırakırsan “ne var?”):','')||'';
+    notify('Ekran inceleniyor…');
+    const r=await api('/api/screen/ask',{confirmed:true,question:soru.trim()||undefined});
+    add('Sen','[ekran] '+(soru.trim()||'Ekranda ne var?'),'user');
+    say(r.reply||'Yanıt gelmedi.');
+  }catch(e){notify('Ekran: '+e.message)}
+};
+
+/* Ollama sekmesinde geçerli arka ucu göster */
 document.getElementById('openjarvisTab').onclick=async()=>{selectSettingsTab('openjarvisTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','OpenJarvis bağlantısı'),element('p','OpenJarvis yerel sunucusunu Ollama ile kullan. Emre’nin defter ve uygulama izinleri ayrı yönetilir.'));let status=element('p','Bağlantı kontrol ediliyor…');status.className='hint';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px';for(let [v,t] of [['ollama','Ollama doğrudan · CPU'],['openjarvis','OpenJarvis · CPU modeli']]){let o=element('option',t);o.value=v;select.append(o)}select.value=localStorage.getItem('emre-backend')||'ollama';let note=element('p','OpenJarvis için bilgisayarında yerel sunucu ve emre-cpu modeli gerekir. Model seçimini Ollama modeli sekmesinden yap. Sunucu yalnızca 127.0.0.1:8766 üzerinden bağlanır. İşlemci kullanımını ollama ps ile doğrula.');note.className='hint';body.append(status,select,button('Bağlantıyı kaydet',()=>{localStorage.setItem('emre-backend',select.value);conversation=[];localStorage.removeItem('emre-context');persistActiveChat();notify('Bağlantı seçildi; sohbet bağlamı temizlendi.')}),button('Durumu yenile',async()=>{try{let r=await api('/api/openjarvis/status');status.textContent=r.online?'OpenJarvis yerel sunucusu erişilebilir.':'OpenJarvis sunucusu çalışmıyor veya erişilemiyor.'}catch(e){status.textContent=e.message}}),note);try{let r=await api('/api/openjarvis/status');status.textContent=r.online?'OpenJarvis yerel sunucusu erişilebilir.':'OpenJarvis sunucusu çalışmıyor veya erişilemiyor.'}catch(e){status.textContent=e.message}};
 document.getElementById('browserAccessTab').onclick=()=>{selectSettingsTab('browserAccessTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Tarayıcı erişimi'),element('p','Tarayıcı kontrolü henüz bağlı değil. Bu seçim yalnızca hazırlık tercihidir; şimdilik herhangi bir tarayıcı işlemini etkinleştirmez veya denetlemez.'));let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let [value,label] of [['restricted','Kısıtlı · işlemler onaylı'],['full','Tam erişim · işlem onayı yok']]){let option=element('option',label);option.value=value;select.append(option)}select.value=localStorage.getItem('emre-browser-access')==='full'?'full':'restricted';let info=element('p','LUX FUTURES için emir açmama hedefi iki modda da geçerlidir. Botun masaüstü sürümü ve işlem yolları incelenmeden bu korumanın çalıştığı garanti edilemez.');info.className='hint';body.append(select,button('Tercihi kaydet',()=>{localStorage.setItem('emre-browser-access',select.value);notify('Tercih kaydedildi; tarayıcı kontrolü henüz bağlı değil.')}),info)};
-document.getElementById('voiceTab').onclick=async()=>{selectSettingsTab('voiceTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Yerel konuşma sesi'),element('p','Bilgisayarında kurulu Türkçe seslerden seçim yap. Sesin tonu, seçtiğin örnekle birebir aynı olmayabilir.'));let status=element('p','Yerel sesler aranıyor…');status.className='hint';body.append(status);try{let r=await api('/api/tts/voices');if(!r.voices?.length){status.textContent='Yerel ses bulunamadı. Piper için ses_model_kur.bat dosyasını çalıştır.';return}status.textContent='Türkçe sesler bulundu.';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let v of r.voices){let o=element('option',(v.label||v.name)+' · '+v.gender);o.value=v.name;select.append(o)}select.value=localStorage.getItem('emre-tts-voice')||r.voices.find(v=>String(v.gender).toLowerCase()==='male')?.name||r.voices[0].name;if(!select.value)select.value=r.voices[0].name;let save=button('Sesi kaydet',()=>{localStorage.setItem('emre-tts-voice',select.value);notify('Yerel ses seçildi.')});let test=button('Örneği dinle',()=>{localStorage.setItem('emre-tts-voice',select.value);playLocalSpeech('İyi akşamlar dostum. Ben Emre. Her şey kontrol altında; sen rahatına bak. Sistemleri izliyorum ve ihtiyaç duyduğunda buradayım.')});let reverbLabel=document.createElement('label');reverbLabel.style.cssText='display:block;margin:14px 5px;color:#a6c1c3;font-size:12px';let reverbToggle=document.createElement('input');reverbToggle.type='checkbox';reverbToggle.checked=localStorage.getItem('emre-reverb')==='1';reverbToggle.onchange=()=>localStorage.setItem('emre-reverb',reverbToggle.checked?'1':'0');reverbLabel.append(reverbToggle,document.createTextNode(' Hafif reverb (isteğe bağlı)'));let note=element('p','Ses bilgisayarında oluşturulur. Anlaşılırlığı kontrol etmek için önce reverb kapalı dinle. Fahrettin ve Fettah yerel seslerini seçebilirsin.');note.className='hint';body.append(select,save,test,reverbLabel,note)}catch(e){status.textContent=e.message}};
+function sesAkisAyarlari(body){
+  let akisLabel=document.createElement('label');akisLabel.style.cssText='display:block;margin:10px 5px;color:#a6c1c3;font-size:12px';
+  let akisToggle=document.createElement('input');akisToggle.type='checkbox';akisToggle.checked=localStorage.getItem('emre-tts-akis')!=='0';
+  akisToggle.onchange=()=>{localStorage.setItem('emre-tts-akis',akisToggle.checked?'1':'0');api('/api/system/tts',{akis:akisToggle.checked}).catch(()=>{})};
+  akisLabel.append(akisToggle,document.createTextNode(' Akışlı seslendirme (yanıt yazılırken cümle cümle oku)'));
+  let bargeLabel=document.createElement('label');bargeLabel.style.cssText='display:block;margin:10px 5px;color:#a6c1c3;font-size:12px';
+  let bargeToggle=document.createElement('input');bargeToggle.type='checkbox';bargeToggle.checked=localStorage.getItem('emre-barge-in')!=='0';
+  bargeToggle.onchange=()=>{localStorage.setItem('emre-barge-in',bargeToggle.checked?'1':'0');api('/api/system/tts',{barge_in:bargeToggle.checked}).catch(()=>{})};
+  bargeLabel.append(bargeToggle,document.createTextNode(' Söz kesme (sen konuşunca okuma dursun)'));
+  let not=element('p','Akışlı seslendirme açıkken ilk cümle hazır olur olmaz okunmaya başlar. Söz kesme açıkken mikrofon açıkken sen konuşmaya başladığında okuma kesilir ve seni dinlemeye geçer.');not.className='hint';
+  body.append(akisLabel,bargeLabel,not);
+}
+document.getElementById('voiceTab').onclick=async()=>{selectSettingsTab('voiceTab');let body=document.getElementById('settingsBody');body.replaceChildren();body.append(element('h2','Yerel konuşma sesi'),element('p','Bilgisayarında kurulu Türkçe seslerden seçim yap. Sesin tonu, seçtiğin örnekle birebir aynı olmayabilir.'));let status=element('p','Yerel sesler aranıyor…');status.className='hint';body.append(status);try{let r=await api('/api/tts/voices');if(!r.voices?.length){status.textContent='Yerel ses bulunamadı. Piper için ses_model_kur.bat dosyasını çalıştır.';sesAkisAyarlari(body);sesTanimaAyarlari(body);return}status.textContent='Türkçe sesler bulundu.';let select=document.createElement('select');select.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;max-width:100%';for(let v of r.voices){let o=element('option',(v.label||v.name)+' · '+v.gender);o.value=v.name;select.append(o)}select.value=localStorage.getItem('emre-tts-voice')||r.voices.find(v=>String(v.gender).toLowerCase()==='male')?.name||r.voices[0].name;if(!select.value)select.value=r.voices[0].name;let save=button('Sesi kaydet',()=>{localStorage.setItem('emre-tts-voice',select.value);notify('Yerel ses seçildi.')});let test=button('Örneği dinle',()=>{localStorage.setItem('emre-tts-voice',select.value);playLocalSpeech('İyi akşamlar dostum. Ben Emre. Her şey kontrol altında; sen rahatına bak. Sistemleri izliyorum ve ihtiyaç duyduğunda buradayım.')});let reverbLabel=document.createElement('label');reverbLabel.style.cssText='display:block;margin:14px 5px;color:#a6c1c3;font-size:12px';let reverbToggle=document.createElement('input');reverbToggle.type='checkbox';reverbToggle.checked=localStorage.getItem('emre-reverb')==='1';reverbToggle.onchange=()=>localStorage.setItem('emre-reverb',reverbToggle.checked?'1':'0');reverbLabel.append(reverbToggle,document.createTextNode(' Hafif reverb (isteğe bağlı)'));let note=element('p','Ses bilgisayarında oluşturulur. Anlaşılırlığı kontrol etmek için önce reverb kapalı dinle. Fahrettin ve Fettah yerel seslerini seçebilirsin.');note.className='hint';
+  body.append(select,save,test,reverbLabel,note);
+  sesAkisAyarlari(body)}catch(e){status.textContent=e.message}sesTanimaAyarlari(body)};
 const canvas=document.getElementById('energy'),ctx=canvas.getContext('2d');
 let tick=0;const TAU=Math.PI*2;let seed=27;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}const sparks=Array.from({length:360},()=>({lat:Math.asin(rand()*2-1),lon:rand()*TAU,r:136+rand()*25,alpha:.15+rand()*.75,phase:rand()*TAU}));const traces=Array.from({length:48},()=>({lat:(rand()-.5)*2.7,lon:rand()*TAU,len:.13+rand()*.75,step:.05+rand()*.2,r:140+rand()*18,alpha:.12+rand()*.35}));
 function project(lat,lon,r,t){let x=r*Math.cos(lat)*Math.cos(lon+t*.23),y=r*Math.sin(lat),z=r*Math.cos(lat)*Math.sin(lon+t*.23);let tilt=.26;let yy=y*Math.cos(tilt)-z*Math.sin(tilt),zz=y*Math.sin(tilt)+z*Math.cos(tilt),scale=400/(400-zz*.48);return [250+x*scale,250+yy*scale,zz]}
@@ -101,4 +1397,452 @@ for(const p of sparks){let [x,y,z]=project(p.lat,p.lon,p.r,tick);let pulse=.45+.
 // Nested tilted holographic arcs
 for(let j=0;j<6;j++){ctx.save();ctx.translate(250,250);ctx.rotate(j*.6+tick*(j%2?.09:-.12));ctx.scale(1,.35+j*.095);ctx.beginPath();let radius=48+j*19;ctx.arc(0,0,radius,tick*(j%2?-.2:.2)+j,tick*(j%2?-.2:.2)+j+4.7);ctx.strokeStyle=`rgba(255,${135+j*9},${57+j*5},${.48-j*.045})`;ctx.lineWidth=j===1?2.5:1;ctx.shadowBlur=0;ctx.shadowColor='#ff783f';ctx.stroke();ctx.restore()}
 let core=ctx.createRadialGradient(250,250,0,250,250,43);core.addColorStop(0,'rgba(255,244,210,.95)');core.addColorStop(.12,'rgba(255,189,100,.85)');core.addColorStop(.4,'rgba(255,111,44,.32)');core.addColorStop(1,'rgba(255,76,16,0)');ctx.fillStyle=core;ctx.fillRect(205,205,90,90);ctx.globalCompositeOperation='source-over';requestAnimationFrame(frame)}frame();
-</script></body></html>
+</script>
+<script>
+/* Canlı sistem durumu ve yaklaşan hatırlatıcılar (salt okunur, yalnızca yerel API). */
+(function(){
+  if(typeof api!=='function') return;
+  const rows={};
+  document.querySelectorAll('[data-durum]').forEach(el=>{rows[el.dataset.durum]=el});
+  function set(key,text,ok){const el=rows[key];if(!el)return;el.textContent=text;el.classList.toggle('off',!ok)}
+  function fmtDue(iso){try{return new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short'}).format(new Date(iso))}catch(e){return iso}}
+  async function refreshStatus(){
+    try{
+      const s=await api('/api/status');
+      const ses=!!(s.piper_installed||s.speech_installed);
+      set('ses',ses?(s.piper_installed?'Piper hazır':'Windows sesi hazır'):'Kurulu değil',ses);
+      set('internet',s.internet_access?'Bağlı':'Bağlı değil',!!s.internet_access);
+      set('telegram',s.telegram_configured?'Bağlı':'Bağlı değil',!!s.telegram_configured);
+      set('cihaz',s.apps_supported?(s.openjarvis_online?'Hazır · OpenJarvis açık':'Hazır'):'Yalnızca Windows',!!s.apps_supported);
+      const varsayilan=localStorage.getItem('emre-backend')||'ollama';
+      const saglayici=s.provider&&s.provider.configured?((s.provider.model||'model seçilmedi').split('/').pop()+' · API'):'';
+      const ollama=s.ollama?(localStorage.getItem('emre-model')||s.model):'';
+      const secili=varsayilan==='api'?saglayici:ollama;
+      set('yapayzeka',secili||'Bağlı değil',!!secili);
+    }catch(e){set('ses','Sunucuya ulaşılamıyor',false)}
+  }
+  async function refreshUpcoming(){
+    const box=document.getElementById('upcomingReminders');if(!box)return;
+    try{
+      const r=await api('/api/reminders'),now=Date.now();
+      const next=(r.reminders||[]).filter(x=>!x.done&&new Date(x.due).getTime()>=now).sort((a,b)=>new Date(a.due)-new Date(b.due)).slice(0,3);
+      box.replaceChildren();
+      if(!next.length){const p=document.createElement('p');p.className='hint';p.textContent='Yaklaşan hatırlatıcı yok.';box.append(p);return}
+      for(const x of next){
+        const row=document.createElement('div');row.className='reminder';
+        const cal=document.createElement('span');cal.className='cal';cal.textContent='◷';
+        const wrap=document.createElement('div');
+        const title=document.createElement('b');title.textContent=x.text;
+        const when=document.createElement('p');when.textContent=fmtDue(x.due);
+        wrap.append(title,when);row.append(cal,wrap);box.append(row);
+      }
+    }catch(e){}
+  }
+  refreshStatus();refreshUpcoming();
+  setInterval(refreshStatus,15000);
+  setInterval(refreshUpcoming,30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshStatus();refreshUpcoming()}});
+})();
+
+</script>
+<script>
+/* --- Sunucu geçmişi, dışa aktarma ve erişilebilirlik yardımcıları --------- */
+(function(){
+  if(typeof api!=='function') return;
+
+  async function indir(yol, varsayilanAd){
+    try{
+      const res=await fetch(yol,{headers:{'X-Emre-Token':document.querySelector('meta[name="emre-token"]').content}});
+      if(!res.ok){const j=await res.json().catch(()=>({error:'İndirme başarısız'}));throw Error(j.error||'İndirme başarısız')}
+      const blob=await res.blob();
+      const ad=(res.headers.get('Content-Disposition')||'').match(/filename="([^"]+)"/)?.[1]||varsayilanAd;
+      const url=URL.createObjectURL(blob), a=document.createElement('a');
+      a.href=url; a.download=ad; document.body.append(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+      notify('İndirildi: '+ad);
+    }catch(e){notify(e.message)}
+  }
+
+  document.addEventListener('click',(e)=>{
+    if(e.target.id==='ledgerExport') indir('/api/ledger/export?format=csv','emre-defter.csv');
+    if(e.target.id==='ledgerBackup') indir('/api/backup','emre-yedek.json');
+  });
+
+  async function serverHistory(){
+    const box=document.getElementById('serverHistoryList');
+    if(!box) return;
+    try{
+      const r=await api('/api/history');
+      box.replaceChildren();
+      if(!r.sessions.length){const p=document.createElement('p');p.className='hint';p.textContent='Kayıt yok.';box.append(p);return}
+      for(const s of r.sessions){
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:4px;align-items:center;margin:4px 0';
+        const b=document.createElement('button');
+        b.className='iconbtn'; b.style.cssText='flex:1;min-width:0;text-align:left;font-size:11px';
+        b.textContent=(s.preview||s.session).slice(0,42)+' · '+s.count;
+        b.onclick=async()=>{
+          try{
+            const d=await api('/api/history?session='+encodeURIComponent(s.session));
+            const liste=document.getElementById('messages'); liste.replaceChildren();
+            for(const m of d.messages) add(m.role==='user'?'Sen':'EMRE',m.text,m.role==='user'?'user':'');
+            notify('Sunucu geçmişinden yüklendi.');
+          }catch(e){notify(e.message)}
+        };
+        // Sunucu geçmişini silme (onay zorunlu; yalnızca bu bilgisayardaki kayıtlar).
+        const sil=document.createElement('button');
+        sil.className='iconbtn'; sil.style.cssText='font-size:11px;padding:6px 8px';
+        sil.textContent='Sil'; sil.title='Bu konuşmayı sunucudan sil';
+        sil.onclick=async()=>{
+          if(!confirm('“'+((s.preview||s.session).slice(0,40))+'” konuşması sunucudan silinsin mi?\n\nBu işlem geri alınamaz.'))return;
+          try{
+            await api('/api/history/delete',{session:s.session,confirmed:true});
+            notify('Konuşma silindi.'); serverHistory();
+          }catch(e){notify(e.message)}
+        };
+        satir.append(b,sil); box.append(satir);
+      }
+    }catch(e){box.textContent=e.message}
+  }
+  const refreshBtn=document.getElementById('historyRefresh');
+  if(refreshBtn) refreshBtn.onclick=serverHistory;
+  const chatPage=document.getElementById('chatPage');
+  if(chatPage && 'MutationObserver' in window){
+    new MutationObserver(()=>{ if(!chatPage.hidden) serverHistory(); })
+      .observe(chatPage,{attributes:true,attributeFilter:['hidden']});
+  }
+
+  /* Escape tuşu açık onay pencerelerini kapatır (C2) */
+  document.addEventListener('keydown',(e)=>{
+    if(e.key!=='Escape') return;
+    document.querySelectorAll('.ledger-overlay').forEach(o=>o.remove());
+  });
+  /* Bölüm değişince başlığa odaklan (C3) */
+  const odak=()=>{
+    const h=document.querySelector('main section:not([hidden]) h1, main .content:not([hidden]) h1');
+    if(h){ if(!h.hasAttribute('tabindex')) h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); }
+  };
+  document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>setTimeout(odak,60)));
+})();
+</script>
+<script>
+
+/* ===================== D1 · BUGÜN KARTI ================================== */
+function paraCevir(kurus){return new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(kurus)}
+function saatKisa(iso){return String(iso||'').replace('T',' ').slice(0,16)||'—'}
+function bugunKart(etiket,icerik){
+  const kart=document.createElement('div');kart.className='today-card';
+  kart.append(element('h3',etiket));
+  if(typeof icerik==='string'){const p=element('p',icerik);p.className='bos';kart.append(p);return kart}
+  kart.append(icerik);return kart;
+}
+async function bugunYukle(){
+  const grid=document.getElementById('todayGrid'),damga=document.getElementById('todayStamp');
+  if(!grid)return;
+  if(!apiToken){damga.textContent='Yerel sunucu kapalı';return}
+  try{
+    const d=await api('/api/today');
+    grid.replaceChildren();damga.textContent=d.tarih;
+    // Hatırlatıcılar
+    const h=d.hatirlaticilar||{};const hListe=document.createElement('ul');
+    const hepsi=[...(h.geciken||[]).map(x=>({...x,gecik:true})),...(h.bugun||[]),...(h.yaklasan||[])].slice(0,5);
+    for(const x of hepsi){
+      const li=element('li',(x.gecik?'⚠ ':'')+x.text+' · '+saatKisa(x.due));
+      if(x.gecik)li.style.color='#ffb3a7';
+      hListe.append(li);
+    }
+    grid.append(bugunKart('Hatırlatıcılar',hepsi.length?hListe:(h.toplam?'Bu hafta hatırlatıcı yok.':'Hatırlatıcı yok.')));
+    // Defter
+    const defterBox=document.createElement('div');
+    defterBox.append(element('span',paraCevir(Math.round((d.defter?.alacak_tl||0)*100))));
+    const alacak=defterBox.firstChild;alacak.className='today-num';
+    alacak.append(element('em',' alacak'));
+    const verecek=element('span',paraCevir(Math.round((d.defter?.verecek_tl||0)*100)));
+    verecek.className='today-num';verecek.style.fontSize='16px';verecek.style.marginTop='4px';
+    verecek.append(element('em',' verecek'));
+    defterBox.append(verecek,element('p',(d.defter?.kayit||0)+' kayıt'));
+    defterBox.lastChild.className='bos';
+    grid.append(bugunKart('Defter',defterBox));
+    // Takvim
+    const tk=d.takvim||{};
+    if(tk.error){grid.append(bugunKart('Takvim',tk.error))}
+    else if(!tk.path){grid.append(bugunKart('Takvim','Takvim yolu tanımlı değil. Ayarlar › Takvim & posta.'))}
+    else if(!(tk.etkinlikler||[]).length){grid.append(bugunKart('Takvim','Bugün etkinlik yok.'))}
+    else{
+      const ul=document.createElement('ul');
+      for(const e of tk.etkinlikler.slice(0,4))ul.append(element('li',saatKisa(e.basla)+' · '+e.baslik+(e.yer?' ('+e.yer+')':'')));
+      grid.append(bugunKart('Takvim',ul));
+    }
+    // Bellek + belgeler
+    const bBox=document.createElement('div');
+    const bellek=(d.bellek||[]);
+    if(bellek.length){
+      const ul=document.createElement('ul');
+      for(const x of bellek)ul.append(element('li',String(x.text).slice(0,90)));
+      bBox.append(ul);
+    }else bBox.append(element('p','Henüz bellek kaydı yok.'));
+    if(!bellek.length)bBox.lastChild.className='bos';
+    const belge=element('p',d.belgeler?'📄 '+(d.belgeler)+' belge ekli':'Belge eklenmedi');
+    belge.className='bos';belge.style.marginTop='6px';
+    bBox.append(belge);
+    grid.append(bugunKart('Bellek ve belgeler',bBox));
+  }catch(e){
+    grid.replaceChildren(bugunKart('Bugün','Özet alınamadı: '+e.message));
+    damga.textContent='Bağlantı yok';
+  }
+}
+document.getElementById('todayRefresh').onclick=()=>bugunYukle();
+
+/* ===================== D3 · TEMA VE YAZI BOYUTU ========================== */
+function temaUygula(){
+  const secim=localStorage.getItem('emre-tema')||'koyu';
+  const sistem=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;
+  const acik=secim==='acik'||(secim==='sistem'&&sistem);
+  document.body.dataset.tema=acik?'acik':'koyu';
+  const boyut=localStorage.getItem('emre-yazi')||'14';
+  document.body.style.setProperty('--yazi',/^\d{2}$/.test(boyut)?boyut+'px':'14px');
+}
+temaUygula();
+if(window.matchMedia){
+  try{window.matchMedia('(prefers-color-scheme: light)').addEventListener('change',temaUygula)}catch(e){}
+}
+document.getElementById('gorunumTab').onclick=async()=>{
+  selectSettingsTab('gorunumTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Görünüm'),
+    element('p','Tema ve yazı boyutu yalnızca bu tarayıcıda saklanır. Koyu tema varsayılandır.'));
+  const tema=document.createElement('select');
+  tema.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:10px 0';
+  for(const [deger,ad] of [['koyu','Koyu (varsayılan)'],['acik','Açık'],['sistem','Sistemle aynı']]){
+    const o=element('option',ad);o.value=deger;tema.append(o);
+  }
+  tema.value=localStorage.getItem('emre-tema')||'koyu';
+  tema.onchange=()=>{localStorage.setItem('emre-tema',tema.value);temaUygula();notify('Tema değişti.')};
+  const yazi=document.createElement('select');
+  yazi.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:10px 0 10px 8px';
+  for(const [deger,ad] of [['13','Küçük (13px)'],['14','Normal (14px)'],['16','Büyük (16px)'],['18','Çok büyük (18px)']]){
+    const o=element('option',ad);o.value=deger;yazi.append(o);
+  }
+  yazi.value=localStorage.getItem('emre-yazi')||'14';
+  yazi.onchange=()=>{localStorage.setItem('emre-yazi',yazi.value);temaUygula();notify('Yazı boyutu değişti.')};
+  const temaSatir=document.createElement('div');
+  temaSatir.append(element('label','Tema: '),tema);
+  const yaziSatir=document.createElement('div');
+  yaziSatir.append(element('label','Yazı boyutu: '),yazi);
+  temaSatir.style.cssText=yaziSatir.style.cssText='margin:8px 0;color:#a6c1c3;font-size:12px';
+  body.append(temaSatir,yaziSatir);
+  // Görsel üretimi modeli (B5)
+  body.append(element('h2','Görsel üretimi'),
+    element('p','Görsel, Ayarlar › Ücretsiz API bölümünde bağladığın sağlayıcının /images/generations ucunda üretilir. '+
+      'Ücretsiz modellerin çoğu görsel üretmez; sağlayıcı desteklemiyorsa açık hata alırsın. Görsel diske yazılmaz.'));
+  try{
+    const d=await api('/api/system/status');
+    const aktif=(d.provider&&d.provider.configured)||false;
+    const uyari=element('p',aktif?'Sağlayıcı bağlı. Görsel modeli adı boş bırakılırsa sağlayıcının varsayılanı kullanılır.'
+      :'Önce Ayarlar › Ücretsiz API bölümünden bir sağlayıcı bağla.');
+    uyari.className='hint';
+    const model=field('Görsel modeli (isteğe bağlı): ör. dall-e-3');
+    model.style.width='min(420px,100%)';
+    body.append(uyari,model,button('Kaydet',async()=>{
+      try{await api('/api/image/model',{model:model.value.trim()});notify('Görsel modeli kaydedildi.')}catch(e){notify(e.message)}
+    }),button('Görsel üret panelini aç',()=>showGorsel()));
+  }catch(e){body.append(element('p',e.message))}
+  body.append(element('p','Kısayollar: / veya Ctrl+K komut paleti · Esc açık paneli kapatır.'));
+};
+
+/* ===================== B5 · GÖRSEL ÜRETİMİ =============================== */
+function showGorsel(){
+  const body=panel('Görsel üret');
+  body.append(element('p','Ne çizileceğini yaz. Görsel, bağladığın sağlayıcıda üretilir; hiçbir dosya diske yazılmaz, '+
+    'sonucu yalnızca bu ekranda görürsün. Üretim dışarıya istek gönderdiği için her seferinde onay istenir.'));
+  const istem=document.createElement('textarea');
+  istem.placeholder='Örnek: gün batımında İstanbul silueti, suluboya';
+  istem.style.cssText='width:100%;min-height:86px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;font:inherit';
+  const boyut=document.createElement('select');
+  boyut.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:9px;margin:10px 0';
+  for(const [deger,ad] of [['1024x1024','Kare 1024×1024'],['1024x1792','Dikey 1024×1792'],['1792x1024','Yatay 1792×1024'],['512x512','Küçük 512×512']]){
+    const o=element('option',ad);o.value=deger;boyut.append(o);
+  }
+  const durum=element('p','');durum.className='hint';
+  const sonuc=document.createElement('div');sonuc.style.cssText='margin-top:14px';
+  body.append(istem,boyut,button('Görsel üret',async()=>{
+    const metin=istem.value.trim();
+    if(!metin){notify('Önce ne çizileceğini yaz.');return}
+    if(!confirm('Görsel, bağlı sağlayıcıya gönderilerek üretilecek. Devam edilsin mi?\n\n'+metin))return;
+    durum.textContent='Görsel üretiliyor… bu birkaç dakika sürebilir.';
+    sonuc.replaceChildren();
+    try{
+      const r=await api('/api/image/generate',{prompt:metin,size:boyut.value,confirmed:true});
+      const img=document.createElement('img');
+      img.src='data:'+(r.mime||'image/png')+';base64,'+r.image;
+      img.alt=metin;
+      img.style.cssText='max-width:100%;border-radius:10px;border:1px solid #24383f;display:block';
+      const indir=document.createElement('a');
+      indir.href=img.src;indir.download='emre-gorsel.png';indir.textContent='Görseli indir';
+      indir.className='iconbtn';indir.style.cssText='display:inline-block;margin-top:10px;text-decoration:none';
+      sonuc.append(img,indir);
+      durum.textContent='Üretildi · model: '+(r.model||'varsayılan')+' · '+r.size;
+    }catch(e){durum.textContent=e.message;notify(e.message)}
+  }),durum,sonuc);
+}
+
+/* ===================== WEB ARAMA (A4 · elle tetikleme) =================== */
+function showWebArama(){
+  const body=panel('Web\'de ara');
+  body.append(element('p','Arama yalnızca sen istediğinde yapılır ve sonuçlar bağlantılarıyla gösterilir. '+
+    'Kullanılan kaynaklar: DuckDuckGo (lite), DuckDuckGo anlık yanıt, Vikipedi. Hiçbiri anahtar istemez.'));
+  const girdi=field('Aranacak metin: ör. İstanbul hava durumu');
+  girdi.style.width='min(560px,100%)';
+  const durum=element('p','');durum.className='hint';
+  const sonuc=document.createElement('div');sonuc.style.cssText='display:grid;gap:8px;margin-top:12px';
+  function yaz(sonuclar){
+    sonuc.replaceChildren();
+    if(!sonuclar.length){durum.textContent='Sonuç bulunamadı. Farklı kelimelerle dene.';return}
+    durum.textContent=sonuclar.length+' sonuç';
+    for(const s of sonuclar){
+      const kart=document.createElement('div');
+      kart.style.cssText='border:1px solid #24383f;border-radius:8px;padding:10px;background:#0d181d';
+      let adres=null;
+      try{adres=new URL(s.url)}catch(e){}
+      if(adres&&/^https?:$/.test(adres.protocol)){
+        const a=document.createElement('a');
+        a.href=adres.href;a.target='_blank';a.rel='noopener noreferrer';
+        a.textContent=s.baslik||adres.hostname;a.style.color='#8fe9e2';
+        kart.append(a,element('small',' · '+adres.hostname));
+      }else{
+        kart.append(element('b',s.baslik||'Sonuç'));
+      }
+      if(s.ozet){
+        const p=element('p',String(s.ozet).slice(0,300));p.className='hint';kart.append(p);
+      }
+      sonuc.append(kart);
+    }
+  }
+  body.append(girdi,button('Ara',async()=>{
+    const q=girdi.value.trim();
+    if(!q){notify('Aranacak metni yaz.');return}
+    durum.textContent='Aranıyor…';sonuc.replaceChildren();
+    try{const r=await api('/api/web/search?q='+encodeURIComponent(q));yaz(r.results||[])}
+    catch(e){durum.textContent=e.message}
+  }),durum,sonuc,
+    (()=>{const p=element('p','İpucu: Sohbette “güncel … nedir?” gibi sorularda Emre gerekirse kendi de arar ve kaynak gösterir.');p.className='hint';return p})());
+}
+
+/* ===================== KISAYOLLAR YARDIMI ================================ */
+function showKisayollar(){
+  const body=panel('Kısayollar');
+  body.append(element('p','Klavyeden hızlı erişim. Kısayollar yalnızca bir metin alanına yazmıyorken çalışır; '+
+    'yazarken yanlışlıkla panel açılmaz.'));
+  const satirlar=[
+    ['/','Komut paletini aç'],
+    ['Ctrl + K','Komut paletini aç (⌘K da olur)'],
+    ['?','Bu yardım panelini aç'],
+    ['Esc','Açık paneli / paleti kapat'],
+    ['↑ ↓ · Enter','Palette gezin ve komutu çalıştır'],
+    ['Ctrl + Alt + D','Her yerden canlı dikte (Windows, Ayarlar › Sistem)'],
+    ['Mikrofon düğmesi','Sesli dinlemeyi aç/kapat'],
+  ];
+  const tablo=document.createElement('div');
+  tablo.style.cssText='display:grid;gap:6px;margin-top:12px';
+  for(const [tus,aciklama] of satirlar){
+    const satir=document.createElement('div');
+    satir.style.cssText='display:flex;gap:12px;align-items:baseline;flex-wrap:wrap';
+    const k=element('code',tus);
+    k.style.cssText='min-width:120px;background:#0d1c23;border:1px solid #24414d;border-radius:6px;padding:4px 8px;color:#8fe9e2;font-size:12px';
+    satir.append(k,element('span',aciklama));
+    tablo.append(satir);
+  }
+  body.append(tablo,ipucuNotu());
+}
+function ipucuNotu(){
+  const p=element('p','İpucu: Yazarken `/` karakteri metne girer; palet için Ctrl+K kullanabilirsin.');
+  p.className='hint';return p;
+}
+
+/* ===================== D2 · KOMUT PALETİ ================================= */
+const PALETTE_KOMUTLAR=[
+  {ad:'Sohbete git',detay:'yazışma ekranı',calistir:()=>showChatPage()},
+  {ad:'Yeni sohbet',detay:'geçmişi temizle',calistir:()=>document.getElementById('newChat').click()},
+  {ad:'Hatırlatıcılar',detay:'ekle / tamamla / sil',calistir:()=>showReminders()},
+  {ad:'Defter',detay:'alacak · verecek',calistir:()=>showLedger()},
+  {ad:'Telegram',detay:'bot mesajları',calistir:()=>showTelegram()},
+  {ad:'Uygulamalar',detay:'Windows uygulamaları',calistir:()=>showApps()},
+  {ad:'Geliştirici',detay:'kod çalışma alanı',calistir:()=>showDeveloper()},
+  {ad:'Ayarlar',detay:'model ve bağlantı',calistir:()=>showSettings()},
+  {ad:'Belgeler',detay:'PDF/Word yükle, belgeye sor',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('docsTab').click(),80)}},
+  {ad:'Takvim ve posta',detay:'.ics · .eml · .mbox',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('calendarTab').click(),80)}},
+  {ad:'Görünüm',detay:'tema · yazı boyutu',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('gorunumTab').click(),80)}},
+  {ad:'Görsel üret',detay:'sağlayıcı üzerinden resim',calistir:()=>showGorsel()},
+  {ad:'Web\'de ara',detay:'DuckDuckGo · Vikipedi, kaynak bağlantılı',calistir:()=>showWebArama()},
+  {ad:'Bugünü yenile',detay:'ana sayfa özeti',calistir:()=>{returnHome();bugunYukle()}},
+  {ad:'Mikrofonu aç / kapat',detay:'sesli dinleme',calistir:()=>document.getElementById('mic').click()},
+  {ad:'Sistemi tanı',detay:'yerel kontroller',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('systemTab').click(),80)}},
+  {ad:'Kısayollar',detay:'klavye kısayolları ve ipuçları',calistir:()=>showKisayollar()},
+];
+let paletteSecim=0,paletteSonuc=[];
+function paletteCiz(){
+  const liste=document.getElementById('paletteList');
+  liste.replaceChildren();
+  if(!paletteSonuc.length){
+    const li=element('li','Eşleşen komut yok.');li.style.cursor='default';liste.append(li);return;
+  }
+  paletteSonuc.forEach((k,i)=>{
+    const li=document.createElement('li');
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected',String(i===paletteSecim));
+    li.append(element('span',k.ad),element('small',k.detay||''));
+    li.onclick=()=>paletteCalistir(k);
+    li.onmousemove=()=>{if(paletteSecim!==i){paletteSecim=i;paletteCiz()}};
+    liste.append(li);
+  });
+  const secili=liste.children[paletteSecim];
+  if(secili&&secili.scrollIntoView)secili.scrollIntoView({block:'nearest'});
+}
+function paletteFiltrele(){
+  const q=(document.getElementById('paletteInput').value||'').toLowerCase().trim();
+  paletteSonuc=q?PALETTE_KOMUTLAR.filter(k=>(k.ad+' '+(k.detay||'')).toLowerCase().includes(q)):PALETTE_KOMUTLAR.slice();
+  paletteSecim=0;paletteCiz();
+}
+function paletteAc(){
+  const kutu=document.getElementById('palette');
+  if(!kutu||!kutu.hidden)return;
+  kutu.hidden=false;
+  const girdi=document.getElementById('paletteInput');
+  girdi.value='';paletteFiltrele();girdi.focus();
+}
+function paletteKapat(){
+  const kutu=document.getElementById('palette');
+  if(kutu)kutu.hidden=true;
+}
+function paletteCalistir(komut){
+  paletteKapat();
+  try{komut.calistir()}catch(e){notify(e.message)}
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+}
+document.getElementById('paletteInput').addEventListener('input',paletteFiltrele);
+document.getElementById('paletteInput').addEventListener('keydown',(e)=>{
+  if(e.key==='ArrowDown'){e.preventDefault();paletteSecim=Math.min(paletteSecim+1,Math.max(paletteSonuc.length-1,0));paletteCiz()}
+  else if(e.key==='ArrowUp'){e.preventDefault();paletteSecim=Math.max(paletteSecim-1,0);paletteCiz()}
+  else if(e.key==='Enter'){e.preventDefault();if(paletteSonuc[paletteSecim])paletteCalistir(paletteSonuc[paletteSecim])}
+  else if(e.key==='Escape'){e.preventDefault();paletteKapat()}
+});
+document.getElementById('palette').addEventListener('mousedown',(e)=>{if(e.target.id==='palette')paletteKapat()});
+document.getElementById('todayPalette').onclick=()=>paletteAc();
+document.addEventListener('keydown',(e)=>{
+  const hedef=e.target||{};
+  const yaziyor=/^(INPUT|TEXTAREA|SELECT)$/.test(hedef.tagName||'')||hedef.isContentEditable;
+  if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){e.preventDefault();paletteAc();return}
+  if(e.key==='/'&&!yaziyor&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();paletteAc();return}
+  if(e.key==='?'&&!yaziyor&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();showKisayollar();return}
+  if(e.key==='Escape'){
+    const kutu=document.getElementById('palette');
+    if(kutu&&!kutu.hidden){paletteKapat();return}
+  }
+});
+/* Bugün özeti: açılışta yükle, 2 dakikada bir tazele (sekme görünürken). */
+bugunYukle();
+setInterval(()=>{if(!document.hidden&&!document.querySelector('main > .content').hidden)bugunYukle()},120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)bugunYukle()});
+
+</script>
+</body></html>

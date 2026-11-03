@@ -1,0 +1,49 @@
+name: EMRE test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Bağımlılıklar
+        run: python -m pip install --upgrade pip ruff
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Sözdizimi kontrolü (tüm Python dosyaları)
+        run: python -m compileall -q -x '(^|/)(\.git|node_modules|__pycache__)/' .
+      - name: Birim ve HTTP testleri
+        run: python -m unittest discover -s tests -t . -v
+
+  arayuz-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Sunucuyu başlat
+        run: |
+          python tools/e2e/baslat.py > /tmp/e2e-server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8765/ > /dev/null && break; sleep 1; done
+          cat /tmp/e2e-server.log
+      - name: Arayüz E2E testleri
+        working-directory: tools/e2e
+        run: |
+          npm install --no-audit --no-fund
+          npm test

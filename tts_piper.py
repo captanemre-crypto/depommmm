@@ -1,6 +1,9 @@
 """Persistent local Piper TTS worker; loads requested voice on CPU."""
-import json,sys,wave
+import json
+import sys
+import wave
 from pathlib import Path
+
 try:
     from piper import PiperVoice
 except Exception:

@@ -10,6 +10,7 @@ if sys.platform != 'win32':
 import pystray
 import webview
 from PIL import Image, ImageDraw
+
 import server
 from openjarvis_yonet import OpenJarvisManager
 

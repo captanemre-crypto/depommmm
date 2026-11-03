@@ -1,6 +1,5 @@
 """Desktop-only lifecycle manager for an existing local OpenJarvis checkout."""
 import json
-import os
 import socket
 import subprocess
 import threading
