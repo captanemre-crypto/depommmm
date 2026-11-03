@@ -63,7 +63,7 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**579 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, günlük özet, görsel üretimi, arayüz erişilebilirliği (kontrast), akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**580 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, günlük özet, görsel üretimi, arayüz erişilebilirliği (kontrast), akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
 `tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (51 kontrol).
@@ -207,7 +207,27 @@ Yol haritasındaki son açık başlıklar kapatıldı; bu tur yeni özellik değ
 - Navigasyonda ulaşılamayan “bölümü henüz hazırlanmadı” ve “özelliği henüz bağlı değil” yedek mesajları kaldırıldı;
   artık her menü öğesi gerçek bir ekrana gider.
 
-### 5. Telefondan erişim (C5) — kod değişikliği yok
+### 5. Arayüze bağlanmamış uç kalmadı
+
+- Sunucudaki her `/api/...` ucunun artık arayüzde bir karşılığı var:
+  - **Sunucu sohbet geçmişini silme**: Sohbet ekranının solundaki “Sunucu geçmişi” listesinde her konuşmanın yanında **Sil** (onay ister).
+  - **Bellekten eşleşenleri unutma**: Ayarlar › Bellek › “Eşleşenleri unut” alanı (sohbetteki `unut:` komutunun düğmeli hâli).
+  - **Dikte durumu**: dikte paneli açılırken `/api/dictate/status` okunur; etkin pencere adı ipucu olarak gösterilir, Windows dışında “yazma desteklenmiyor” uyarısı eklenir.
+  - **Web'de ara paneli**: paletten **Web'de ara** — DuckDuckGo/Vikipedi sonuçları, yalnızca sen istediğinde ve kaynak bağlantılarıyla.
+- Yeni test bu bağı korur: `test_her_uc_noktasinin_arayuz_karsiligi_var` (sunucudaki tüm uçlar arayüzde geçmeli; iki bilinçli istisna gerekçesiyle listelenir).
+
+### 6. Windows elle doğrulama listesi
+
+- **[`WINDOWS_DOGRULAMA.md`](WINDOWS_DOGRULAMA.md)**: 11 bölüm, ~25 dakika. SAPI/Piper sesleri, WebView2 masaüstü,
+  tepsi, `.bat` dosyaları, global kısayol, etkin pencereye yazma, uygulama açma ve ekran görüntüsü gibi
+  Linux CI'nın kapsayamadığı adımlar tek tek “beklenen davranış” ile listelendi.
+
+### 7. CI iyileştirmesi
+
+- `ruff` zaten koşuyordu; sözdizimi kontrolü artık **tüm Python dosyalarını** kapsıyor
+  (`python -m compileall -q .`), yeni modüller (belge/posta/takvim/sesli_yanit) da denetleniyor.
+
+### 8. Telefondan erişim (C5) — kod değişikliği yok
 
 - Sunucu **yalnızca `127.0.0.1`** dinlemeye devam ediyor.
 - Güvenli yol adım adım yazıldı: **[`UZAK_ERISIM.md`](UZAK_ERISIM.md)** — Tailscale özel ağı + SSH tüneli,
@@ -215,7 +235,7 @@ Yol haritasındaki son açık başlıklar kapatıldı; bu tur yeni özellik değ
 
 ### Testler
 
-`tests/test_arayuz_erisim.py` +11 → **579 test**. Arayüz E2E **60/60** (yeni kontroller: `?` yardımı, uzun sohbet sınırı).
+`tests/test_arayuz_erisim.py` +12 → **580 test**. Arayüz E2E **63/63** (yeni kontroller: `?` yardımı, uzun sohbet sınırı, bellek “unut”, sohbet geçmişi silme, web arama paneli).
 
 ## Bugün özeti, komut paleti, tema ve görsel üretimi (2026-11-03 · yedinci tur)
 

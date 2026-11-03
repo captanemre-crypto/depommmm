@@ -174,7 +174,20 @@ toggle.onclick=async()=>{if(listening){birikim='';clearTimeout(birikimZaman);sto
 const dk={ctx:null,stream:null,proc:null,kaynak:null,parcalar:[],ornek:0,hz:48000,zamanlayici:0,
   calisiyor:false,mesgul:false,metin:'',sonSes:0,oturum:'d'+Date.now().toString(36),sonGonderi:0,yazilan:''};
 
-function dkAc(){document.getElementById('dictation').hidden=false;document.getElementById('dictation').scrollIntoView({behavior:'smooth'});dkDurum()}
+function dkAc(){
+  document.getElementById('dictation').hidden=false;
+  document.getElementById('dictation').scrollIntoView({behavior:'smooth'});
+  dkDurum();
+  // Hedef pencereyi ve dikte desteğini sunucudan oku (yalnızca bilgi amaçlı).
+  api('/api/dictate/status').then(d=>{
+    const alan=document.getElementById('dictateTarget');
+    if(alan&&!alan.value&&d.window)alan.placeholder='Şu an etkin: '+d.window;
+    const ipucu=document.getElementById('dictateHint');
+    if(ipucu&&d.typing_supported===false&&!/Bu sistemde/.test(ipucu.textContent)){
+      ipucu.textContent+=' Bu sistemde etkin pencereye yazma desteklenmiyor (yalnızca Windows).';
+    }
+  }).catch(()=>{});
+}
 function dkDurum(mesaj){document.getElementById('dictateState').textContent=mesaj||(dk.calisiyor?'Dinliyor · canlı':'Kapalı')}
 function dkHedef(){return (document.getElementById('dictateTarget').value||'').trim()}
 function dkMetinYaz(t){dk.metin=t||'';document.getElementById('dictateText').value=dk.metin}
@@ -800,6 +813,24 @@ document.getElementById('memoryTab').onclick=async()=>{
     (()=>{const p=element('p','Yedek dosyası yalnızca senin bilgisayarına iner; içinde kişisel notların olur, '+
       'paylaşırken dikkat et. Geri yükleme aynı metinleri iki kez eklemez.');p.className='hint';return p})());
   yukle('');
+
+  /* --- eşleşenleri unut (sohbetteki `unut:` komutunun düğmeli hâli) --- */
+  body.append(element('h2','Eşleşenleri unut'));
+  const unutGirdi=field('Unutulacak metin veya kişi: ör. Ahmet telefon');
+  unutGirdi.style.width='min(520px,100%)';
+  const unutBilgi=element('p','');unutBilgi.className='hint';
+  const unutBtn=button('Eşleşen kayıtları unut',async()=>{
+    const q=unutGirdi.value.trim();
+    if(!q){notify('Unutulacak metni yaz.');return}
+    if(!confirm('“'+q+'” ile eşleşen bellek kayıtları silinsin mi?\n\nBu işlem geri alınamaz; '+
+      'önce yedek almak istersen “Yedeği indir” düğmesini kullan.'))return;
+    try{
+      const r=await api('/api/memory/forget',{q,confirmed:true});
+      unutBilgi.textContent=r.deleted+' kayıt silindi.';
+      unutGirdi.value='';yukle(arama.value.trim());
+    }catch(e){unutBilgi.textContent=e.message}
+  });
+  body.append(unutGirdi,unutBtn,unutBilgi);
 
   /* --- uyandırma sözcüğü --- */
   body.append(element('h2','Uyandırma sözcüğü'));
@@ -1445,8 +1476,10 @@ let core=ctx.createRadialGradient(250,250,0,250,250,43);core.addColorStop(0,'rgb
       box.replaceChildren();
       if(!r.sessions.length){const p=document.createElement('p');p.className='hint';p.textContent='Kayıt yok.';box.append(p);return}
       for(const s of r.sessions){
+        const satir=document.createElement('div');
+        satir.style.cssText='display:flex;gap:4px;align-items:center;margin:4px 0';
         const b=document.createElement('button');
-        b.className='iconbtn'; b.style.cssText='display:block;width:100%;text-align:left;margin:4px 0;font-size:11px';
+        b.className='iconbtn'; b.style.cssText='flex:1;min-width:0;text-align:left;font-size:11px';
         b.textContent=(s.preview||s.session).slice(0,42)+' · '+s.count;
         b.onclick=async()=>{
           try{
@@ -1456,7 +1489,18 @@ let core=ctx.createRadialGradient(250,250,0,250,250,43);core.addColorStop(0,'rgb
             notify('Sunucu geçmişinden yüklendi.');
           }catch(e){notify(e.message)}
         };
-        box.append(b);
+        // Sunucu geçmişini silme (onay zorunlu; yalnızca bu bilgisayardaki kayıtlar).
+        const sil=document.createElement('button');
+        sil.className='iconbtn'; sil.style.cssText='font-size:11px;padding:6px 8px';
+        sil.textContent='Sil'; sil.title='Bu konuşmayı sunucudan sil';
+        sil.onclick=async()=>{
+          if(!confirm('“'+((s.preview||s.session).slice(0,40))+'” konuşması sunucudan silinsin mi?\n\nBu işlem geri alınamaz.'))return;
+          try{
+            await api('/api/history/delete',{session:s.session,confirmed:true});
+            notify('Konuşma silindi.'); serverHistory();
+          }catch(e){notify(e.message)}
+        };
+        satir.append(b,sil); box.append(satir);
       }
     }catch(e){box.textContent=e.message}
   }
@@ -1642,6 +1686,48 @@ function showGorsel(){
   }),durum,sonuc);
 }
 
+/* ===================== WEB ARAMA (A4 · elle tetikleme) =================== */
+function showWebArama(){
+  const body=panel('Web\'de ara');
+  body.append(element('p','Arama yalnızca sen istediğinde yapılır ve sonuçlar bağlantılarıyla gösterilir. '+
+    'Kullanılan kaynaklar: DuckDuckGo (lite), DuckDuckGo anlık yanıt, Vikipedi. Hiçbiri anahtar istemez.'));
+  const girdi=field('Aranacak metin: ör. İstanbul hava durumu');
+  girdi.style.width='min(560px,100%)';
+  const durum=element('p','');durum.className='hint';
+  const sonuc=document.createElement('div');sonuc.style.cssText='display:grid;gap:8px;margin-top:12px';
+  function yaz(sonuclar){
+    sonuc.replaceChildren();
+    if(!sonuclar.length){durum.textContent='Sonuç bulunamadı. Farklı kelimelerle dene.';return}
+    durum.textContent=sonuclar.length+' sonuç';
+    for(const s of sonuclar){
+      const kart=document.createElement('div');
+      kart.style.cssText='border:1px solid #24383f;border-radius:8px;padding:10px;background:#0d181d';
+      let adres=null;
+      try{adres=new URL(s.url)}catch(e){}
+      if(adres&&/^https?:$/.test(adres.protocol)){
+        const a=document.createElement('a');
+        a.href=adres.href;a.target='_blank';a.rel='noopener noreferrer';
+        a.textContent=s.baslik||adres.hostname;a.style.color='#8fe9e2';
+        kart.append(a,element('small',' · '+adres.hostname));
+      }else{
+        kart.append(element('b',s.baslik||'Sonuç'));
+      }
+      if(s.ozet){
+        const p=element('p',String(s.ozet).slice(0,300));p.className='hint';kart.append(p);
+      }
+      sonuc.append(kart);
+    }
+  }
+  body.append(girdi,button('Ara',async()=>{
+    const q=girdi.value.trim();
+    if(!q){notify('Aranacak metni yaz.');return}
+    durum.textContent='Aranıyor…';sonuc.replaceChildren();
+    try{const r=await api('/api/web/search?q='+encodeURIComponent(q));yaz(r.results||[])}
+    catch(e){durum.textContent=e.message}
+  }),durum,sonuc,
+    (()=>{const p=element('p','İpucu: Sohbette “güncel … nedir?” gibi sorularda Emre gerekirse kendi de arar ve kaynak gösterir.');p.className='hint';return p})());
+}
+
 /* ===================== KISAYOLLAR YARDIMI ================================ */
 function showKisayollar(){
   const body=panel('Kısayollar');
@@ -1687,6 +1773,7 @@ const PALETTE_KOMUTLAR=[
   {ad:'Takvim ve posta',detay:'.ics · .eml · .mbox',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('calendarTab').click(),80)}},
   {ad:'Görünüm',detay:'tema · yazı boyutu',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('gorunumTab').click(),80)}},
   {ad:'Görsel üret',detay:'sağlayıcı üzerinden resim',calistir:()=>showGorsel()},
+  {ad:'Web\'de ara',detay:'DuckDuckGo · Vikipedi, kaynak bağlantılı',calistir:()=>showWebArama()},
   {ad:'Bugünü yenile',detay:'ana sayfa özeti',calistir:()=>{returnHome();bugunYukle()}},
   {ad:'Mikrofonu aç / kapat',detay:'sesli dinleme',calistir:()=>document.getElementById('mic').click()},
   {ad:'Sistemi tanı',detay:'yerel kontroller',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('systemTab').click(),80)}},

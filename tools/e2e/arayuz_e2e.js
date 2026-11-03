@@ -937,6 +937,64 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     window.localStorage.removeItem('emre-chat');
   });
 
+
+  await check('bellek: "Eşleşenleri unut" düğmesi kayıtları siliyor', async () => {
+    await request('/api/memory/add', {
+      body: JSON.stringify({ text: 'E2E unutulacak kayit', kind: 'not' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('memoryTab').click();
+    await sleep(1400);
+    const metin = $('settingsBody').textContent;
+    assert(/Eşleşenleri unut/.test(metin), 'unut bölümü yok');
+    assert(/E2E unutulacak kayit/.test(metin), 'eklenen kayıt listede yok');
+
+    const alan = [...$('settingsBody').querySelectorAll('input')]
+      .find(i => /Unutulacak metin/.test(i.placeholder || ''));
+    assert(alan, 'unut alanı yok');
+    alan.value = 'E2E unutulacak kayit';
+    [...$('settingsBody').querySelectorAll('button')]
+      .find(b => b.textContent === 'Eşleşen kayıtları unut').click();
+    await sleep(1500);
+    assert(!/E2E unutulacak kayit/.test($('settingsBody').textContent), 'kayıt silinmedi');
+    assert(/kayıt silindi|bulunamadı/i.test($('settingsBody').textContent), 'sonuç mesajı yok');
+  });
+
+  await check('sohbet geçmişi: sunucu oturumu silinebiliyor', async () => {
+    // Önce sunucu geçmişinde bir oturum oluştur.
+    await request('/api/chat', {
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'E2E geçmiş silme denemesi' }], session: 'e2esil' }),
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {});
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Sohbet').click();
+    await sleep(900);
+    $('historyRefresh').click();
+    await sleep(1200);
+    const liste = $('serverHistoryList');
+    const satirlar = [...liste.querySelectorAll('div')];
+    assert(satirlar.length >= 1, 'sunucu geçmişi listesi boş');
+    const silDugmeleri = [...liste.querySelectorAll('button')].filter(b => b.textContent === 'Sil');
+    assert(silDugmeleri.length >= 1, 'silme düğmesi yok');
+    silDugmeleri[0].click();
+    await sleep(1200);
+    assert(/silindi/i.test($('toast').textContent), 'silme bildirimi yok: ' + $('toast').textContent);
+  });
+
+  await check('web arama paneli açılıyor (ağ isteği yapmadan)', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ana sayfa').click();
+    await sleep(400);
+    window.showWebArama();
+    await sleep(400);
+    assert(/Web'de ara/.test($('simpleTitle').textContent), 'panel açılmadı');
+    const alan = $('simpleBody').querySelector('input');
+    assert(alan && /Aranacak metin/.test(alan.placeholder || ''), 'arama alanı yok');
+    assert(/DuckDuckGo/.test($('simpleBody').textContent), 'kaynak bilgisi yok');
+    $('simpleBack').click();
+    await sleep(300);
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));

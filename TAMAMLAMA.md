@@ -28,14 +28,14 @@ Ek olarak: **`/api/chat` sıralaması düzeltildi** — Ollama model kontrolü k
 
 ```bash
 ruff check .                                  # All checks passed
-python3 -m unittest discover -s tests -t .    # Ran 579 tests ... OK
-cd tools/e2e && npm test                      # 60/60 kontrol, JS hatası yok
+python3 -m unittest discover -s tests -t .    # Ran 580 tests ... OK
+cd tools/e2e && npm test                      # 63/63 kontrol, JS hatası yok
 ```
 
 | Paket | Test sayısı |
 |---|---|
 | `tests/test_server.py` (HTTP) | 152 |
-| `tests/test_arayuz_erisim.py` (kontrast + yapı) | 11 |
+| `tests/test_arayuz_erisim.py` (kontrast + yapı + uç kapsamı) | 12 |
 | `tests/test_saglayici.py` (sağlayıcı + görsel) | 44 |
 | `tests/test_belge.py` | 35 |
 | `tests/test_beceriler.py` | 28 |
@@ -61,7 +61,7 @@ cd tools/e2e && npm test                      # 60/60 kontrol, JS hatası yok
 | `tests/test_yerel_isci.py` | 6 |
 | `tests/test_arena_bridge.py` | 5 |
 | `tests/test_piper_indir.py` | 5 |
-| **Toplam** | **579** |
+| **Toplam** | **580** |
 
 E2E paketi: 30 kontrol (menü, defter, hatırlatıcı, sohbetten hatırlatıcı, sunucu geçmişi, CSV/yedek indirme, ayarlar sekmeleri, geliştirici, mikrofon, 403, erişilebilirlik, Escape, sürüm, Telegram durumu, token'ın depolanmaması).
 
@@ -361,6 +361,11 @@ Bilinçli sınırlar:
 | X5 | Ulaşılamayan “henüz hazırlanmadı / henüz bağlı değil” yedek mesajlarının kaldırılması | ✅ |
 | X6 | [`UZAK_ERISIM.md`](UZAK_ERISIM.md): telefondan erişimin güvenli yolu (Tailscale + SSH tüneli); sunucu yine `127.0.0.1` | ✅ |
 | X7 | Testler: +11 → **579 test**; E2E +2 → **60/60** (`?` yardımı, uzun sohbet sınırı); `ruff` temiz | ✅ |
+| X8 | Arayüze bağlanmamış uçlar kapatıldı: sohbet geçmişi silme düğmesi, bellek “Eşleşenleri unut”, dikte durumu (`/api/dictate/status`), paletten **Web'de ara** paneli | ✅ |
+| X9 | `test_her_uc_noktasinin_arayuz_karsiligi_var`: sunucudaki tüm `/api/...` uçları arayüzde geçmeli (2 bilinçli istisna gerekçeli) | ✅ |
+| X10 | `WINDOWS_DOGRULAMA.md`: Windows'ta elle doğrulama listesi (11 bölüm) | ✅ |
+| X11 | CI: sözdizimi kontrolü artık tüm Python dosyalarını kapsıyor (`compileall -q .`) | ✅ |
+| X12 | E2E +3 → **63/63**; toplam **580 test** | ✅ |
 
 Bilinçli sınırlar:
 

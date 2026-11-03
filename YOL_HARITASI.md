@@ -5,7 +5,7 @@ Her maddede: neden gerekli, bugün ne var/ne yok, tahmini emek (S ≤ 1 gün, M 
 
 Mevcut durum (özet): sohbet (Ollama + ücretsiz API), Türkçe sesli giriş, canlı dikte + etkin pencereye yazma,
 uyandırma sözcüğü (metin tabanlı), kişisel bellek, MCP araçları, ekranı sor, defter, hatırlatıcılar,
-Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 579 test + 60 E2E kontrol.
+Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 580 test + 63 E2E kontrol.
 
 ---
 
@@ -67,7 +67,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 6. ~~**B3** (belge okuma)~~ ✅ · ~~**B4** (takvim/e-posta)~~ ✅.
 7. ~~**D1** (bugün özeti) + **D2** (komut paleti) + **D3** (tema/yazı boyutu) + **B5** (görsel üretimi)~~ ✅ (2026-11-03).
 8. ~~**Kapanış turu**: WCAG AA kontrast düzeltmeleri + kontrast testi, uzun sohbet DOM sınırı,
-   `?` kısayol yardımı, C5 erişim rehberi~~ ✅ (2026-11-03).
+   `?` kısayol yardımı, C5 erişim rehberi, arayüze bağlanmamış uçların kapatılması,
+   uç kapsamı testi, Windows elle doğrulama listesi, CI sözdizimi kontrolünün genişletilmesi~~ ✅ (2026-11-03).
    **Yol haritasındaki her madde kapandı.** Açık kalan tek başlık “bilinçli olarak yapılmayacaklar”:
    tam tarayıcı erişimi ve sunucuyu dışarı açmak.
 

@@ -5,11 +5,13 @@ işaretlerini denetler. Amaç: koyu temada küçük yardımcı metinlerin okunma
 gelmesini ve yeni panellerin klavye/aria desteğini kaybetmesini yakalamak.
 """
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HTML = (ROOT / 'index.html').read_text(encoding='utf-8')
+sys.path.insert(0, str(ROOT))
 
 # (açıklama, ön plan, arka plan) — koyu tema
 KOYU = [
@@ -109,6 +111,32 @@ class YapiTest(unittest.TestCase):
         # Navigasyon ve eylem düğmeleri bağlı olmalı; kullanıcıya "hazırlanmadı" denmemeli.
         self.assertNotIn('bölümü henüz hazırlanmadı', HTML)
         self.assertNotIn('özelliği henüz bağlı değil', HTML)
+
+    def test_her_uc_noktasinin_arayuz_karsiligi_var(self):
+        """Sunucudaki her `/api/...` ucu arayüzde ya kullanılmalı ya da bilinçli istisna olmalı.
+
+        Kullanılmayan uçlar ölü kod birikmesini gösterir; bu test yeni bir uç eklenip
+        arayüze bağlanmadığında uyarır. İstisnalar gerekçesiyle listelenir.
+        """
+        import server
+
+        bilincli = {
+            # Ekran görüntüsü: /api/screen/ask zaten görüntüyü alıp soruyu yanıtlar;
+            # /api/screen/capture yalnızca tanılama/elle deneme için açık bırakıldı.
+            '/api/screen/capture',
+            # Akışlı seslendirme cümleleri tarayıcıda bölünür (gecikme yok); uç,
+            # sunucu tarafında bölmek isteyen istemciler için yardımcı API olarak duruyor.
+            '/api/tts/split',
+        }
+        kaynak = (ROOT / 'server.py').read_text(encoding='utf-8')
+        uclar = sorted(set(re.findall(r"path=='(/api/[^']+)'", kaynak)))
+        self.assertGreater(len(uclar), 80)
+        kullanilmayan = [u for u in uclar if u not in HTML and u not in bilincli]
+        self.assertEqual(kullanilmayan, [], f'Arayüze bağlanmamış uçlar: {kullanilmayan}')
+        # İstisnalar gerçekten sunucuda tanımlı olmalı (bayat istisna olmasın).
+        for uc in bilincli:
+            self.assertIn(uc, uclar, f'{uc} artık sunucuda yok; istisnayı kaldır')
+        del server
 
     def test_ozellikler_yukleniyor(self):
         # Yeni sekmeler gerçek bir işlev tanımlıyor mu?
