@@ -398,6 +398,46 @@ class Saglayici:
                 yield parca
 
     # --- işlemler ----------------------------------------------------------
+    def gorsel(self, istem, model=None, boyut='1024x1024', timeout=180):
+        """OpenAI uyumlu `/images/generations` ile görsel üretir.
+
+        Yalnızca **kullanıcı onayıyla** çağrılır. Görsel base64 olarak döner ve
+        diske yazılmaz; tarayıcı `data:` adresiyle gösterir. Sağlayıcı görsel
+        üretimini desteklemiyorsa açık Türkçe hata verilir.
+        """
+        istem = ' '.join(str(istem or '').split())
+        if not istem:
+            raise ValueError('Görsel için bir istem (ne çizileceği) yaz.')
+        if len(istem) > 1000:
+            raise ValueError('İstem çok uzun (en fazla 1000 karakter).')
+        ayar = self.yukle()
+        if not ayar['base_url']:
+            raise ValueError('Görsel üretimi için ücretsiz API sağlayıcısı gerekli. '
+                             'Ayarlar > Ücretsiz API bölümünden bağlan.')
+        model = str(model or '').strip()[:120]
+        payload = {'prompt': istem, 'n': 1, 'size': boyut if boyut in
+                   ('256x256', '512x512', '1024x1024', '1024x1792', '1792x1024') else '1024x1024',
+                   'response_format': 'b64_json'}
+        if model:
+            payload['model'] = model
+        yanit = self._istek('/images/generations', payload, timeout=timeout, ayar=ayar)
+        veri = (yanit or {}).get('data') if isinstance(yanit, dict) else None
+        if not isinstance(veri, list) or not veri:
+            hata = (yanit or {}).get('error') if isinstance(yanit, dict) else None
+            if hata:
+                raise ValueError('Sağlayıcı görsel üretemedi: ' + str(hata)[:200])
+            raise ValueError('Sağlayıcı görsel üretimini desteklemiyor olabilir '
+                             '(yanıtta görsel yok). Yerel geçit ya da farklı bir sağlayıcı dene.')
+        ilk = veri[0] if isinstance(veri[0], dict) else {}
+        b64 = ilk.get('b64_json') or ilk.get('image') or ''
+        if not b64:
+            if ilk.get('url'):
+                raise ValueError('Sağlayıcı görseli bağlantı olarak döndürdü; Emre güvenlik için '
+                                 'dış bağlantıdan indirme yapmaz. Sağlayıcı ayarını b64_json olarak değiştir.')
+            raise ValueError('Sağlayıcı görsel verisi döndürmedi.')
+        return {'image': str(b64)[:12 * 1024 * 1024], 'model': model or ayar['model'],
+                'size': payload['size']}
+
     def modeller(self, base_url=None, key=None, timeout=25):
         """`/v1/models` listesini döndürür; ücretsiz modeller önce gelir."""
         ayar = self.yukle()

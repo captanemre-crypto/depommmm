@@ -63,7 +63,7 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**553 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**568 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, günlük özet, görsel üretimi, akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
 `tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (51 kontrol).
@@ -174,6 +174,69 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Bugün özeti, komut paleti, tema ve görsel üretimi (2026-11-03 · yedinci tur)
+
+Bu tur `YOL_HARITASI.md` içindeki **D1, D2, D3** ve **B5** maddelerini kapatır. Yol haritasındaki tüm maddeler bitti;
+yalnızca “bilinçli olarak yapılmayacaklar” listesi (telefondan erişim, tam tarayıcı erişimi) açık.
+
+### 1. “Bugün” kartı (D1)
+
+Ana sayfanın üstünde tek bakışta günlük durum:
+
+- **Hatırlatıcılar**: gecikenler (⚠ kırmızı), bugün olanlar ve önümüzdeki 7 gün.
+- **Defter**: alacak/verecek bakiyesi ve kayıt sayısı.
+- **Takvim**: bugünün etkinlikleri (takvim yolu tanımlıysa).
+- **Bellek ve belgeler**: son 3 bellek kaydı ve ekli belge sayısı.
+
+Kart açılışta ve sekme görünür olduğunda yüklenir, 2 dakikada bir tazelenir; “Yenile” düğmesiyle elle yenilenir.
+Tüm veriler tek istekte gelir ve hiçbir dış bağlantı kurulmaz.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/today` | `{tarih, hatirlaticilar:{geciken,bugun,yaklasan,toplam}, defter:{alacak_tl,verecek_tl,kayit}, bellek:[…], belgeler, takvim:{path,etkinlikler,error}}` |
+
+### 2. Komut paleti (D2)
+
+- `/` veya `Ctrl+K` (macOS'ta `⌘K`) ile açılır; yazarken filtrelenir.
+- `↑` `↓` ile gez, `Enter` ile çalıştır, `Esc` ile kapat. Palet dışına tıklamak da kapatır.
+- 15 komut: sohbet, yeni sohbet, hatırlatıcılar, defter, Telegram, uygulamalar, geliştirici, ayarlar, belgeler,
+  takvim ve posta, görünüm, görsel üret, bugünü yenile, mikrofonu aç/kapat, sistemi tanı.
+- Ana sayfadaki **⌘ Komutlar** düğmesi de paleti açar (klavye kullanmayanlar için).
+- `Esc` ayrıca açık onay pencerelerini kapatır.
+
+### 3. Tema ve yazı boyutu (D3)
+
+- Ayarlar › **Görünüm**: **Koyu** (varsayılan), **Açık**, **Sistemle aynı**.
+- Yazı boyutu: 13 / 14 / 16 / 18 px.
+- Seçimler yalnızca bu tarayıcıda (`localStorage`) saklanır; sunucuya yazılmaz. Açık tema tüm ana panellerde
+  (sohbet, ayarlar, defter, bugün kartı, palet) geçerlidir.
+
+### 4. Görsel üretimi (B5)
+
+- Ayarlar › Görünüm › **Görsel üretimi**: kullanılan görsel modeli adı kaydedilir; “Görsel üret panelini aç” düğmesi paneli açar.
+  Paletten de **Görsel üret** komutuyla ulaşılır.
+- İstem + boyut seçilir, **onay** verilir; görsel, Ayarlar › Ücretsiz API bölümünde bağlı sağlayıcının
+  `/images/generations` ucunda üretilir ve `data:` adresiyle gösterilir. İndirmek istersen “Görseli indir”e basarsın.
+- **Görsel diske yazılmaz**, sunucuda saklanmaz. Sağlayıcı görseli bağlantı (URL) olarak döndürürse Emre
+  güvenlik gereği indirmez ve açık hata verir.
+- Ücretsiz modellerin çoğu görsel üretmez; sağlayıcı desteklemiyorsa “Sağlayıcı görsel üretemedi…” mesajı gelir.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/image/generate` | `{prompt, size?, confirmed:true}` → `{ok, image(base64), mime, model, size}` |
+| `POST /api/image/model` | `{model}` → görsel modeli ayarını kaydeder (boş gönderim kaldırır) |
+
+### 5. Yapılmayan: telefondan erişim (C5)
+
+Sunucu yalnızca `127.0.0.1` dinler ve bu değişmedi. Telefondan erişim için sunucuyu dışarı açmak token + TLS +
+güncelleme yönetimi gerektirir; “yalnızca bu bilgisayar” sınırını bozar. İhtiyaç olursa önerilen yol: ayrı bir tünel
+(Tailscale/WireGuard) kurup Emre'yi yine yerel adreste bırakmak. Bu turda **kod değişikliği yapılmadı**.
+
+### Testler
+
+`test_server.py` +8 (bugün özeti, görsel üretimi uçları), `test_saglayici.py` +7 (`gorsel` yolu, sahte görsel ucu)
+→ **568 test**. Arayüz E2E **58/58** (“Bugün” kartı, komut paleti, tema/yazı boyutu, görsel paneli kontrolleri eklendi).
 
 ## Akışlı seslendirme, belge okuma, takvim ve posta (2026-11-03 · altıncı tur)
 

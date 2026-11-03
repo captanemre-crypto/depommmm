@@ -62,6 +62,13 @@ class SahteSaglayici(BaseHTTPRequestHandler):
             return self._json(401, {'error': {'message': 'invalid api key'}})
         if govde.get('model') == 'kota-dolu':
             return self._json(429, {'error': {'message': 'rate limit exceeded'}})
+        if self.path.endswith('/images/generations'):
+            SahteSaglayici.kayitlar.append(('IMAGE', self.path, govde))
+            if 'desteklenmiyor' in govde.get('prompt', ''):
+                return self._json(200, {'error': {'message': 'images endpoint not supported'}})
+            if 'baglanti' in govde.get('prompt', ''):
+                return self._json(200, {'data': [{'url': 'https://example.com/a.png'}]})
+            return self._json(200, {'data': [{'b64_json': 'iVBORw0KGgo='}]})
         if govde.get('model') == 'tool-model':
             return self._json(200, {'choices': [{'message': {
                 'role': 'assistant', 'content': None,
@@ -422,6 +429,66 @@ class YedekModelTest(unittest.TestCase):
         self.sag.kaydet(self.base, 'k', 'hata-model', yedek='hata-model')
         with self.assertRaises(ValueError):
             self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
+class GorselTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), SahteSaglayici)
+        cls.base = f'http://127.0.0.1:{cls.httpd.server_address[1]}/v1'
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.SAG = saglayici.Saglayici(Path(self.tmp.name) / 'ayar.json')
+        SahteSaglayici.kayitlar = []
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_requires_provider(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.SAG.gorsel('kedi')
+        self.assertIn('sağlayıcı', str(ctx.exception).lower())
+
+    def test_requires_prompt(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        with self.assertRaises(ValueError):
+            self.SAG.gorsel('   ')
+
+    def test_rejects_long_prompt(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        with self.assertRaises(ValueError):
+            self.SAG.gorsel('a' * 1200)
+
+    def test_returns_base64_image(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        sonuc = self.SAG.gorsel('gün batımı', model='dall-e-3', boyut='512x512')
+        self.assertEqual(sonuc['image'], 'iVBORw0KGgo=')
+        self.assertEqual(sonuc['size'], '512x512')
+        gonderilen = [k for k in SahteSaglayici.kayitlar if k[0] == 'IMAGE'][0][2]
+        self.assertEqual(gonderilen['prompt'], 'gün batımı')
+        self.assertEqual(gonderilen['response_format'], 'b64_json')
+
+    def test_unknown_size_falls_back(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        self.assertEqual(self.SAG.gorsel('kedi', boyut='9999x1')['size'], '1024x1024')
+
+    def test_unsupported_provider_message(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        with self.assertRaises(ValueError) as ctx:
+            self.SAG.gorsel('desteklenmiyor')
+        self.assertIn('görsel üretemedi', str(ctx.exception).lower())
+
+    def test_url_response_is_refused(self):
+        self.SAG.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+        with self.assertRaises(ValueError) as ctx:
+            self.SAG.gorsel('baglanti')
+        self.assertIn('indirme', str(ctx.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

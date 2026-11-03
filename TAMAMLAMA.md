@@ -28,26 +28,39 @@ Ek olarak: **`/api/chat` sıralaması düzeltildi** — Ollama model kontrolü k
 
 ```bash
 ruff check .                                  # All checks passed
-python3 -m unittest discover -s tests -t .    # Ran 553 tests ... OK
-cd tools/e2e && npm test                      # 54/54 kontrol, JS hatası yok
+python3 -m unittest discover -s tests -t .    # Ran 568 tests ... OK
+cd tools/e2e && npm test                      # 58/58 kontrol, JS hatası yok
 ```
 
 | Paket | Test sayısı |
 |---|---|
-| `tests/test_server.py` (HTTP) | 123 + 29 = 152 |
-| `tests/test_bellek.py` | 27 |
-| `tests/test_saglayici.py` | 37 |
+| `tests/test_server.py` (HTTP) | 152 |
+| `tests/test_saglayici.py` (sağlayıcı + görsel) | 44 |
 | `tests/test_belge.py` | 35 |
+| `tests/test_beceriler.py` | 28 |
+| `tests/test_bellek.py` | 27 |
 | `tests/test_takvim.py` | 26 |
+| `tests/test_dikte.py` | 26 |
+| `tests/test_arama.py` | 21 |
 | `tests/test_posta.py` | 20 |
+| `tests/test_kisayol.py` | 16 |
+| `tests/test_tanilama.py` | 16 |
+| `tests/test_uyandirma.py` | 16 |
 | `tests/test_sesli_yanit.py` | 15 |
 | `tests/test_ledger_tools.py` | 15 |
-| `tests/test_zaman_ayristir.py` | 11 |
+| `tests/test_mcp_istemci.py` | 15 |
+| `tests/test_denetim.py` | 14 |
+| `tests/test_otomatik_baslat.py` | 12 |
+| `tests/test_bildirim.py` | 11 |
+| `tests/test_dikte_yaz.py` | 11 |
+| `tests/test_zaman_ayristir.py` | 10 |
+| `tests/test_ses_baglanti.py` | 9 |
 | `tests/test_hatirlatici.py` | 7 |
+| `tests/test_ekran.py` | 6 |
+| `tests/test_yerel_isci.py` | 6 |
 | `tests/test_arena_bridge.py` | 5 |
 | `tests/test_piper_indir.py` | 5 |
-| `tests/test_yerel_isci.py` | 7 |
-| **Toplam** | **553** |
+| **Toplam** | **568** |
 
 E2E paketi: 30 kontrol (menü, defter, hatırlatıcı, sohbetten hatırlatıcı, sunucu geçmişi, CSV/yedek indirme, ayarlar sekmeleri, geliştirici, mikrofon, 403, erişilebilirlik, Escape, sürüm, Telegram durumu, token'ın depolanmaması).
 
@@ -311,6 +324,28 @@ Bilinçli sınırlar:
 - Belge yedeği şifrelenmez; içerik `docs`/`doc_chunks` tablolarında düz metindir.
 - Belge araması kelime tabanlıdır (gömme/vektör arama yok); çok uzun belgelerde en iyi 5 parça getirilir.
 - Takvimde tekrarlayan etkinliklerin yalnızca ilk oluşumu gösterilir; seriyi genişletmek takvim uygulamasının işidir.
+
+## Ek tur: bugün özeti, komut paleti, tema ve görsel üretimi (2026-11-03 · yedinci tur)
+
+**İstek:** “kalanları bitir” — `YOL_HARITASI.md` D1, D2, D3 ve B5.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| W1 | `server.gun_ozeti()` + `GET /api/today`: geciken/bugün/hafta hatırlatıcıları, defter bakiyesi, son bellek kayıtları, belge sayısı, bugünün takvim etkinlikleri | ✅ |
+| W2 | Arayüz: ana sayfada “Bugün” kartı (4 bölüm), “Yenile” + “⌘ Komutlar” düğmeleri, 2 dakikalık tazeleme | ✅ |
+| W3 | Komut paleti: `/` ve `Ctrl+K`, 15 komut, filtre, ↑↓/Enter, `Esc` kapatma, dışına tıklayınca kapanma | ✅ |
+| W4 | Ayarlar › **Görünüm**: Koyu/Açık/Sistem teması, 13–18 px yazı boyutu, `localStorage` kalıcılığı, açık tema CSS kapsamı | ✅ |
+| W5 | `saglayici.gorsel()`: OpenAI uyumlu `/images/generations`, b64 yanıt zorunlu, URL yanıtı reddedilir, boyut doğrulama, Türkçe hatalar | ✅ |
+| W6 | Uçlar `/api/image/generate` (onay zorunlu) ve `/api/image/model`; arayüzde “Görsel üret” paneli + model alanı | ✅ |
+| W7 | Testler: `test_server` +8, `test_saglayici` +7 → **568 test**; E2E +4 → **58/58** | ✅ |
+
+Bilinçli sınırlar:
+
+- **C5 (telefondan erişim) yapılmadı**: sunucu yalnızca `127.0.0.1` dinler; dışarı açmak token + TLS + yama yönetimi
+  gerektirir ve güvenlik sınırını bozar. Öneri: ayrı tünel (Tailscale/WireGuard), Emre yine yerel adreste.
+- Görsel üretimi sağlayıcıya bağlıdır; ücretsiz modellerin çoğu desteklemez. Sağlayıcı görseli URL olarak dönerse indirilmez.
+- Üretilen görsel yalnızca tarayıcıda gösterilir; diske yazılmaz, veritabanına girmez (istenirse kullanıcı indirir).
+- Tema seçimi sunucuda saklanmaz; tarayıcı değişirse varsayılan koyu temaya döner.
 
 Bilinçli sınırlar:
 

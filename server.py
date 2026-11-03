@@ -14,7 +14,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote_plus, urlparse
@@ -51,7 +51,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.6'
+VERSION = '2026-11-03.7'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -450,6 +450,59 @@ def sohbet_istegi(data):
     return clean, last_user, session, backend, selected, api_model
 
 
+def gun_ozeti(simdi=None):
+    """Ana sayfadaki “Bugün” kartı için tek istekte özet üretir.
+
+    Dönen alanlar: hatırlatıcılar (geciken/bugün/yaklaşan), defter bakiyesi,
+    son bellek kayıtları, belge sayısı ve varsa bugünün takvim etkinlikleri.
+    Hiçbir dış istek yapılmaz; yalnızca yerel veritabanı ve yerel dosyalar okunur.
+    """
+    simdi = simdi or datetime.now()
+    bugun = simdi.strftime('%Y-%m-%d')
+    with db() as c:
+        satirlar = c.execute('SELECT id,text,due FROM reminders WHERE done=0 ORDER BY due LIMIT 200').fetchall()
+        defter_satir = c.execute('SELECT kind,amount FROM ledger').fetchall()
+        bellek_satir = c.execute('SELECT text,created FROM memories ORDER BY id DESC LIMIT 3').fetchall()
+        belge_sayisi = c.execute('SELECT COUNT(*) FROM docs').fetchone()[0]
+        takvim_yolu = ayar_al(c, 'takvim_yolu', '')
+    geciken, bugun_kayit, yaklasan = [], [], []
+    bitis = (simdi + timedelta(days=7)).strftime('%Y-%m-%dT%H:%M')
+    for rid, metin, due in satirlar:
+        kayit = {'id': rid, 'text': metin, 'due': due}
+        if due < simdi.strftime('%Y-%m-%dT%H:%M'):
+            geciken.append(kayit)
+        elif due[:10] == bugun:
+            bugun_kayit.append(kayit)
+        elif due <= bitis:
+            yaklasan.append(kayit)
+    bakiye = {'alacak': 0, 'verecek': 0}
+    for kind, amount in defter_satir:
+        if kind == 'receivable':
+            bakiye['alacak'] += amount
+        elif kind == 'received':
+            bakiye['alacak'] -= amount
+        elif kind == 'payable':
+            bakiye['verecek'] += amount
+        elif kind == 'paid':
+            bakiye['verecek'] -= amount
+    etkinlikler, takvim_hatasi = [], ''
+    if takvim_yolu:
+        try:
+            etkinlikler = takvim.yaklasan(takvim.yolu_oku(takvim_yolu), gun=1, simdi=simdi)[:5]
+        except ValueError as hata:
+            takvim_hatasi = str(hata)
+    return {
+        'tarih': simdi.strftime('%Y-%m-%d %H:%M'),
+        'hatirlaticilar': {'geciken': geciken[:5], 'bugun': bugun_kayit[:5], 'yaklasan': yaklasan[:5],
+                           'toplam': len(satirlar)},
+        'defter': {'alacak_tl': bakiye['alacak'] / 100, 'verecek_tl': bakiye['verecek'] / 100,
+                   'kayit': len(defter_satir)},
+        'bellek': [{'text': metin, 'created': tarih} for metin, tarih in bellek_satir],
+        'belgeler': belge_sayisi,
+        'takvim': {'path': takvim_yolu, 'etkinlikler': etkinlikler, 'error': takvim_hatasi},
+    }
+
+
 def belge_baglami(metin, doc_id=None, limit=4):
     """Belgeye soru sorulduysa ilgili parçaları kaynak numaralı metne çevirir."""
     metin = str(metin or '')
@@ -839,6 +892,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(kota_ozet(gun))
             if path=='/api/wake/status':
                 return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/today':
+                return self.out(gun_ozeti())
             if path=='/api/docs':
                 with db() as c: belgeler=belge.listele(c)
                 return self.out({'docs':belgeler})
@@ -1531,6 +1586,21 @@ class Handler(BaseHTTPRequestHandler):
                 _denetle('belge','belge sorusu yanıtlandı',f'{soru[:80]} · {len(parcalar)} bölüm')
                 return self.out({'reply':yanit,'sources':kaynaklar,
                                  'docs':[adlar.get(x['doc_id'],'') for x in parcalar]})
+            if path=='/api/image/generate':
+                if data.get('confirmed') is not True:
+                    raise ValueError('Görsel üretmek için onay gerekli.')
+                istem=str(data.get('prompt') or '').strip()
+                boyut=str(data.get('size') or '1024x1024')
+                with db() as c: model=ayar_al(c,'gorsel_model','')
+                sonuc=SAG.gorsel(istem,model=model,boyut=boyut)
+                _denetle('gorsel','görsel üretildi',istem[:80])
+                return self.out({'ok':True,'image':sonuc['image'],'mime':'image/png',
+                                 'model':sonuc['model'],'size':sonuc['size']})
+            if path=='/api/image/model':
+                model=str(data.get('model') or '').strip()[:120]
+                with db() as c: ayar_yaz(c,'gorsel_model',model)
+                _denetle('gorsel','görsel modeli ayarlandı',model or '(kaldırıldı)')
+                return self.out({'ok':True,'model':model})
             if path=='/api/calendar/path':
                 yol=data.get('path','')
                 if yol is not None and not isinstance(yol,str): raise ValueError('Yol metin olmalı.')

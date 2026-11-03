@@ -1174,6 +1174,83 @@ class ServerTestCase(unittest.TestCase):
         self.api('/api/tts/split', {'text': 'a' * 7000}, expect=400)
         self.api('/api/tts/split', {'text': 5}, expect=400)
 
+    # --- D1: bugün özeti ------------------------------------------------
+    def test_today_empty_database(self):
+        veri = self.api('/api/today')
+        self.assertIn('tarih', veri)
+        self.assertEqual(veri['defter']['kayit'], 0)
+        self.assertEqual(veri['hatirlaticilar']['toplam'], 0)
+        self.assertEqual(veri['belgeler'], 0)
+        self.assertEqual(veri['takvim']['path'], '')
+
+    def sabit_saat(self, saat):
+        """`server.datetime`'ı sabitler: gün sınırında testler kaymasın."""
+        sinif = type('SabitZaman', (datetime,), {'now': classmethod(lambda cls, tz=None: saat)})
+        return mock.patch.object(server, 'datetime', sinif)
+
+    def test_today_counts_reminders_and_ledger(self):
+        saat = datetime(2026, 11, 3, 12, 0)
+        with self.sabit_saat(saat):
+            self.api('/api/reminders', {'text': 'Geciken is', 'due': '2026-11-03T09:00'})
+            self.api('/api/reminders', {'text': 'Bugun is', 'due': '2026-11-03T18:30'})
+            self.api('/api/reminders', {'text': 'Hafta is', 'due': '2026-11-06T10:00'})
+            self.api('/api/ledger', {'person': 'Ahmet', 'kind': 'receivable', 'amount': 150000})
+            self.api('/api/ledger', {'person': 'Ahmet', 'kind': 'received', 'amount': 50000})
+            self.api('/api/ledger', {'person': 'Mehmet', 'kind': 'payable', 'amount': 20000})
+            veri = self.api('/api/today')
+        self.assertEqual([x['text'] for x in veri['hatirlaticilar']['geciken']], ['Geciken is'])
+        self.assertEqual([x['text'] for x in veri['hatirlaticilar']['bugun']], ['Bugun is'])
+        self.assertEqual([x['text'] for x in veri['hatirlaticilar']['yaklasan']], ['Hafta is'])
+        self.assertEqual(veri['defter']['alacak_tl'], 1000.0)
+        self.assertEqual(veri['defter']['verecek_tl'], 200.0)
+        self.assertEqual(veri['defter']['kayit'], 3)
+
+    def test_today_includes_memory_and_docs(self):
+        self.api('/api/memory/add', {'text': 'Bugün için not', 'kind': 'not'})
+        icerik = base64.b64encode('Kısa belge.'.encode('utf-8')).decode()
+        self.api('/api/docs/import', {'confirmed': True, 'name': 'kisa.txt', 'content': icerik})
+        veri = self.api('/api/today')
+        self.assertEqual(veri['belgeler'], 1)
+        self.assertTrue(any('Bugün için not' in (x.get('text') or '') for x in veri['bellek']))
+
+    def test_today_reports_calendar_events_and_errors(self):
+        dosya = Path(self.tmp.name) / 'bugun.ics'
+        dosya.write_text('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:Bugünkü iş\r\n'
+                         'DTSTART:20261103T150000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n', encoding='utf-8')
+        with self.sabit_saat(datetime(2026, 11, 3, 12, 0)):
+            self.api('/api/calendar/path', {'path': str(dosya)})
+            veri = self.api('/api/today')
+            self.assertEqual(veri['takvim']['etkinlikler'][0]['baslik'], 'Bugünkü iş')
+            # Dosya silinirse özet çökmeden hata bildirir.
+            dosya.unlink()
+            veri = self.api('/api/today')
+        self.assertEqual(veri['takvim']['etkinlikler'], [])
+        self.assertIn('bulunamadı', veri['takvim']['error'])
+
+    # --- B5: görsel üretimi ---------------------------------------------
+    def test_image_generate_requires_confirmation(self):
+        hata = self.api('/api/image/generate', {'prompt': 'kedi'}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_image_generate_requires_provider(self):
+        hata = self.api('/api/image/generate', {'prompt': 'kedi', 'confirmed': True}, expect=400)
+        self.assertIn('sağlayıcı', hata['error'].lower())
+
+    def test_image_generate_returns_base64(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(server.SAG, 'gorsel',
+                               return_value={'image': 'aGVsbG8=', 'model': 'dall-e-3', 'size': '1024x1024'}):
+            veri = self.api('/api/image/generate', {'prompt': 'gün batımı', 'confirmed': True})
+        self.assertTrue(veri['ok'])
+        self.assertEqual(veri['image'], 'aGVsbG8=')
+        self.assertEqual(veri['mime'], 'image/png')
+
+    def test_image_model_setting(self):
+        veri = self.api('/api/image/model', {'model': 'dall-e-3'})
+        self.assertEqual(veri['model'], 'dall-e-3')
+        self.api('/api/image/model', {'model': 'x' * 300})
+        self.assertEqual(len(self.api('/api/image/model', {})['model']), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

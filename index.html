@@ -31,8 +31,54 @@
 .apps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.apps-card{text-align:left;background:#09171b;border:1px solid #243c43;border-radius:10px;padding:22px;color:#e4f5f3;cursor:pointer;min-height:160px}.apps-card:hover{border-color:#56c8bf;background:#102429}.apps-card span{display:block;color:#66e2d5;font-size:25px}.apps-card b{display:block;margin-top:14px;font-size:14px}.apps-card small{display:block;color:#809ba2;margin-top:7px}.apps-card em{display:block;color:#69d8cf;font-style:normal;font-size:11px;margin-top:18px}@media(max-width:650px){.apps-grid{grid-template-columns:1fr 1fr}.apps-card{padding:15px}}
 
 .chat-layout{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px}.chat-history{border:1px solid #20353e;border-radius:10px;padding:14px;background:#071014;align-self:start}.chat-history-head{display:flex;justify-content:space-between;align-items:center}.chat-history-head b{font-size:13px}.history-row{display:flex;align-items:center;gap:4px;margin-top:8px}.history-choice{border:0;background:transparent;color:#a9bfc4;text-align:left;border-radius:6px;padding:10px;min-width:0;flex:1;cursor:pointer}.history-choice.active{background:#103039;color:#baf9f0}.history-choice span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.history-choice small{display:block;color:#77949a;margin-top:4px}.history-delete{background:transparent;color:#7d969d;border:0;cursor:pointer;padding:8px}.history-delete:hover{color:#f18780}#chatHolder .messages{min-height:280px;max-height:55vh}@media(max-width:650px){.chat-layout{grid-template-columns:1fr}.chat-history{max-height:190px;overflow:auto}}
-</style></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-icon"></div><div>EMREE<small>KİŞİSEL ASİSTAN</small></div></div><div class="navlabel">ÇALIŞMA ALANI</div><nav class="nav"><button class="active" data-section="Ana sayfa"><span class="nav-icon">⌂</span>Ana sayfa</button><button data-section="Sohbet"><span class="nav-icon">◌</span>Sohbet</button><button data-section="Keşfet"><span class="nav-icon">⌕</span>Keşfet</button><button data-section="Hatırlatıcılar"><span class="nav-icon">◷</span>Hatırlatıcılar</button><button data-section="Defter"><span class="nav-icon">▤</span>Defter</button><button data-section="Telegram"><span class="nav-icon">➤</span>Telegram</button><button data-section="Uygulamalar"><span class="nav-icon">▦</span>Uygulamalar</button><button data-section="Geliştirici"><span class="nav-icon">⌘</span>Geliştirici</button><button data-section="Ayarlar"><span class="nav-icon">⚙</span>Ayarlar</button></nav></aside><main class="main"><div class="content"><section class="hero"><canvas id="energy" width="500" height="500" aria-label="Mercan turuncusu enerji küresi animasyonu"></canvas></section><section class="web-panel" id="features" hidden><div class="web-head"><h2 id="featureTitle"></h2><button type="button" class="iconbtn" id="closeFeatures">Kapat ✕</button></div><div id="featureBody" style="padding:16px"></div></section><section class="web-panel" id="cameraPanel" hidden><div class="web-head"><div><h2>Kamera önizlemesi</h2><span class="hint">Bu bir görüntülü arama değil; yalnızca kendi kameranı gösterir.</span></div><button type="button" class="iconbtn" id="closeCamera">Kamerayı kapat ✕</button></div><video id="video" autoplay playsinline muted style="width:100%;max-height:400px;background:#03090c"></video></section><section class="web-panel" id="arena" hidden><div class="web-head"><div><h2>Arena bağlantısı</h2><span class="hint">Tarayıcı üzerinden, onaylı soru gönderimi</span></div><button type="button" class="iconbtn" id="closeArena">Kapat ✕</button></div><div style="padding:0 16px 16px"><p class="hint">Önce Arena tarayıcısını aç; giriş ve güvenlik doğrulamasını kendin tamamla. Soru yalnızca onayından sonra gönderilir.</p><button type="button" class="iconbtn" id="arenaNormal">Normal Edge’de aç</button> <button type="button" class="iconbtn" id="arenaStart">Otomasyon penceresini aç</button><p class="hint">Normal Edge kendi oturumunu kullanır; Emre bu pencereden yanıtları otomatik okuyamaz.</p><p id="arenaStatus" class="hint">Bağlantı durumu bilinmiyor.</p><textarea id="arenaQuestion" placeholder="Arena’ya sorulacak soru" style="width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit"></textarea><button type="button" class="iconbtn" id="arenaSend" style="margin-top:10px">Onayla ve gönder</button><p class="hint">Bulunan yanıtın tamamlandığını ve doğru olduğunu Arena ekranından kontrol et. Site değişiklikleri otomasyonu bozabilir.</p><div id="arenaAnswer" style="white-space:pre-wrap;line-height:1.6;color:#d3e9e8"></div></div></section><div id="sohbet" style="height:28px"></div><div class="chat"><div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet"><div class="msg"><div class="avatar">E</div><div><strong>EMRE</strong>Merhaba, ben Emre.</div></div></div><section class="web-panel" id="dictation" hidden><div class="web-head"><div><h2>Canlı dikte</h2><span class="hint">Konuştuklarını anında yazar · yerel Whisper, ses dışarı gitmez</span></div><button type="button" class="iconbtn" id="dictateClose">Kapat ✕</button></div><div style="padding:0 16px 16px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="iconbtn" id="dictateToggle">Dikteyi başlat</button><span class="hint" id="dictateState">Kapalı</span></div><label style="display:block;margin:10px 0 4px;color:#a6c1c3;font-size:12px">Hedef pencere (boş bırakılırsa etkin pencere)</label><input id="dictateTarget" placeholder="ör. Antigravity" style="width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px" value=""><label style="display:block;margin:10px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateLive"> Konuştukça etkin pencereye yaz (canlı yazım)</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateEnter"> Her cümleden sonra Enter gönder</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateAnswer"> Durdurduğumda Emre cevap versin</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictatePolish"> Durdurduğumda yazımı ve noktalamayı yapay zekâ düzeltsin (ücretsiz API bağlıysa)</label><textarea id="dictateText" readonly placeholder="Konuştukların burada anında belirecek…" style="width:100%;min-height:110px;margin-top:10px;background:#02090c;color:#d3e9e8;border:1px solid #29424a;border-radius:7px;padding:12px;font:inherit;resize:vertical"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="iconbtn" id="dictateType">Aktif pencereye yaz</button><button type="button" class="iconbtn" id="dictateSend">Sohbete gönder</button><button type="button" class="iconbtn" id="dictateClear">Temizle</button></div><p class="hint" id="dictateHint">Konuşurken metin ~1 saniye içinde görünür; cümle bitmesini beklemez. Yazma yalnızca “canlı yazım” açıkken veya düğmeye bastığında yapılır.</p></div></section>
-<form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button type="button" class="iconbtn" id="dictateOpen" aria-label="Canlı dikte" title="Canlı dikte: konuş, anında yaz">⌨</button><button type="button" class="iconbtn" id="screenAsk" aria-label="Ekranı sor" title="Ekranı görüntüleyip soru sor">▣</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div><div class="chat-history-head" style="margin-top:14px"><b>Sunucu geçmişi</b><button id="historyRefresh" class="iconbtn">↻</button></div><p class="hint">Bu bilgisayarda kalıcı</p><div id="serverHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="providerTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ücretsiz API</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button><button class="settings-tab" id="memoryTab" role="tab" aria-selected="false" aria-controls="settingsBody">Bellek</button><button class="settings-tab" id="mcpTab" role="tab" aria-selected="false" aria-controls="settingsBody">MCP araçları</button><button class="settings-tab" id="systemTab" role="tab" aria-selected="false" aria-controls="settingsBody">Sistem</button><button class="settings-tab" id="skillsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Beceriler</button><button class="settings-tab" id="docsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Belgeler</button><button class="settings-tab" id="calendarTab" role="tab" aria-selected="false" aria-controls="settingsBody">Takvim &amp; posta</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off" data-durum="ses">Kontrol ediliyor…</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off" data-durum="internet">Kontrol ediliyor…</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off" data-durum="telegram">Kontrol ediliyor…</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off" data-durum="cihaz">Kontrol ediliyor…</b></div><div class="statusrow"><span>✧ &nbsp; Yapay zekâ</span><b class="off" data-durum="yapayzeka">Kontrol ediliyor…</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder" id="upcomingReminders"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
+
+/* ===== D1: Bugün kartı ==================================================== */
+.today-panel{margin:16px 0 10px;border:1px solid #1d343f;border-radius:14px;background:linear-gradient(180deg,#08131a,#050c11);padding:16px 18px}
+.today-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.today-head h2{font-size:15px;margin:0;color:#cfe9e6;letter-spacing:.04em}
+.today-head small{color:#5f7d89;font-size:11px}
+.today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+.today-card{border:1px solid #1b2f39;border-radius:10px;padding:12px;background:#081217;min-height:100px}
+.today-card h3{margin:0 0 6px;font-size:11px;color:#6fd7d2;text-transform:uppercase;letter-spacing:.08em}
+.today-card ul{margin:0;padding-left:15px;color:#c6dde0;font-size:12.5px;line-height:1.55;max-height:132px;overflow:auto}
+.today-card .bos{color:#6d8794;font-size:12px;margin:0}
+.today-num{font-size:21px;font-weight:700;color:#eafcfb;display:block;line-height:1.25}
+.today-num em{font-style:normal;font-size:11px;color:#6d8794;font-weight:400}
+.today-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* ===== D2: komut paleti =================================================== */
+.palette{position:fixed;inset:0;z-index:80;background:#000000b3;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh}
+.palette[hidden]{display:none}
+.palette-box{width:min(620px,92vw);background:#071319;border:1px solid #24414d;border-radius:14px;box-shadow:0 22px 60px #000a;overflow:hidden}
+.palette-box input{width:100%;border:0;border-bottom:1px solid #1c333d;background:#08161d;color:#eafcfb;padding:16px 18px;font-size:15px;outline:none}
+.palette-list{max-height:46vh;overflow:auto;margin:0;padding:6px;list-style:none}
+.palette-list li{padding:10px 12px;border-radius:8px;color:#cfe3e6;display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px}
+.palette-list li[aria-selected="true"]{background:#0e2b33;color:#eafcfb;outline:1px solid #2d6b74}
+.palette-list small{color:#6d8794}
+.palette-hint{padding:8px 14px 12px;color:#5c7581;font-size:11px}
+
+/* ===== D3: açık tema ===================================================== */
+body[data-tema="acik"]{--bg:#eef3f5;--panel:#fff;--line:#cfdde3;--muted:#4e6a76;--text:#0d1b21;background:#eef3f5;color:#0d1b21}
+body[data-tema="acik"] .app,body[data-tema="acik"] .main,body[data-tema="acik"] .content,body[data-tema="acik"] .sidebar,body[data-tema="acik"] .right,body[data-tema="acik"] .chat,body[data-tema="acik"] .sidecard,body[data-tema="acik"] .web-panel,body[data-tema="acik"] .composer,body[data-tema="acik"] .settings-card,body[data-tema="acik"] .chat-history,body[data-tema="acik"] .apps-card,body[data-tema="acik"] .ledger-page,body[data-tema="acik"] .messages,body[data-tema="acik"] .msg{background:#fff;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] input,body[data-tema="acik"] textarea,body[data-tema="acik"] select{background:#fff!important;color:#0d1b21!important;border-color:#cfdde3!important}
+body[data-tema="acik"] .settings-tabs{background:#e4ecef;border-color:#cfdde3}
+body[data-tema="acik"] .settings-tab{color:#4e6a76}
+body[data-tema="acik"] .settings-tab.active{color:#0a6a6d;border-bottom-color:#0a6a6d}
+body[data-tema="acik"] .hint,body[data-tema="acik"] .settings-card p,body[data-tema="acik"] .today-card .bos{color:#4e6a76}
+body[data-tema="acik"] .iconbtn{background:#eef4f6;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] .today-panel{background:#fff;border-color:#cfdde3}
+body[data-tema="acik"] .today-card{background:#f7fafb;border-color:#cfdde3}
+body[data-tema="acik"] .today-card ul,body[data-tema="acik"] .today-num{color:#173842}
+body[data-tema="acik"] .today-head h2,body[data-tema="acik"] .today-card h3{color:#0a6a6d}
+body[data-tema="acik"] .palette-box{background:#fff;border-color:#cfdde3}
+body[data-tema="acik"] .palette-box input{background:#f4f8f9;color:#0d1b21;border-color:#cfdde3}
+body[data-tema="acik"] .palette-list li{color:#24404a}
+body[data-tema="acik"] .palette-list li[aria-selected="true"]{background:#dff0f1;color:#08343a}
+body[data-tema="acik"] .toast{background:#fff;color:#0d1b21;border:1px solid #cfdde3}
+/* Yazı boyutu (D3) */
+body{font-size:var(--yazi,14px)}
+</style></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-icon"></div><div>EMREE<small>KİŞİSEL ASİSTAN</small></div></div><div class="navlabel">ÇALIŞMA ALANI</div><nav class="nav"><button class="active" data-section="Ana sayfa"><span class="nav-icon">⌂</span>Ana sayfa</button><button data-section="Sohbet"><span class="nav-icon">◌</span>Sohbet</button><button data-section="Keşfet"><span class="nav-icon">⌕</span>Keşfet</button><button data-section="Hatırlatıcılar"><span class="nav-icon">◷</span>Hatırlatıcılar</button><button data-section="Defter"><span class="nav-icon">▤</span>Defter</button><button data-section="Telegram"><span class="nav-icon">➤</span>Telegram</button><button data-section="Uygulamalar"><span class="nav-icon">▦</span>Uygulamalar</button><button data-section="Geliştirici"><span class="nav-icon">⌘</span>Geliştirici</button><button data-section="Ayarlar"><span class="nav-icon">⚙</span>Ayarlar</button></nav></aside><main class="main"><div class="content"><section class="hero"><canvas id="energy" width="500" height="500" aria-label="Mercan turuncusu enerji küresi animasyonu"></canvas></section><section class="today-panel" id="todayCard" aria-labelledby="todayTitle"><div class="today-head"><div><h2 id="todayTitle">Bugün</h2><small id="todayStamp">Yükleniyor…</small></div><div class="today-actions"><button type="button" class="iconbtn" id="todayRefresh">Yenile</button><button type="button" class="iconbtn" id="todayPalette" title="Komut paleti (/)">⌘ Komutlar</button></div></div><div class="today-grid" id="todayGrid"></div></section><section class="web-panel" id="features" hidden><div class="web-head"><h2 id="featureTitle"></h2><button type="button" class="iconbtn" id="closeFeatures">Kapat ✕</button></div><div id="featureBody" style="padding:16px"></div></section><section class="web-panel" id="cameraPanel" hidden><div class="web-head"><div><h2>Kamera önizlemesi</h2><span class="hint">Bu bir görüntülü arama değil; yalnızca kendi kameranı gösterir.</span></div><button type="button" class="iconbtn" id="closeCamera">Kamerayı kapat ✕</button></div><video id="video" autoplay playsinline muted style="width:100%;max-height:400px;background:#03090c"></video></section><section class="web-panel" id="arena" hidden><div class="web-head"><div><h2>Arena bağlantısı</h2><span class="hint">Tarayıcı üzerinden, onaylı soru gönderimi</span></div><button type="button" class="iconbtn" id="closeArena">Kapat ✕</button></div><div style="padding:0 16px 16px"><p class="hint">Önce Arena tarayıcısını aç; giriş ve güvenlik doğrulamasını kendin tamamla. Soru yalnızca onayından sonra gönderilir.</p><button type="button" class="iconbtn" id="arenaNormal">Normal Edge’de aç</button> <button type="button" class="iconbtn" id="arenaStart">Otomasyon penceresini aç</button><p class="hint">Normal Edge kendi oturumunu kullanır; Emre bu pencereden yanıtları otomatik okuyamaz.</p><p id="arenaStatus" class="hint">Bağlantı durumu bilinmiyor.</p><textarea id="arenaQuestion" placeholder="Arena’ya sorulacak soru" style="width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit"></textarea><button type="button" class="iconbtn" id="arenaSend" style="margin-top:10px">Onayla ve gönder</button><p class="hint">Bulunan yanıtın tamamlandığını ve doğru olduğunu Arena ekranından kontrol et. Site değişiklikleri otomasyonu bozabilir.</p><div id="arenaAnswer" style="white-space:pre-wrap;line-height:1.6;color:#d3e9e8"></div></div></section><div id="sohbet" style="height:28px"></div><div class="chat"><div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet"><div class="msg"><div class="avatar">E</div><div><strong>EMRE</strong>Merhaba, ben Emre.</div></div></div><section class="web-panel" id="dictation" hidden><div class="web-head"><div><h2>Canlı dikte</h2><span class="hint">Konuştuklarını anında yazar · yerel Whisper, ses dışarı gitmez</span></div><button type="button" class="iconbtn" id="dictateClose">Kapat ✕</button></div><div style="padding:0 16px 16px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="iconbtn" id="dictateToggle">Dikteyi başlat</button><span class="hint" id="dictateState">Kapalı</span></div><label style="display:block;margin:10px 0 4px;color:#a6c1c3;font-size:12px">Hedef pencere (boş bırakılırsa etkin pencere)</label><input id="dictateTarget" placeholder="ör. Antigravity" style="width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px" value=""><label style="display:block;margin:10px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateLive"> Konuştukça etkin pencereye yaz (canlı yazım)</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateEnter"> Her cümleden sonra Enter gönder</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateAnswer"> Durdurduğumda Emre cevap versin</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictatePolish"> Durdurduğumda yazımı ve noktalamayı yapay zekâ düzeltsin (ücretsiz API bağlıysa)</label><textarea id="dictateText" readonly placeholder="Konuştukların burada anında belirecek…" style="width:100%;min-height:110px;margin-top:10px;background:#02090c;color:#d3e9e8;border:1px solid #29424a;border-radius:7px;padding:12px;font:inherit;resize:vertical"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="iconbtn" id="dictateType">Aktif pencereye yaz</button><button type="button" class="iconbtn" id="dictateSend">Sohbete gönder</button><button type="button" class="iconbtn" id="dictateClear">Temizle</button></div><p class="hint" id="dictateHint">Konuşurken metin ~1 saniye içinde görünür; cümle bitmesini beklemez. Yazma yalnızca “canlı yazım” açıkken veya düğmeye bastığında yapılır.</p></div></section>
+<form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button type="button" class="iconbtn" id="dictateOpen" aria-label="Canlı dikte" title="Canlı dikte: konuş, anında yaz">⌨</button><button type="button" class="iconbtn" id="screenAsk" aria-label="Ekranı sor" title="Ekranı görüntüleyip soru sor">▣</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div><div class="chat-history-head" style="margin-top:14px"><b>Sunucu geçmişi</b><button id="historyRefresh" class="iconbtn">↻</button></div><p class="hint">Bu bilgisayarda kalıcı</p><div id="serverHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="providerTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ücretsiz API</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button><button class="settings-tab" id="memoryTab" role="tab" aria-selected="false" aria-controls="settingsBody">Bellek</button><button class="settings-tab" id="mcpTab" role="tab" aria-selected="false" aria-controls="settingsBody">MCP araçları</button><button class="settings-tab" id="systemTab" role="tab" aria-selected="false" aria-controls="settingsBody">Sistem</button><button class="settings-tab" id="skillsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Beceriler</button><button class="settings-tab" id="docsTab" role="tab" aria-selected="false" aria-controls="settingsBody">Belgeler</button><button class="settings-tab" id="calendarTab" role="tab" aria-selected="false" aria-controls="settingsBody">Takvim &amp; posta</button><button class="settings-tab" id="gorunumTab" role="tab" aria-selected="false" aria-controls="settingsBody">Görünüm</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off" data-durum="ses">Kontrol ediliyor…</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off" data-durum="internet">Kontrol ediliyor…</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off" data-durum="telegram">Kontrol ediliyor…</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off" data-durum="cihaz">Kontrol ediliyor…</b></div><div class="statusrow"><span>✧ &nbsp; Yapay zekâ</span><b class="off" data-durum="yapayzeka">Kontrol ediliyor…</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder" id="upcomingReminders"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><div class="palette" id="palette" hidden role="dialog" aria-modal="true" aria-label="Komut paleti"><div class="palette-box"><input id="paletteInput" placeholder="Komut ara… (örn. defter, belge, tema)" aria-label="Komut ara" autocomplete="off"><ul class="palette-list" id="paletteList" role="listbox" aria-label="Komutlar"></ul><div class="palette-hint">↑ ↓ gez · Enter çalıştır · Esc kapat</div></div></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
 
 let bargeSayac=0;
 let timer,stream=null,recognition=null, listening=false, pendingSearch=false, speechActive=false, lastVoiceText="", lastVoiceAt=0;
@@ -1434,4 +1480,249 @@ let core=ctx.createRadialGradient(250,250,0,250,250,43);core.addColorStop(0,'rgb
   };
   document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>setTimeout(odak,60)));
 })();
-</script></body></html>
+</script>
+<script>
+
+/* ===================== D1 · BUGÜN KARTI ================================== */
+function paraCevir(kurus){return new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY'}).format(kurus)}
+function saatKisa(iso){return String(iso||'').replace('T',' ').slice(0,16)||'—'}
+function bugunKart(etiket,icerik){
+  const kart=document.createElement('div');kart.className='today-card';
+  kart.append(element('h3',etiket));
+  if(typeof icerik==='string'){const p=element('p',icerik);p.className='bos';kart.append(p);return kart}
+  kart.append(icerik);return kart;
+}
+async function bugunYukle(){
+  const grid=document.getElementById('todayGrid'),damga=document.getElementById('todayStamp');
+  if(!grid)return;
+  if(!apiToken){damga.textContent='Yerel sunucu kapalı';return}
+  try{
+    const d=await api('/api/today');
+    grid.replaceChildren();damga.textContent=d.tarih;
+    // Hatırlatıcılar
+    const h=d.hatirlaticilar||{};const hListe=document.createElement('ul');
+    const hepsi=[...(h.geciken||[]).map(x=>({...x,gecik:true})),...(h.bugun||[]),...(h.yaklasan||[])].slice(0,5);
+    for(const x of hepsi){
+      const li=element('li',(x.gecik?'⚠ ':'')+x.text+' · '+saatKisa(x.due));
+      if(x.gecik)li.style.color='#ffb3a7';
+      hListe.append(li);
+    }
+    grid.append(bugunKart('Hatırlatıcılar',hepsi.length?hListe:(h.toplam?'Bu hafta hatırlatıcı yok.':'Hatırlatıcı yok.')));
+    // Defter
+    const defterBox=document.createElement('div');
+    defterBox.append(element('span',paraCevir(Math.round((d.defter?.alacak_tl||0)*100))));
+    const alacak=defterBox.firstChild;alacak.className='today-num';
+    alacak.append(element('em',' alacak'));
+    const verecek=element('span',paraCevir(Math.round((d.defter?.verecek_tl||0)*100)));
+    verecek.className='today-num';verecek.style.fontSize='16px';verecek.style.marginTop='4px';
+    verecek.append(element('em',' verecek'));
+    defterBox.append(verecek,element('p',(d.defter?.kayit||0)+' kayıt'));
+    defterBox.lastChild.className='bos';
+    grid.append(bugunKart('Defter',defterBox));
+    // Takvim
+    const tk=d.takvim||{};
+    if(tk.error){grid.append(bugunKart('Takvim',tk.error))}
+    else if(!tk.path){grid.append(bugunKart('Takvim','Takvim yolu tanımlı değil. Ayarlar › Takvim & posta.'))}
+    else if(!(tk.etkinlikler||[]).length){grid.append(bugunKart('Takvim','Bugün etkinlik yok.'))}
+    else{
+      const ul=document.createElement('ul');
+      for(const e of tk.etkinlikler.slice(0,4))ul.append(element('li',saatKisa(e.basla)+' · '+e.baslik+(e.yer?' ('+e.yer+')':'')));
+      grid.append(bugunKart('Takvim',ul));
+    }
+    // Bellek + belgeler
+    const bBox=document.createElement('div');
+    const bellek=(d.bellek||[]);
+    if(bellek.length){
+      const ul=document.createElement('ul');
+      for(const x of bellek)ul.append(element('li',String(x.text).slice(0,90)));
+      bBox.append(ul);
+    }else bBox.append(element('p','Henüz bellek kaydı yok.'));
+    if(!bellek.length)bBox.lastChild.className='bos';
+    const belge=element('p',d.belgeler?'📄 '+(d.belgeler)+' belge ekli':'Belge eklenmedi');
+    belge.className='bos';belge.style.marginTop='6px';
+    bBox.append(belge);
+    grid.append(bugunKart('Bellek ve belgeler',bBox));
+  }catch(e){
+    grid.replaceChildren(bugunKart('Bugün','Özet alınamadı: '+e.message));
+    damga.textContent='Bağlantı yok';
+  }
+}
+document.getElementById('todayRefresh').onclick=()=>bugunYukle();
+
+/* ===================== D3 · TEMA VE YAZI BOYUTU ========================== */
+function temaUygula(){
+  const secim=localStorage.getItem('emre-tema')||'koyu';
+  const sistem=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;
+  const acik=secim==='acik'||(secim==='sistem'&&sistem);
+  document.body.dataset.tema=acik?'acik':'koyu';
+  const boyut=localStorage.getItem('emre-yazi')||'14';
+  document.body.style.setProperty('--yazi',/^\d{2}$/.test(boyut)?boyut+'px':'14px');
+}
+temaUygula();
+if(window.matchMedia){
+  try{window.matchMedia('(prefers-color-scheme: light)').addEventListener('change',temaUygula)}catch(e){}
+}
+document.getElementById('gorunumTab').onclick=async()=>{
+  selectSettingsTab('gorunumTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Görünüm'),
+    element('p','Tema ve yazı boyutu yalnızca bu tarayıcıda saklanır. Koyu tema varsayılandır.'));
+  const tema=document.createElement('select');
+  tema.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:10px 0';
+  for(const [deger,ad] of [['koyu','Koyu (varsayılan)'],['acik','Açık'],['sistem','Sistemle aynı']]){
+    const o=element('option',ad);o.value=deger;tema.append(o);
+  }
+  tema.value=localStorage.getItem('emre-tema')||'koyu';
+  tema.onchange=()=>{localStorage.setItem('emre-tema',tema.value);temaUygula();notify('Tema değişti.')};
+  const yazi=document.createElement('select');
+  yazi.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:10px 0 10px 8px';
+  for(const [deger,ad] of [['13','Küçük (13px)'],['14','Normal (14px)'],['16','Büyük (16px)'],['18','Çok büyük (18px)']]){
+    const o=element('option',ad);o.value=deger;yazi.append(o);
+  }
+  yazi.value=localStorage.getItem('emre-yazi')||'14';
+  yazi.onchange=()=>{localStorage.setItem('emre-yazi',yazi.value);temaUygula();notify('Yazı boyutu değişti.')};
+  const temaSatir=document.createElement('div');
+  temaSatir.append(element('label','Tema: '),tema);
+  const yaziSatir=document.createElement('div');
+  yaziSatir.append(element('label','Yazı boyutu: '),yazi);
+  temaSatir.style.cssText=yaziSatir.style.cssText='margin:8px 0;color:#a6c1c3;font-size:12px';
+  body.append(temaSatir,yaziSatir);
+  // Görsel üretimi modeli (B5)
+  body.append(element('h2','Görsel üretimi'),
+    element('p','Görsel, Ayarlar › Ücretsiz API bölümünde bağladığın sağlayıcının /images/generations ucunda üretilir. '+
+      'Ücretsiz modellerin çoğu görsel üretmez; sağlayıcı desteklemiyorsa açık hata alırsın. Görsel diske yazılmaz.'));
+  try{
+    const d=await api('/api/system/status');
+    const aktif=(d.provider&&d.provider.configured)||false;
+    const uyari=element('p',aktif?'Sağlayıcı bağlı. Görsel modeli adı boş bırakılırsa sağlayıcının varsayılanı kullanılır.'
+      :'Önce Ayarlar › Ücretsiz API bölümünden bir sağlayıcı bağla.');
+    uyari.className='hint';
+    const model=field('Görsel modeli (isteğe bağlı): ör. dall-e-3');
+    model.style.width='min(420px,100%)';
+    body.append(uyari,model,button('Kaydet',async()=>{
+      try{await api('/api/image/model',{model:model.value.trim()});notify('Görsel modeli kaydedildi.')}catch(e){notify(e.message)}
+    }),button('Görsel üret panelini aç',()=>showGorsel()));
+  }catch(e){body.append(element('p',e.message))}
+  body.append(element('p','Kısayollar: / veya Ctrl+K komut paleti · Esc açık paneli kapatır.'));
+};
+
+/* ===================== B5 · GÖRSEL ÜRETİMİ =============================== */
+function showGorsel(){
+  const body=panel('Görsel üret');
+  body.append(element('p','Ne çizileceğini yaz. Görsel, bağladığın sağlayıcıda üretilir; hiçbir dosya diske yazılmaz, '+
+    'sonucu yalnızca bu ekranda görürsün. Üretim dışarıya istek gönderdiği için her seferinde onay istenir.'));
+  const istem=document.createElement('textarea');
+  istem.placeholder='Örnek: gün batımında İstanbul silueti, suluboya';
+  istem.style.cssText='width:100%;min-height:86px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;font:inherit';
+  const boyut=document.createElement('select');
+  boyut.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:9px;margin:10px 0';
+  for(const [deger,ad] of [['1024x1024','Kare 1024×1024'],['1024x1792','Dikey 1024×1792'],['1792x1024','Yatay 1792×1024'],['512x512','Küçük 512×512']]){
+    const o=element('option',ad);o.value=deger;boyut.append(o);
+  }
+  const durum=element('p','');durum.className='hint';
+  const sonuc=document.createElement('div');sonuc.style.cssText='margin-top:14px';
+  body.append(istem,boyut,button('Görsel üret',async()=>{
+    const metin=istem.value.trim();
+    if(!metin){notify('Önce ne çizileceğini yaz.');return}
+    if(!confirm('Görsel, bağlı sağlayıcıya gönderilerek üretilecek. Devam edilsin mi?\n\n'+metin))return;
+    durum.textContent='Görsel üretiliyor… bu birkaç dakika sürebilir.';
+    sonuc.replaceChildren();
+    try{
+      const r=await api('/api/image/generate',{prompt:metin,size:boyut.value,confirmed:true});
+      const img=document.createElement('img');
+      img.src='data:'+(r.mime||'image/png')+';base64,'+r.image;
+      img.alt=metin;
+      img.style.cssText='max-width:100%;border-radius:10px;border:1px solid #24383f;display:block';
+      const indir=document.createElement('a');
+      indir.href=img.src;indir.download='emre-gorsel.png';indir.textContent='Görseli indir';
+      indir.className='iconbtn';indir.style.cssText='display:inline-block;margin-top:10px;text-decoration:none';
+      sonuc.append(img,indir);
+      durum.textContent='Üretildi · model: '+(r.model||'varsayılan')+' · '+r.size;
+    }catch(e){durum.textContent=e.message;notify(e.message)}
+  }),durum,sonuc);
+}
+
+/* ===================== D2 · KOMUT PALETİ ================================= */
+const PALETTE_KOMUTLAR=[
+  {ad:'Sohbete git',detay:'yazışma ekranı',calistir:()=>showChatPage()},
+  {ad:'Yeni sohbet',detay:'geçmişi temizle',calistir:()=>document.getElementById('newChat').click()},
+  {ad:'Hatırlatıcılar',detay:'ekle / tamamla / sil',calistir:()=>showReminders()},
+  {ad:'Defter',detay:'alacak · verecek',calistir:()=>showLedger()},
+  {ad:'Telegram',detay:'bot mesajları',calistir:()=>showTelegram()},
+  {ad:'Uygulamalar',detay:'Windows uygulamaları',calistir:()=>showApps()},
+  {ad:'Geliştirici',detay:'kod çalışma alanı',calistir:()=>showDeveloper()},
+  {ad:'Ayarlar',detay:'model ve bağlantı',calistir:()=>showSettings()},
+  {ad:'Belgeler',detay:'PDF/Word yükle, belgeye sor',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('docsTab').click(),80)}},
+  {ad:'Takvim ve posta',detay:'.ics · .eml · .mbox',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('calendarTab').click(),80)}},
+  {ad:'Görünüm',detay:'tema · yazı boyutu',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('gorunumTab').click(),80)}},
+  {ad:'Görsel üret',detay:'sağlayıcı üzerinden resim',calistir:()=>showGorsel()},
+  {ad:'Bugünü yenile',detay:'ana sayfa özeti',calistir:()=>{returnHome();bugunYukle()}},
+  {ad:'Mikrofonu aç / kapat',detay:'sesli dinleme',calistir:()=>document.getElementById('mic').click()},
+  {ad:'Sistemi tanı',detay:'yerel kontroller',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('systemTab').click(),80)}},
+];
+let paletteSecim=0,paletteSonuc=[];
+function paletteCiz(){
+  const liste=document.getElementById('paletteList');
+  liste.replaceChildren();
+  if(!paletteSonuc.length){
+    const li=element('li','Eşleşen komut yok.');li.style.cursor='default';liste.append(li);return;
+  }
+  paletteSonuc.forEach((k,i)=>{
+    const li=document.createElement('li');
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected',String(i===paletteSecim));
+    li.append(element('span',k.ad),element('small',k.detay||''));
+    li.onclick=()=>paletteCalistir(k);
+    li.onmousemove=()=>{if(paletteSecim!==i){paletteSecim=i;paletteCiz()}};
+    liste.append(li);
+  });
+  const secili=liste.children[paletteSecim];
+  if(secili&&secili.scrollIntoView)secili.scrollIntoView({block:'nearest'});
+}
+function paletteFiltrele(){
+  const q=(document.getElementById('paletteInput').value||'').toLowerCase().trim();
+  paletteSonuc=q?PALETTE_KOMUTLAR.filter(k=>(k.ad+' '+(k.detay||'')).toLowerCase().includes(q)):PALETTE_KOMUTLAR.slice();
+  paletteSecim=0;paletteCiz();
+}
+function paletteAc(){
+  const kutu=document.getElementById('palette');
+  if(!kutu||!kutu.hidden)return;
+  kutu.hidden=false;
+  const girdi=document.getElementById('paletteInput');
+  girdi.value='';paletteFiltrele();girdi.focus();
+}
+function paletteKapat(){
+  const kutu=document.getElementById('palette');
+  if(kutu)kutu.hidden=true;
+}
+function paletteCalistir(komut){
+  paletteKapat();
+  try{komut.calistir()}catch(e){notify(e.message)}
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+}
+document.getElementById('paletteInput').addEventListener('input',paletteFiltrele);
+document.getElementById('paletteInput').addEventListener('keydown',(e)=>{
+  if(e.key==='ArrowDown'){e.preventDefault();paletteSecim=Math.min(paletteSecim+1,Math.max(paletteSonuc.length-1,0));paletteCiz()}
+  else if(e.key==='ArrowUp'){e.preventDefault();paletteSecim=Math.max(paletteSecim-1,0);paletteCiz()}
+  else if(e.key==='Enter'){e.preventDefault();if(paletteSonuc[paletteSecim])paletteCalistir(paletteSonuc[paletteSecim])}
+  else if(e.key==='Escape'){e.preventDefault();paletteKapat()}
+});
+document.getElementById('palette').addEventListener('mousedown',(e)=>{if(e.target.id==='palette')paletteKapat()});
+document.getElementById('todayPalette').onclick=()=>paletteAc();
+document.addEventListener('keydown',(e)=>{
+  const hedef=e.target||{};
+  const yaziyor=/^(INPUT|TEXTAREA|SELECT)$/.test(hedef.tagName||'')||hedef.isContentEditable;
+  if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){e.preventDefault();paletteAc();return}
+  if(e.key==='/'&&!yaziyor&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();paletteAc();return}
+  if(e.key==='Escape'){
+    const kutu=document.getElementById('palette');
+    if(kutu&&!kutu.hidden){paletteKapat();return}
+  }
+});
+/* Bugün özeti: açılışta yükle, 2 dakikada bir tazele (sekme görünürken). */
+bugunYukle();
+setInterval(()=>{if(!document.hidden&&!document.querySelector('main > .content').hidden)bugunYukle()},120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)bugunYukle()});
+
+</script>
+</body></html>

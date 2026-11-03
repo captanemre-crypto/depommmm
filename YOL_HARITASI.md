@@ -5,7 +5,7 @@ Her maddede: neden gerekli, bugün ne var/ne yok, tahmini emek (S ≤ 1 gün, M 
 
 Mevcut durum (özet): sohbet (Ollama + ücretsiz API), Türkçe sesli giriş, canlı dikte + etkin pencereye yazma,
 uyandırma sözcüğü (metin tabanlı), kişisel bellek, MCP araçları, ekranı sor, defter, hatırlatıcılar,
-Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 239 test + 40 E2E kontrol.
+Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 568 test + 58 E2E kontrol.
 
 ---
 
@@ -27,7 +27,7 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | ~~B2~~ ✅ | **Akışlı TTS + barge-in** | **Eklendi (2026-11-03):** `sesli_yanit.py` cümle bölme + akış parçalayıcı + hiserezisli söz kesme; `/api/tts/split`, `/api/system/tts`, Ayarlar › Ses anahtarları | — |
 | ~~B3~~ ✅ | **Belge okuma ve soru-cevap** | **Eklendi:** `belge.py` (PDF/DOCX/txt/md/csv/html, stdlib), parçalama + aksan duyarsız arama, `/api/docs/*`, kaynak numaralı yanıt, Ayarlar › Belgeler | — |
 | ~~B4~~ ✅ | **Takvim / e-posta** | **Eklendi:** `takvim.py` (.ics, salt okunur) ve `posta.py` (.eml/.mbox, salt okunur); **IMAP/SMTP bilinçli olarak yok** (parola + dış ağ gerekir) | — |
-| B5 | **Görsel üretimi** | Ücretli servis gerektirir; sağlayıcı katmanına eklenebilir | S (servis varsa) |
+| ~~B5~~ ✅ | **Görsel üretimi** | **Eklendi (2026-11-03):** ücretsiz API sağlayıcısının `/images/generations` ucu, `/api/image/generate`, Ayarlar › Görünüm'de model alanı ve “Görsel üret” paneli. Sağlayıcı desteklemiyorsa açık hata verir; görsel diske yazılmaz, dış bağlantıdan indirilmez | — |
 
 ## C. Güvenlik, dayanıklılık, bakım
 
@@ -37,15 +37,15 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | ~~C2~~ ✅ | **Bellek dışa/içe aktarma ve yaşlandırma** | **Eklendi:** JSON yedek indir/geri yükle, `unut:` komutu, 180 gün yaşlandırma | S |
 | ~~C3~~ ✅ | **Sağlayıcı yedeği ve kota sayacı** | **Eklendi:** 429/402/5xx’te tek denemeli yedek model, günlük istek/hata sayacı | M |
 | ~~C4~~ ✅ | **Açılışta kendi kendini kontrol** | **Eklendi:** `tanilama.py` 10 kontrol + Ayarlar › Sistem paneli | S |
-| C5 | **Telefondan erişim** | README’de bilinçli sınır. Ancak Tailscale/ZeroTier + token ile mümkün; **önerilmez** (yüzey alanı büyür) | L |
+| C5 | **Telefondan erişim** | README’de bilinçli sınır. Ancak Tailscale/ZeroTier + token ile mümkün; **önerilmez** (yüzey alanı büyür) — **bilinçli olarak yapılmadı**, gerekçe aşağıda | L |
 
 ## D. Deneyim / kozmetik
 
 | # | Eksik | Emek |
 | --- | --- | --- |
-| D1 | Ana sayfada “bugün” özeti (yaklaşan hatırlatıcı + defter bakiyesi + son bellek kayıtları) | S |
-| D2 | Klavye kısayolları (`/` komut paleti, `Esc` panel kapat) | S |
-| D3 | Tema seçimi (koyu/açık), yazı boyutu | S |
+| ~~D1~~ ✅ | **Eklendi:** ana sayfada “Bugün” kartı — hatırlatıcılar (geciken/bugün/hafta), defter bakiyesi, bugünün takvim etkinlikleri, son bellek kayıtları ve belge sayısı; `/api/today` + 2 dakikalık tazeleme | — |
+| ~~D2~~ ✅ | **Eklendi:** `/` veya `Ctrl+K` komut paleti (15 komut, filtre, ↑↓, Enter), `Esc` panel/palet kapatma | — |
+| ~~D3~~ ✅ | **Eklendi:** Ayarlar › Görünüm — Koyu/Açık/Sistem teması ve 13/14/16/18 px yazı boyutu (tarayıcıda saklanır) | — |
 
 ---
 
@@ -54,6 +54,9 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 - Onaysız komut/uygulama çalıştırma (OpenClaw modeli) — README sınırı.
 - CAPTCHA/giriş atlatma, gerçek para işlemi, AI’nın önerdiği komutu otomatik çalıştırma.
 - Tarayıcı erişimi “tam” modunu etkinleştirme; şu an yalnızca hazırlık tercihi.
+- **C5 — telefondan erişim**: sunucu yalnızca `127.0.0.1` dinler. Dışarı açmak token + TLS + yama yönetimi gerektirir
+  ve “yalnızca bu bilgisayar” sınırını bozar. İhtiyaç olursa önerilen yol: ayrı bir tünel (Tailscale/WireGuard)
+  kurup Emre'yi yine `127.0.0.1` üzerinde bırakmak. Kod tarafında değişiklik yapılmadı.
 
 ## Önerilen sıra
 
@@ -61,6 +64,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 2. ~~A5 (akışlı yanıt) + A4 (web araması)~~ ✅ (2026-11-03'te eklendi).
 4. ~~B1 (skill sistemi) + C1 (denetim izi) + C4 (tanılama)~~ ✅ (2026-11-03'te eklendi).
 5. ~~**B2** (akışlı TTS + barge-in)~~ ✅ — tam çift yönlü ses.
-6. ~~**B3** (belge okuma)~~ ✅ · ~~**B4** (takvim/e-posta)~~ ✅ — sırada **D1** (ana sayfada “bugün” özeti), **D2** (komut paleti), **B5** (görsel üretimi, sağlayıcıya bağlı).
+6. ~~**B3** (belge okuma)~~ ✅ · ~~**B4** (takvim/e-posta)~~ ✅.
+7. ~~**D1** (bugün özeti) + **D2** (komut paleti) + **D3** (tema/yazı boyutu) + **B5** (görsel üretimi)~~ ✅ (2026-11-03).
+   **Yol haritasındaki tüm maddeler kapandı**; yalnızca “bilinçli olarak yapılmayacaklar” listesi (C5, tam tarayıcı erişimi) açık.
 
 Yaklaşık toplam: A bloğu ~1,5 hafta, B1–B2 ~1 hafta, C1–C4 ~3 gün.

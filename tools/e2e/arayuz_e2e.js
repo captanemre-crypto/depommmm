@@ -818,6 +818,100 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     await sleep(400);
   });
 
+
+  await check('ana sayfa: "Bugün" kartı hatırlatıcı, defter ve belge özetini gösteriyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ana sayfa').click();
+    await sleep(800);
+    assert(!$('todayCard').hidden, 'bugün kartı görünmüyor');
+    const kartlar = [...$('todayGrid').querySelectorAll('.today-card')];
+    assert(kartlar.length >= 3, 'bugün kartı bölümleri eksik: ' + kartlar.length);
+    assert(/Hatırlatıcılar/.test($('todayGrid').textContent), 'hatırlatıcı bölümü yok');
+
+    await request('/api/reminders', {
+      body: JSON.stringify({ text: 'E2E bugün işi', due: new Date(Date.now() + 3600000).toISOString().slice(0, 16) }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    $('todayRefresh').click();
+    await sleep(1200);
+    assert(/E2E bugün işi/.test($('todayGrid').textContent), 'yeni hatırlatıcı özete yansımadı');
+    const tumu = await (await request('/api/reminders')).json();
+    for (const kayit of tumu.reminders.filter(r => /E2E bugün işi/.test(r.text))) {
+      await request('/api/reminders/delete', {
+        body: JSON.stringify({ id: kayit.id, confirmed: true }),
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {});
+    }
+  });
+
+  await check('komut paleti: "/" ile açılıyor, filtre ve Enter çalışıyor, Esc kapatıyor', async () => {
+    assert($('palette').hidden, 'palet başlangıçta açık');
+    d.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: '/', bubbles: true }));
+    await sleep(300);
+    assert(!$('palette').hidden, 'palet açılmadı');
+    const girdi = $('paletteInput');
+    girdi.value = 'hatırlat';
+    girdi.dispatchEvent(new window.Event('input'));
+    await sleep(200);
+    const satirlar = [...$('paletteList').querySelectorAll('li')];
+    assert(satirlar.length >= 1 && /Hatırlatıcı/.test(satirlar[0].textContent), 'filtre sonucu yok');
+
+    girdi.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(200);
+    assert($('palette').hidden, 'Esc paleti kapatmadı');
+
+    d.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+    await sleep(250);
+    assert(!$('palette').hidden, 'Ctrl+K paleti açmadı');
+    $('paletteInput').value = 'hatırlat';
+    $('paletteInput').dispatchEvent(new window.Event('input'));
+    await sleep(200);
+    $('paletteInput').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await sleep(900);
+    assert($('palette').hidden, 'Enter sonrası palet kapanmadı');
+    assert(!$('simplePage').hidden && /Hatırlatıcılar/.test($('simpleTitle').textContent),
+      'komut çalışmadı: ' + $('simpleTitle').textContent);
+  });
+
+  await check('görünüm: tema ve yazı boyutu değişiyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(600);
+    $('gorunumTab').click();
+    await sleep(900);
+    const metin = $('settingsBody').textContent;
+    assert(/Görünüm/.test(metin), 'görünüm sekmesi açılmadı');
+    assert(/Görsel üretimi/.test(metin), 'görsel üretimi bölümü yok');
+
+    const secimler = [...$('settingsBody').querySelectorAll('select')];
+    const tema = secimler[0], yazi = secimler[1];
+    tema.value = 'acik';
+    tema.dispatchEvent(new window.Event('change'));
+    await sleep(300);
+    assert(d.body.dataset.tema === 'acik', 'açık tema uygulanmadı: ' + d.body.dataset.tema);
+    assert(window.localStorage.getItem('emre-tema') === 'acik', 'tema kaydedilmedi');
+
+    yazi.value = '16';
+    yazi.dispatchEvent(new window.Event('change'));
+    await sleep(300);
+    assert(/16px/.test(d.body.style.getPropertyValue('--yazi')), 'yazı boyutu uygulanmadı');
+
+    tema.value = 'koyu';
+    tema.dispatchEvent(new window.Event('change'));
+    await sleep(200);
+    assert(d.body.dataset.tema === 'koyu', 'koyu temaya dönülmedi');
+  });
+
+  await check('görsel üret: panel açılıyor, sağlayıcı yokken açık hata veriyor', async () => {
+    window.showGorsel();
+    await sleep(500);
+    assert(!$('simplePage').hidden && /Görsel üret/.test($('simpleTitle').textContent), 'görsel paneli açılmadı');
+    const alan = $('simpleBody').querySelector('textarea');
+    assert(alan, 'istem alanı yok');
+    alan.value = 'gün batımı';
+    [...$('simpleBody').querySelectorAll('button')].find(b => b.textContent === 'Görsel üret').click();
+    await sleep(1200);
+    assert(/sağlayıcı|bağla/i.test($('simpleBody').textContent), 'sağlayıcı uyarısı yok: ' + $('simpleBody').textContent.slice(-160));
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));
