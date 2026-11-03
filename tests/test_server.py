@@ -3,6 +3,7 @@
 Sunucu rastgele bir portta, geçici bir veritabanıyla ayağa kaldırılır; testler
 gerçek Emre veritabanına (emre.sqlite3) dokunmaz.
 """
+import base64
 import json
 import sqlite3
 import sys
@@ -1035,6 +1036,143 @@ class ServerTestCase(unittest.TestCase):
             server.sqlite3.connect = original_connect
         self.assertGreater(counts['open'], 0)
         self.assertEqual(counts['open'], counts['close'], 'SQLite bağlantıları kapatılmıyor (fd sızıntısı)')
+
+    # --- B3: belgeler ----------------------------------------------------
+    def test_docs_import_text_base64_and_list(self):
+        icerik = base64.b64encode('Kira sözleşmesi 12 ay sürer.'.encode('utf-8')).decode()
+        veri = self.api('/api/docs/import', {'confirmed': True, 'name': 'kira.txt', 'content': icerik})
+        self.assertTrue(veri['ok'])
+        self.assertEqual(veri['name'], 'kira.txt')
+        liste = self.api('/api/docs')
+        self.assertEqual(len(liste['docs']), 1)
+        self.assertEqual(liste['docs'][0]['name'], 'kira.txt')
+
+    def test_docs_import_requires_confirmation(self):
+        hata = self.api('/api/docs/import', {'name': 'a.txt', 'content': 'eA=='}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_docs_import_from_path(self):
+        dosya = Path(self.tmp.name) / 'not.md'
+        dosya.write_text('Ödeme planı hazır.', encoding='utf-8')
+        veri = self.api('/api/docs/import', {'confirmed': True, 'path': str(dosya)})
+        self.assertEqual(veri['name'], 'not.md')
+
+    def test_docs_import_rejects_unknown_kind(self):
+        icerik = base64.b64encode(b'MZ').decode()
+        hata = self.api('/api/docs/import', {'confirmed': True, 'name': 'program.exe', 'content': icerik}, expect=400)
+        self.assertIn('Desteklenmeyen', hata['error'])
+
+    def test_docs_delete(self):
+        icerik = base64.b64encode('Silinecek belge.'.encode('utf-8')).decode()
+        belge_id = self.api('/api/docs/import', {'confirmed': True, 'name': 'sil.txt', 'content': icerik})['id']
+        self.api('/api/docs/delete', {'confirmed': True, 'id': belge_id})
+        self.assertEqual(self.api('/api/docs')['docs'], [])
+        self.api('/api/docs/delete', {'confirmed': True, 'id': belge_id}, expect=400)
+
+    def test_docs_delete_requires_confirmation(self):
+        self.api('/api/docs/delete', {'id': 1}, expect=400)
+
+    def test_docs_ask_without_docs_explains(self):
+        hata = self.api('/api/docs/ask', {'question': 'tutar ne kadar'}, expect=400)
+        self.assertIn('belge', hata['error'].lower())
+
+    def test_docs_ask_returns_sources(self):
+        icerik = base64.b64encode('Fatura toplamı 1500 TL. Son ödeme 12 Aralık.'.encode('utf-8')).decode()
+        self.api('/api/docs/import', {'confirmed': True, 'name': 'fatura.txt', 'content': icerik})
+        with mock.patch.object(server, 'request_json',
+                               return_value={'message': {'content': 'Fatura 1500 TL [1]'}}):
+            veri = self.api('/api/docs/ask', {'question': 'fatura toplamı ne kadar'})
+        self.assertIn('1500', veri['reply'])
+        self.assertTrue(veri['sources'])
+        self.assertEqual(veri['sources'][0]['name'], 'fatura.txt')
+
+    def test_chat_uses_document_context(self):
+        icerik = base64.b64encode('Sözleşme süresi 24 aydır.'.encode('utf-8')).decode()
+        belge_id = self.api('/api/docs/import', {'confirmed': True, 'name': 'soz.txt', 'content': icerik})['id']
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(server.SAG, 'sohbet', return_value={'content': '24 ay'}) as sahte:
+            self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'sözleşme kaç ay'}],
+                                   'backend': 'api', 'doc_id': belge_id})
+        gonderilen = sahte.call_args[0][0]
+        self.assertIn('24 aydır', gonderilen[0]['content'])
+
+    # --- B4: takvim ------------------------------------------------------
+    def test_calendar_without_path(self):
+        veri = self.api('/api/calendar')
+        self.assertEqual(veri['events'], [])
+        self.assertIn('tanımlı değil', veri['message'])
+
+    def test_calendar_path_setting_and_events(self):
+        from datetime import datetime, timedelta
+        basla = (datetime.now() + timedelta(days=2)).strftime('%Y%m%dT%H%M%S')
+        dosya = Path(self.tmp.name) / 'a.ics'
+        dosya.write_text('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:Toplantı\r\n'
+                         f'DTSTART:{basla}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n', encoding='utf-8')
+        self.api('/api/calendar/path', {'path': str(dosya)})
+        veri = self.api('/api/calendar?days=10')
+        self.assertEqual(len(veri['events']), 1)
+        self.assertEqual(veri['events'][0]['baslik'], 'Toplantı')
+
+    def test_calendar_path_rejects_missing_file(self):
+        hata = self.api('/api/calendar/path', {'path': str(Path(self.tmp.name) / 'yok.ics')}, expect=400)
+        self.assertIn('bulunamadı', hata['error'])
+
+    def test_chat_calendar_rule(self):
+        from datetime import datetime, timedelta
+        basla = (datetime.now() + timedelta(days=1)).strftime('%Y%m%dT%H%M%S')
+        dosya = Path(self.tmp.name) / 'b.ics'
+        dosya.write_text('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:Diş randevusu\r\n'
+                         f'DTSTART:{basla}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n', encoding='utf-8')
+        self.api('/api/calendar/path', {'path': str(dosya)})
+        veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'bu hafta takvimde ne var'}]})
+        self.assertIn('Diş randevusu', veri['reply'])
+
+    # --- B4: posta -------------------------------------------------------
+    def test_mail_without_path(self):
+        veri = self.api('/api/mail')
+        self.assertEqual(veri['messages'], [])
+        self.assertIn('tanımlı değil', veri['message'])
+
+    def test_mail_path_setting_and_list(self):
+        dosya = Path(self.tmp.name) / 'a.eml'
+        dosya.write_text('From: ahmet@ornek.com\nTo: emre@ornek.com\nSubject: Fatura\n'
+                         'Date: Fri, 06 Nov 2026 09:30:00 +0300\n\nFatura ektedir.\n', encoding='utf-8')
+        self.api('/api/mail/path', {'path': str(dosya)})
+        veri = self.api('/api/mail?limit=5')
+        self.assertEqual(len(veri['messages']), 1)
+        self.assertEqual(veri['messages'][0]['konu'], 'Fatura')
+
+    def test_mail_path_rejects_unknown_folder(self):
+        hata = self.api('/api/mail/path', {'path': str(Path(self.tmp.name) / 'yok')}, expect=400)
+        self.assertIn('bulunamadı', hata['error'])
+
+    def test_chat_mail_rule(self):
+        dosya = Path(self.tmp.name) / 'b.eml'
+        dosya.write_text('From: ahmet@ornek.com\nTo: emre@ornek.com\nSubject: Ödeme\n'
+                         'Date: Fri, 06 Nov 2026 09:30:00 +0300\n\nÖdeme yapıldı.\n', encoding='utf-8')
+        self.api('/api/mail/path', {'path': str(dosya)})
+        veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'son mailleri özetle'}]})
+        self.assertIn('Ödeme', veri['reply'])
+
+    # --- B2: akışlı seslendirme -----------------------------------------
+    def test_tts_settings_default_on(self):
+        durum = self.api('/api/system/status')
+        self.assertTrue(durum['tts']['akis'])
+        self.assertTrue(durum['tts']['barge_in'])
+
+    def test_tts_settings_toggle(self):
+        veri = self.api('/api/system/tts', {'akis': False, 'barge_in': False})
+        self.assertFalse(veri['akis'])
+        self.assertFalse(self.api('/api/system/status')['tts']['barge_in'])
+        self.api('/api/system/tts', {'akis': 'evet'}, expect=400)
+
+    def test_tts_split_sentences(self):
+        veri = self.api('/api/tts/split', {'text': 'Birinci cümle. İkinci cümle!'})
+        self.assertEqual(veri['sentences'], ['Birinci cümle.', 'İkinci cümle!'])
+
+    def test_tts_split_rejects_long_text(self):
+        self.api('/api/tts/split', {'text': 'a' * 7000}, expect=400)
+        self.api('/api/tts/split', {'text': 5}, expect=400)
 
 
 if __name__ == '__main__':

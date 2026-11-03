@@ -24,9 +24,9 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | # | Eksik | Notlar | Emek |
 | --- | --- | --- | --- |
 | ~~B1~~ ✅ | **Skill (yetenek) sistemi** | **Eklendi (2026-11-03):** `beceriler/<ad>/SKILL.md` + alt süreçle çalıştırma, `!ad` komutu, arayüz paneli, örnek beceri | M |
-| B2 | **Akışlı TTS + barge-in** | Yanıtı cümle cümle seslendir, kullanıcı konuşmaya başlayınca sesi kes. Şu an tek parça WAV | M |
-| B3 | **Belge okuma ve soru-cevap** | PDF/Word/txt içe aktarma, yerel parçalama + arama, yanıtta sayfa referansı | L |
-| B4 | **Takvim / e-posta** | ICS okuma (salt okunur, en güvenli seçenek); IMAP ile “son 10 maili özetle” | L |
+| ~~B2~~ ✅ | **Akışlı TTS + barge-in** | **Eklendi (2026-11-03):** `sesli_yanit.py` cümle bölme + akış parçalayıcı + hiserezisli söz kesme; `/api/tts/split`, `/api/system/tts`, Ayarlar › Ses anahtarları | — |
+| ~~B3~~ ✅ | **Belge okuma ve soru-cevap** | **Eklendi:** `belge.py` (PDF/DOCX/txt/md/csv/html, stdlib), parçalama + aksan duyarsız arama, `/api/docs/*`, kaynak numaralı yanıt, Ayarlar › Belgeler | — |
+| ~~B4~~ ✅ | **Takvim / e-posta** | **Eklendi:** `takvim.py` (.ics, salt okunur) ve `posta.py` (.eml/.mbox, salt okunur); **IMAP/SMTP bilinçli olarak yok** (parola + dış ağ gerekir) | — |
 | B5 | **Görsel üretimi** | Ücretli servis gerektirir; sağlayıcı katmanına eklenebilir | S (servis varsa) |
 
 ## C. Güvenlik, dayanıklılık, bakım
@@ -60,7 +60,7 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 1. ~~A1 + A2 + A3~~ ✅ (2026-11-03'te eklendi: otomatik başlatma, global dikte kısayolu, sunucu taraflı hatırlatıcı).
 2. ~~A5 (akışlı yanıt) + A4 (web araması)~~ ✅ (2026-11-03'te eklendi).
 4. ~~B1 (skill sistemi) + C1 (denetim izi) + C4 (tanılama)~~ ✅ (2026-11-03'te eklendi).
-5. **B2** (akışlı TTS + barge-in) — tam çift yönlü ses.
-6. ~~C2 + C3~~ ✅ (2026-11-03'te eklendi). Sırada: **B2** (akışlı TTS + barge-in), **B3** (belge okuma), **B4** (takvim/e-posta).
+5. ~~**B2** (akışlı TTS + barge-in)~~ ✅ — tam çift yönlü ses.
+6. ~~**B3** (belge okuma)~~ ✅ · ~~**B4** (takvim/e-posta)~~ ✅ — sırada **D1** (ana sayfada “bugün” özeti), **D2** (komut paleti), **B5** (görsel üretimi, sağlayıcıya bağlı).
 
 Yaklaşık toplam: A bloğu ~1,5 hafta, B1–B2 ~1 hafta, C1–C4 ~3 gün.

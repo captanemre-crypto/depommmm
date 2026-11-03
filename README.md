@@ -63,7 +63,7 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**436 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği ve sağlayıcı yedek modelini kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**553 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
 `tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (51 kontrol).
@@ -174,6 +174,79 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Akışlı seslendirme, belge okuma, takvim ve posta (2026-11-03 · altıncı tur)
+
+Bu tur `YOL_HARITASI.md` içindeki **B2**, **B3** ve **B4** maddelerini kapatır. Hepsi **standart kütüphane** ile
+çalışır: ek paket, bulut hesabı veya dış ağ bağlantısı yoktur.
+
+### 1. Akışlı seslendirme + söz kesme (B2)
+
+- Yanıt yazılmaya başlar başlamaz **ilk cümle** seslendirilir; kalan cümleler arka planda hazırlanır.
+  Böylece 10 saniyelik bir yanıtın tamamı beklenmez (`sesli_yanit.AkisParcalayici`).
+- Kısaltmalar (`Dr.`, `vb.`, `14.30`) cümle sonu sayılmaz; çok uzun cümleler kelime sınırından bölünür (en fazla 220 karakter).
+- **Söz kesme (barge-in)**: mikrofon açıkken okuma sürerken sen konuşmaya başlarsan Emre susar ve seni dinlemeye geçer.
+  Yanlış tetiklemeyi önlemek için eşik üstünde **3 ardışık ölçüm** gerekir (`sesli_yanit.BargeIn`).
+- Ayar: Ayarlar › Ses › **Akışlı seslendirme** ve **Söz kesme** anahtarları (varsayılan açık).
+  Kapalıyken eski davranış: yanıt bittiğinde tek parça okunur.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/system/tts` | `{akis?: bool, barge_in?: bool}` → anahtarları kaydeder |
+| `POST /api/tts/split` | `{text}` → `{sentences:[…]}` (cümlelere bölme; istemci de aynı mantığı kullanır) |
+
+### 2. Belge okuma ve belgeye soru sorma (B3)
+
+- Ayarlar › **Belgeler** sekmesinden PDF, Word (`.docx`), `.txt`, `.md`, `.csv`, `.json`, `.log`, `.html` ekle.
+- Dosya **hiçbir yere yüklenmez**; sunucu metni çıkarır, sayfalara ve ~900 karakterlik parçalara böler,
+  `docs` / `doc_chunks` tablolarına yazar. Tarayıcı yalnızca dosyayı base64 olarak yerel sunucuya iletir.
+- **Belgeye sor**: soruyla en çok eşleşen bölümler bulunur, modele `[1] dosya · sayfa N` biçiminde kaynak verilir
+  ve yanıtta kaynak numarası istenir. Ekranda kaynak listesi (dosya + sayfa) gösterilir.
+- Arama Türkçe aksan duyarsızdır: `sukru` → `Şükrü`, `CARSAMBA` → `Çarşamba`.
+- Sohbette `doc_id` gönderilirse (veya `belgeye sor: …` yazılırsa) ilgili bölümler sohbet bağlamına eklenir.
+- Sınırlar: 20 MB dosya, 2000 sayfa, parça başına 900 karakter. **Taranmış (görüntü) PDF'lerde OCR yoktur**;
+  metin bulunamazsa açık hata döner.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/docs/import` | `{confirmed:true, name, content(base64)}` **veya** `{confirmed:true, path:'C:\\…\\a.pdf'}` |
+| `GET /api/docs` | `{docs:[{id,name,kind,pages,chars,created}]}` |
+| `POST /api/docs/delete` | `{id, confirmed:true}` → `{deleted}` (parçalar da silinir) |
+| `POST /api/docs/ask` | `{question, id?}` → `{reply, sources:[{name,sayfa}], docs}` |
+
+### 3. Takvim ve posta (B4) — salt okunur
+
+- **Takvim**: `.ics` dosyası veya `.ics` dosyaları olan bir klasör. `SUMMARY`, `DTSTART`, `DTEND`, `LOCATION`,
+  `DESCRIPTION` okunur; `TZID`, `RRULE` ve katlanmış satırlar desteklenir. Tekrarlayan etkinliklerde yalnızca
+  ilk oluşum listelenir ve `⟳` ile işaretlenir.
+- **Posta**: `.eml`, `.mbox` veya `.eml` dolu bir klasör. Gönderen, konu, tarih ve kısa önizleme okunur;
+  ekler **açılmaz**, ileti **gönderilmez/silinmez**.
+- Sohbette kural tabanlı tetikleme: “bu hafta takvimde ne var”, “yarın randevu var mı”, “son mailleri özetle”.
+  Bu sorular model kapalıyken de yanıtlanır (Ollama/API gerekmez).
+- **Bilinçli sınır**: IMAP/SMTP **yoktur**. Hesaba bağlanmak parola saklamayı ve dış ağa çıkmayı gerektirir;
+  Emre'nin “yalnızca 127.0.0.1, onaysız dış işlem yok” kuralıyla çelişir. Bu yüzden posta yalnızca
+  bilgisayarındaki dosyalardan okunur.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/calendar?days=7` | `{path, events:[…], total}`; yol yoksa `message` alanı açıklama verir |
+| `POST /api/calendar/path` | `{path}` → yolu doğrular ve kaydeder (boş gönderim kaldırır) |
+| `GET /api/mail?limit=10` | `{path, messages:[…], total}` |
+| `POST /api/mail/path` | `{path}` → `.eml`/`.mbox`/klasör yolu |
+
+### 4. Windows'ta nasıl denerim?
+
+1. Ayarlar › **Belgeler** → “Dosya seç” → bir PDF/Word/txt seç → “Seçilen dosyayı ekle”.
+2. Aynı sekmede soru yaz → “Belgeye sor”. Yanıtın altında “Kaynaklar: [1] dosya.pdf · sayfa 3” görünür.
+3. Ayarlar › **Takvim & posta** → takvim dosyanın yolunu yaz (örn. `C:\Users\SERVER\Desktop\takvim.ics`) →
+   “Takvim yolunu kaydet” → “Bu haftayı göster”.
+4. Ana ekranda mikrofona bas ve “bu hafta takvimde ne var” de; Emre kendi okur.
+5. Mikrofon açıkken Emre konuşurken araya gir: okuma durur, seni dinlemeye geçer (söz kesme).
+
+### Testler
+
+`test_sesli_yanit.py` (15), `test_belge.py` (35), `test_takvim.py` (26), `test_posta.py` (20),
+`test_server.py` +29 → **553 test**. Arayüz E2E **54/54**.
 
 ## Bellek yedeği ve sağlayıcı dayanıklılığı (2026-11-03 · beşinci tur)
 

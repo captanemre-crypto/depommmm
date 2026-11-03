@@ -738,6 +738,86 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert($('dictation').hidden, 'panel kapanmadı');
   });
 
+
+  await check('belgeler sekmesi: metin belgesi yükleniyor, listede görünüyor ve siliniyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(500);
+    $('docsTab').click();
+    await sleep(900);
+    assert(/Belgeler/.test($('settingsBody').textContent), 'belge sekmesi açılmadı');
+
+    const dosyaGirdi = $('settingsBody').querySelector('input[type=file]');
+    assert(dosyaGirdi, 'dosya seçimi yok');
+    const dosya = new window.File(['Kira sözleşmesi 12 ay sürer. Kira 15000 TL.'], 'e2e-kira.txt', { type: 'text/plain' });
+    Object.defineProperty(dosyaGirdi, 'files', { value: [dosya], configurable: true });
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Seçilen dosyayı ekle').click();
+    await sleep(1500);
+    assert(/e2e-kira\.txt/.test($('settingsBody').textContent), 'belge listede yok: ' + $('settingsBody').textContent.slice(0, 300));
+
+    // Belgeye sor: kaynak gösterilmeli
+    const soru = [...$('settingsBody').querySelectorAll('input')].find(i => /Belgeye soru/.test(i.placeholder || ''));
+    assert(soru, 'soru alanı yok');
+    soru.value = 'kira kaç ay';
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Belgeye sor').click();
+    await sleep(2500);
+    const metin = $('settingsBody').textContent;
+    assert(/Kaynaklar|bulamadım|bağlantı/i.test(metin), 'soru sonucu görünmedi: ' + metin.slice(-200));
+
+    // Silme (onay kutalı)
+    [...$('settingsBody').querySelectorAll('button')].filter(b => b.textContent === 'Sil')[0].click();
+    await sleep(1200);
+    assert(!/e2e-kira\.txt/.test($('settingsBody').textContent), 'belge silinmedi');
+  });
+
+  await check('takvim sekmesi: .ics yolu kaydediliyor ve etkinlik listeleniyor', async () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const yol = path.join(os.tmpdir(), 'e2e-takvim-' + Date.now() + '.ics');
+    const ikiGunSonra = new Date(Date.now() + 2 * 86400000);
+    const damga = ikiGunSonra.getFullYear().toString()
+      + String(ikiGunSonra.getMonth() + 1).padStart(2, '0')
+      + String(ikiGunSonra.getDate()).padStart(2, '0') + 'T140000';
+    fs.writeFileSync(yol, 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:E2E toplantı\r\n'
+      + 'DTSTART:' + damga + '\r\nLOCATION:Ofis\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n', 'utf8');
+
+    $('calendarTab').click();
+    await sleep(900);
+    const yollar = [...$('settingsBody').querySelectorAll('input')];
+    assert(yollar.length >= 2, 'takvim/posta alanları yok');
+    yollar[0].value = yol;
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Takvim yolunu kaydet').click();
+    await sleep(900);
+    [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Bu haftayı göster').click();
+    await sleep(1200);
+    assert(/E2E toplantı/.test($('settingsBody').textContent), 'etkinlik görünmedi: ' + $('settingsBody').textContent.slice(-300));
+
+    // Sohbet kuralı: takvim sorusu model olmadan yanıtlanır
+    const sohbet = await request('/api/chat', {
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'bu hafta takvimde ne var' }] }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const govde = await sohbet.json();
+    assert(/E2E toplantı/.test(govde.reply || ''), 'sohbet takvim yanıtı: ' + (govde.reply || '').slice(0, 120));
+    fs.unlinkSync(yol);
+  });
+
+  await check('ses ayarları: akışlı seslendirme ve söz kesme anahtarları', async () => {
+    $('voiceTab').click();
+    await sleep(1000);
+    const metin = $('settingsBody').textContent;
+    assert(/Akışlı seslendirme/.test(metin), 'akışlı seslendirme anahtarı yok');
+    assert(/Söz kesme/.test(metin), 'söz kesme anahtarı yok');
+    const onaylar = [...$('settingsBody').querySelectorAll('input[type=checkbox]')];
+    const akis = onaylar.find(x => x.checked);
+    assert(akis, 'akışlı seslendirme varsayılan açık değil');
+    akis.click();
+    await sleep(400);
+    assert(window.localStorage.getItem('emre-tts-akis') === '0', 'akış ayarı kaydedilmedi');
+    akis.click();
+    await sleep(400);
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));

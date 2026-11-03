@@ -28,19 +28,26 @@ Ek olarak: **`/api/chat` sıralaması düzeltildi** — Ollama model kontrolü k
 
 ```bash
 ruff check .                                  # All checks passed
-python3 -m unittest discover -s tests -t .    # Ran 80 tests ... OK
-cd tools/e2e && npm test                      # 30/30 kontrol, JS hatası yok
+python3 -m unittest discover -s tests -t .    # Ran 553 tests ... OK
+cd tools/e2e && npm test                      # 54/54 kontrol, JS hatası yok
 ```
 
 | Paket | Test sayısı |
 |---|---|
-| `tests/test_server.py` (HTTP) | 30 |
+| `tests/test_server.py` (HTTP) | 123 + 29 = 152 |
+| `tests/test_bellek.py` | 27 |
+| `tests/test_saglayici.py` | 37 |
+| `tests/test_belge.py` | 35 |
+| `tests/test_takvim.py` | 26 |
+| `tests/test_posta.py` | 20 |
+| `tests/test_sesli_yanit.py` | 15 |
 | `tests/test_ledger_tools.py` | 15 |
 | `tests/test_zaman_ayristir.py` | 11 |
 | `tests/test_hatirlatici.py` | 7 |
 | `tests/test_arena_bridge.py` | 5 |
 | `tests/test_piper_indir.py` | 5 |
 | `tests/test_yerel_isci.py` | 7 |
+| **Toplam** | **553** |
 
 E2E paketi: 30 kontrol (menü, defter, hatırlatıcı, sohbetten hatırlatıcı, sunucu geçmişi, CSV/yedek indirme, ayarlar sekmeleri, geliştirici, mikrofon, 403, erişilebilirlik, Escape, sürüm, Telegram durumu, token'ın depolanmaması).
 
@@ -282,6 +289,28 @@ Bilinçli sınırlar:
 | U5 | Kota sayacı: `provider_usage` tablosu, `kota_artir()/kota_ozet()`, `/api/provider/usage`, `/api/provider/fallback` | ✅ |
 | U6 | Arayüz: Bellek sekmesinde yedek indir / geri yükle / yaşlandır; Sistem sekmesinde kota satırı + yedek model alanı | ✅ |
 | U7 | Testler: `test_bellek` +12, `test_saglayici` +10, `test_server` +14 → **436 test**; E2E **51/51** | ✅ |
+
+## Ek tur: akışlı seslendirme, belge okuma, takvim ve posta (2026-11-03 · altıncı tur)
+
+**İstek:** “kalanları bitir” — `YOL_HARITASI.md` B2, B3 ve B4.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| V1 | `sesli_yanit.py`: `cumlelere_ayir` (kısaltma koruması, 220 karakter sınırı), `AkisParcalayici` (akan metni cümle cümle verir), `BargeIn` (eşik + 3 ardışık ölçüm + 1,5 sn soğuma) | ✅ |
+| V2 | `belge.py`: stdlib ile PDF (`FlateDecode` + `Tj/TJ`), DOCX (ZIP + XML), HTML, txt/md/csv/json/log metin çıkarma; sayfa ve parça bölme; `docs`/`doc_chunks` tabloları; Türkçe aksan duyarsız arama | ✅ |
+| V3 | `takvim.py`: `.ics` salt okunur okuma (TZID, RRULE, katlanmış satır), `yaklasan`, `metin_ozet`, `gerekiyor_mu` | ✅ |
+| V4 | `posta.py`: `.eml` / `.mbox` / klasör salt okunur okuma; RFC 2047 ve 8 bit Türkçe başlık onarımı; `sirala`, `metin_ozet`, `gerekiyor_mu` | ✅ |
+| V5 | `server.py`: `/api/docs/*`, `/api/calendar`, `/api/calendar/path`, `/api/mail`, `/api/mail/path`, `/api/tts/split`, `/api/system/tts`; sohbette belge bağlamı ve takvim/posta kural yanıtları | ✅ |
+| V6 | `index.html`: Ayarlar › **Belgeler** (yükleme, listeleme, silme, belgeye sor) ve **Takvim & posta** sekmeleri; Ses sekmesinde akışlı seslendirme ve söz kesme anahtarları; akış sırasında cümle cümle okuma | ✅ |
+| V7 | Testler: `test_sesli_yanit` (15), `test_belge` (35), `test_takvim` (26), `test_posta` (20), `test_server` +29 → **553 test**; E2E **54/54** | ✅ |
+
+Bilinçli sınırlar:
+
+- **IMAP/SMTP yok**: hesaba bağlanmak parola saklamayı ve dış ağa çıkmayı gerektirir; posta yalnızca yerel dosyalardan okunur.
+- Taranmış PDF'lerde **OCR yok**; metin bulunamazsa açık hata döner.
+- Belge yedeği şifrelenmez; içerik `docs`/`doc_chunks` tablolarında düz metindir.
+- Belge araması kelime tabanlıdır (gömme/vektör arama yok); çok uzun belgelerde en iyi 5 parça getirilir.
+- Takvimde tekrarlayan etkinliklerin yalnızca ilk oluşumu gösterilir; seriyi genişletmek takvim uygulamasının işidir.
 
 Bilinçli sınırlar:
 

@@ -22,6 +22,7 @@ from urllib.parse import unquote_plus, urlparse
 import arama
 import arena_bridge
 import beceriler
+import belge
 import bellek
 import bildirim
 import denetim
@@ -33,8 +34,11 @@ import kisayol
 import ledger_tools
 import mcp_istemci
 import otomatik_baslat
+import posta
 import saglayici
 import ses_baglanti
+import sesli_yanit
+import takvim
 import tanilama
 import telegram_bot
 import tts_piper_bridge
@@ -47,7 +51,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.5'
+VERSION = '2026-11-03.6'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -57,6 +61,10 @@ VARSAYILAN_AYARLAR = {
     'kisayol_tus': kisayol.VARSAYILAN,
     'kisayol_tarayici': '1',
     'bildirim_aktif': '1',
+    'tts_akis': '1',
+    'barge_in': '1',
+    'takvim_yolu': '',
+    'posta_yolu': '',
 }
 
 
@@ -124,6 +132,11 @@ def _init_schema(conn, path):
         CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, action TEXT NOT NULL,
             detail TEXT NOT NULL DEFAULT "", status TEXT NOT NULL DEFAULT "ok", created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT "", pages INTEGER NOT NULL DEFAULT 0, chars INTEGER NOT NULL DEFAULT 0,
+            created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS doc_chunks (id INTEGER PRIMARY KEY AUTOINCREMENT, doc_id INTEGER NOT NULL,
+            sayfa INTEGER NOT NULL DEFAULT 0, metin TEXT NOT NULL, arama TEXT NOT NULL DEFAULT "");
         CREATE TABLE IF NOT EXISTS provider_usage (day TEXT PRIMARY KEY, requests INTEGER NOT NULL DEFAULT 0,
             errors INTEGER NOT NULL DEFAULT 0, fallback INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL, seen INTEGER DEFAULT 0);
@@ -137,6 +150,7 @@ def _init_schema(conn, path):
     if 'raw_text' not in columns:
         conn.execute('ALTER TABLE ledger ADD COLUMN raw_text TEXT')
     # Hatırlatıcının bir kez bildirildiğini işaretleyen kolon (A3)
+    belge.kur(conn)
     rcolumns = {row[1] for row in conn.execute('PRAGMA table_info(reminders)')}
     if 'notified' not in rcolumns:
         conn.execute('ALTER TABLE reminders ADD COLUMN notified INTEGER DEFAULT 0')
@@ -436,6 +450,64 @@ def sohbet_istegi(data):
     return clean, last_user, session, backend, selected, api_model
 
 
+def belge_baglami(metin, doc_id=None, limit=4):
+    """Belgeye soru sorulduysa ilgili parçaları kaynak numaralı metne çevirir."""
+    metin = str(metin or '')
+    soru = metin.split(':', 1)[1] if ':' in metin and metin.lower().startswith(('belgeye sor', 'belge:')) else metin
+    if doc_id in (None, '', 0, '0', 'all'):
+        doc_id = None
+    else:
+        try:
+            doc_id = int(doc_id)
+        except (TypeError, ValueError):
+            doc_id = None
+    with db() as c:
+        parcalar = belge.ara(c, soru, doc_id=doc_id, limit=limit)
+    if not parcalar:
+        return '', []
+    return belge.baglam(parcalar), parcalar
+
+
+def takvim_yaniti(metin, gun=7):
+    """Takvim sorusuysa kural tabanlı yanıt üretir; değilse (None, None)."""
+    if not takvim.gerekiyor_mu(metin):
+        return None, None
+    with db() as c:
+        yol = ayar_al(c, 'takvim_yolu', '')
+    if not yol:
+        return ('Takvim dosyası tanımlı değil. Ayarlar › Takvim ve posta bölümünden bir .ics dosyası '
+                'veya klasör seç.'), None
+    try:
+        hepsi = takvim.yolu_oku(yol)
+    except ValueError as hata:
+        return f'Takvim okunamadı: {hata}', None
+    if 'yarın' in metin.lower():
+        gun = 2
+    elif 'hafta' in metin.lower():
+        gun = 7
+    elif 'bugün' in metin.lower():
+        gun = 1
+    _denetle('takvim', 'takvim okundu', f'{len(hepsi)} etkinlik')
+    return takvim.metin_ozet(hepsi, gun=gun), hepsi
+
+
+def posta_yaniti(metin, adet=5):
+    """Posta sorusuysa son iletileri özetler; değilse (None, None)."""
+    if not posta.gerekiyor_mu(metin):
+        return None, None
+    with db() as c:
+        yol = ayar_al(c, 'posta_yolu', '')
+    if not yol:
+        return ('Posta kaynağı tanımlı değil. Ayarlar › Takvim ve posta bölümünden bir .eml/.mbox '
+                'dosyası veya klasör seç. (Emre e-posta hesabına bağlanmaz; yalnızca yerel dosyaları okur.)'), None
+    try:
+        mesajlar = posta.yolu_oku(yol)
+    except ValueError as hata:
+        return f'Posta okunamadı: {hata}', None
+    _denetle('posta', 'posta okundu', f'{len(mesajlar)} ileti')
+    return posta.metin_ozet(mesajlar, adet=adet), None
+
+
 def beceri_cagrisi(metin):
     """`!beceri-adı ...` yazılmışsa beceriyi çalıştırır; (yanıt, beceri) döndürür."""
     ad, kalan = beceriler.acik_komut(metin)
@@ -541,6 +613,10 @@ class Handler(BaseHTTPRequestHandler):
             bellek.kaydet_cikarimlar(c,last_user,source='sohbet')
             kisisel=bellek.baglam(c,last_user,limit=5)
         web_metin, kaynaklar = web_baglami(last_user, data.get('web'))
+        belge_metin, belge_kaynaklar = belge_baglami(last_user, data.get('doc_id'))
+        if belge_metin:
+            kaynaklar = list(kaynaklar or []) + [{'title': x['name'] + ' · sayfa ' + str(x['sayfa']),
+                                                 'url': ''} for x in belge_kaynaklar]
 
         def tek_parca(metin):
             self.sse_basla()
@@ -552,6 +628,10 @@ class Handler(BaseHTTPRequestHandler):
         unut_yanit, _ = unutma_cagrisi(last_user)
         if unut_yanit is not None:
             return tek_parca(unut_yanit)
+        for kural in (takvim_yaniti, posta_yaniti):
+            yanit, _veri = kural(last_user)
+            if yanit is not None:
+                return tek_parca(yanit)
         beceri_yanit, _ = beceri_cagrisi(last_user)
         if beceri_yanit is not None:
             return tek_parca(beceri_yanit)
@@ -576,7 +656,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError('Bilinmeyen yapay zekâ bağlantısı.')
 
         beceri_metin=beceriler.baglam()
-        system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kısa ve doğrudan yanıt ver.'
+        system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+(' '+belge_metin if belge_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kısa ve doğrudan yanıt ver.'
         mesajlar=[{'role':'system','content':system}]+clean
         self.sse_basla()
         self.sse({'type':'start','sources':kaynaklar})
@@ -759,6 +839,27 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(kota_ozet(gun))
             if path=='/api/wake/status':
                 return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/docs':
+                with db() as c: belgeler=belge.listele(c)
+                return self.out({'docs':belgeler})
+            if path=='/api/calendar':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: gun=max(int(query.get('days',7)),1)
+                except ValueError: gun=7
+                with db() as c: yol=ayar_al(c,'takvim_yolu','')
+                if not yol: return self.out({'path':'','events':[],'message':'Takvim yolu tanımlı değil.'})
+                try: hepsi=takvim.yolu_oku(yol)
+                except ValueError as hata: return self.out({'path':yol,'events':[],'error':str(hata)})
+                return self.out({'path':yol,'events':takvim.yaklasan(hepsi,gun=gun),'total':len(hepsi)})
+            if path=='/api/mail':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: adet=max(int(query.get('limit',10)),1)
+                except ValueError: adet=10
+                with db() as c: yol=ayar_al(c,'posta_yolu','')
+                if not yol: return self.out({'path':'','messages':[],'message':'Posta yolu tanımlı değil.'})
+                try: mesajlar=posta.yolu_oku(yol)
+                except ValueError as hata: return self.out({'path':yol,'messages':[],'error':str(hata)})
+                return self.out({'path':yol,'messages':posta.sirala(mesajlar)[:min(adet,50)],'total':len(mesajlar)})
             if path=='/api/skills':
                 with db() as c: web_acik=ayar_al(c,'web_arama','1')=='1'
                 return self.out({'skills':beceriler.listele(),'folder':str(beceriler.KOK),
@@ -780,6 +881,10 @@ class Handler(BaseHTTPRequestHandler):
                     tarayici=ayar_al(c,'kisayol_tarayici','1')=='1'
                     tus=ayar_al(c,'kisayol_tus',kisayol.VARSAYILAN)
                     web_acik=ayar_al(c,'web_arama','1')=='1'
+                    tts_akis=ayar_al(c,'tts_akis','1')=='1'
+                    barge_in=ayar_al(c,'barge_in','1')=='1'
+                    takvim_yolu=ayar_al(c,'takvim_yolu','')
+                    posta_yolu=ayar_al(c,'posta_yolu','')
                     bekleyen=c.execute('SELECT COUNT(*) FROM notifications WHERE seen=0').fetchone()[0]
                 durum=dict(KISAYOL.durum())
                 durum['acik']=kisayol_acik
@@ -790,6 +895,9 @@ class Handler(BaseHTTPRequestHandler):
                                  'hotkey':durum,'hotkey_tarayici':tarayici,
                                  'notifications':{'aktif':bildirim_acik,'bekleyen':bekleyen},
                                  'web':{'aktif':web_acik},
+                                 'tts':{'akis':tts_akis,'barge_in':barge_in},
+                                 'calendar':{'path':takvim_yolu},
+                                 'mail':{'path':posta_yolu},
                                  'version':VERSION})
             if path=='/api/hotkey/poll':
                 query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
@@ -1206,11 +1314,18 @@ class Handler(BaseHTTPRequestHandler):
                     bellek.kaydet_cikarimlar(c,last_user,source='sohbet')
                     kisisel=bellek.baglam(c,last_user,limit=5)
                 web_metin, kaynaklar = web_baglami(last_user, data.get('web'))
+                belge_metin, belge_kaynaklar = belge_baglami(last_user, data.get('doc_id'))
+                if belge_metin:
+                    kaynaklar = list(kaynaklar or []) + [{'title': x['name'] + ' · sayfa ' + str(x['sayfa']),
+                                                         'url': ''} for x in belge_kaynaklar]
                 def yanitla(text, kaynaklar=None):
                     if session: store_message(session,'assistant',text)
                     return self.out({'reply':text,'sources':kaynaklar or []})
                 unut_yanit, _silinen = unutma_cagrisi(last_user)
                 if unut_yanit is not None: return yanitla(unut_yanit)
+                for kural in (takvim_yaniti, posta_yaniti):
+                    yanit, _veri = kural(last_user)
+                    if yanit is not None: return yanitla(yanit)
                 beceri_yanit, beceri_adi = beceri_cagrisi(last_user)
                 if beceri_yanit is not None: return yanitla(beceri_yanit)
                 direct=ledger_tools.create_account_from_text(last_user,db)
@@ -1234,7 +1349,7 @@ class Handler(BaseHTTPRequestHandler):
                     if selected.lower().startswith('qwen3'):
                         clean[-1]['content'] += '\n/no_think'
                 beceri_metin=beceriler.baglam()
-                system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
+                system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+(' '+belge_metin if belge_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
                 if backend=='openjarvis':
                     if selected not in ('emre-cpu','emre-cpu:latest'): return self.out({'error':'OpenJarvis için önce emre-cpu modelini oluştur ve Ayarlar’dan seç.'},400)
                     # Client-supplied tools keep tool execution under Emre's validation.
@@ -1368,6 +1483,91 @@ class Handler(BaseHTTPRequestHandler):
                 SAG.yedek_ayarla(model)
                 _denetle('saglayici','yedek model ayarlandı',model or '(kaldırıldı)')
                 return self.out({'ok':True,'status':SAG.durum()})
+            if path=='/api/docs/import':
+                if data.get('confirmed') is not True: raise ValueError('Belge eklemek için onay gerekli.')
+                yol=data.get('path'); ad=data.get('name'); icerik=data.get('content')
+                with db() as c:
+                    if isinstance(yol,str) and yol.strip():
+                        sonuc=belge.dosya_ekle(c,yol.strip())
+                    elif isinstance(icerik,str) and icerik.strip():
+                        if not isinstance(ad,str) or not ad.strip(): raise ValueError('Dosya adı gerekli.')
+                        sonuc=belge.icerik_ekle(c,ad.strip(),icerik,kind=str(data.get('kind') or ''))
+                    else: raise ValueError('Dosya yolu veya içerik gerekli.')
+                _denetle('belge','belge eklendi',f'{sonuc["name"]} · {sonuc["pages"]} sayfa')
+                return self.out({'ok':True,**sonuc})
+            if path=='/api/docs/delete':
+                if data.get('confirmed') is not True: raise ValueError('Belge silmek için onay gerekli.')
+                with db() as c: sayi=belge.sil(c,int(data.get('id') or 0))
+                if not sayi: raise ValueError('Belge bulunamadı.')
+                _denetle('belge','belge silindi',f'id={data.get("id")}')
+                return self.out({'ok':True,'deleted':sayi})
+            if path=='/api/docs/ask':
+                soru=str(data.get('question') or '').strip()[:600]
+                if not soru: raise ValueError('Soru gerekli.')
+                doc_id=data.get('id')
+                with db() as c:
+                    belgeler=belge.listele(c)
+                    if not belgeler: raise ValueError('Önce bir belge ekle (Ayarlar › Belgeler).')
+                    parcalar=belge.ara(c,soru,doc_id=doc_id,limit=5)
+                    adlar={b['id']:b['name'] for b in belgeler}
+                if not parcalar:
+                    return self.out({'reply':'Bu soruyla ilgili bölüm bulamadım. Farklı kelimelerle sorabilir '
+                                             'ya da belgeyi yeniden ekleyebilirsin.','sources':[]})
+                kaynaklar=[{'name':x['name'],'sayfa':x['sayfa'],'id':x['doc_id']} for x in parcalar]
+                baglam=belge.baglam(parcalar)
+                mesajlar=[{'role':'system','content':SYSTEM+' '+baglam},
+                          {'role':'user','content':soru}]
+                backend=str(data.get('backend') or '').strip().lower()
+                if backend in ('api','openai','openrouter','omnirouter','saglayici') or (
+                        not backend and SAG.yukle()['base_url']):
+                    msg=SAG.sohbet(mesajlar,max_tokens=500,timeout=120)
+                    yanit=(msg.get('content') or '').strip()
+                else:
+                    secili=str(data.get('model') or MODEL).strip()
+                    sonuc=request_json(OLLAMA+'/api/chat',{'model':secili,'messages':mesajlar,'stream':False,
+                                                          'think':False,'options':{'num_ctx':4096,'num_predict':400,'num_gpu':0}},
+                                       timeout=300)
+                    yanit=clean_reply((sonuc.get('message') or {}).get('content',''))
+                _denetle('belge','belge sorusu yanıtlandı',f'{soru[:80]} · {len(parcalar)} bölüm')
+                return self.out({'reply':yanit,'sources':kaynaklar,
+                                 'docs':[adlar.get(x['doc_id'],'') for x in parcalar]})
+            if path=='/api/calendar/path':
+                yol=data.get('path','')
+                if yol is not None and not isinstance(yol,str): raise ValueError('Yol metin olmalı.')
+                yol=str(yol or '').strip()[:400]
+                if yol:
+                    try: takvim.yolu_oku(yol)
+                    except ValueError as hata: raise ValueError(str(hata))
+                with db() as c: ayar_yaz(c,'takvim_yolu',yol)
+                _denetle('takvim','takvim yolu ayarlandı',yol or '(kaldırıldı)')
+                return self.out({'ok':True,'path':yol})
+            if path=='/api/mail/path':
+                yol=data.get('path','')
+                if yol is not None and not isinstance(yol,str): raise ValueError('Yol metin olmalı.')
+                yol=str(yol or '').strip()[:400]
+                if yol:
+                    try: posta.yolu_oku(yol)
+                    except ValueError as hata: raise ValueError(str(hata))
+                with db() as c: ayar_yaz(c,'posta_yolu',yol)
+                _denetle('posta','posta yolu ayarlandı',yol or '(kaldırıldı)')
+                return self.out({'ok':True,'path':yol})
+            if path=='/api/system/tts':
+                with db() as c:
+                    akis=data.get('akis'); barge=data.get('barge_in')
+                    if akis is not None:
+                        if not isinstance(akis,bool): raise ValueError('akis doğru/yanlış olmalı.')
+                        ayar_yaz(c,'tts_akis','1' if akis else '0')
+                    if barge is not None:
+                        if not isinstance(barge,bool): raise ValueError('barge_in doğru/yanlış olmalı.')
+                        ayar_yaz(c,'barge_in','1' if barge else '0')
+                    sonuc={'akis':ayar_al(c,'tts_akis','1')=='1','barge_in':ayar_al(c,'barge_in','1')=='1'}
+                return self.out(sonuc)
+            if path=='/api/tts/split':
+                # Akışlı seslendirme için metni cümlelere böler (istemci kullanır).
+                metin=data.get('text')
+                if not isinstance(metin,str): raise ValueError('Metin gerekli.')
+                if len(metin)>6000: raise ValueError('Metin çok uzun.')
+                return self.out({'sentences':sesli_yanit.cumlelere_ayir(metin)})
             if path=='/api/skills/run':
                 if data.get('confirmed') is not True: raise ValueError('Beceri çalıştırmak için onay gerekli.')
                 ad=str(data.get('ad') or '').strip().lower()
