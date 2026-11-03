@@ -17,17 +17,21 @@ import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote_plus, urlparse
 
 import arena_bridge
+import bellek
 import dikte
 import dikte_yaz
+import ekran
 import hatirlatici
 import ledger_tools
+import mcp_istemci
 import saglayici
 import ses_baglanti
 import telegram_bot
 import tts_piper_bridge
+import uyandirma
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / 'emre.sqlite3'
@@ -36,7 +40,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-02.7'
+VERSION = '2026-11-03.1'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -75,6 +79,7 @@ def db():
     """
     conn = sqlite3.connect(DB, timeout=10)
     try:
+        bellek.kur(conn)
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('PRAGMA synchronous=NORMAL')
         conn.execute('PRAGMA busy_timeout=10000')
@@ -91,6 +96,7 @@ def db():
 
 BOT = telegram_bot.TelegramBot(lambda: db())
 SAG = saglayici.Saglayici()
+MCP = mcp_istemci.Yonetici()
 
 # --- Canlı dikte oturumları -------------------------------------------------
 # Her oturum: kullanıcının o ana kadar dikte ettiği metin (sunucuda tutulur ki
@@ -105,6 +111,7 @@ class DikteOturum:
     def __init__(self):
         self.metin = ''
         self.guncelleme = time.time()
+        self.uyandi = 0.0  # uyandırma sözcüğünün duyulduğu an (son 12 sn geçerli)
 
     def ekle(self, yeni):
         """Yeni pencere metnini ekler; eklenen kısmı ve tam metni döndürür."""
@@ -383,6 +390,22 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/speech/status': return self.out(ses_baglanti.durum())
             if path=='/api/provider/status':
                 return self.out(SAG.durum())
+            if path=='/api/memory':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                sorgu=unquote_plus(query.get('q',''))[:200].strip()
+                try: limit=min(max(int(query.get('limit',50)),1),200)
+                except ValueError: raise ValueError('Limit sayı olmalı.')
+                with db() as c:
+                    kayitlar=bellek.ara(c,sorgu,limit=limit) if sorgu else bellek.hepsi(c,limit=limit)
+                return self.out({'items':kayitlar,'total':len(kayitlar)})
+            if path=='/api/wake/status':
+                return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/mcp/status':
+                ayar=MCP.yenile()
+                return self.out({'servers':MCP.durum(),'configured':len(ayar['sunucular'])})
+            if path=='/api/mcp/tools':
+                MCP.yenile()
+                return self.out({'tools':MCP.araclar()})
             if path=='/api/openjarvis/status':
                 try:
                     health=request_json(OPENJARVIS+'/health',timeout=3)
@@ -488,6 +511,67 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(ipucu,str): raise ValueError('İpucu metin olmalı.')
                 text=ses_baglanti.transcribe(data.get('audio'), ipucu=ipucu[:300])
                 return self.out({'text':text,'model':ses_baglanti.model()})
+            if path=='/api/memory':
+                sorgu=str(data.get('q') or '').strip()[:200]
+                with db() as c:
+                    kayitlar=bellek.ara(c,sorgu,limit=int(data.get('limit') or 50)) if sorgu else bellek.hepsi(c,limit=50)
+                return self.out({'items':kayitlar,'total':len(kayitlar)})
+            if path=='/api/memory/add':
+                metin=data.get('text'); konu=data.get('subject'); tur=data.get('kind')
+                if not isinstance(metin,str): raise ValueError('Bellek metni gerekli.')
+                if konu is not None and not isinstance(konu,str): raise ValueError('Konu metin olmalı.')
+                if tur is not None and not isinstance(tur,str): raise ValueError('Tür metin olmalı.')
+                with db() as c:
+                    kid=bellek.ekle(c,metin,kind=tur or 'not',subject=konu or '',source='arayuz')
+                return self.out({'ok':True,'id':kid})
+            if path=='/api/memory/delete':
+                if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
+                with db() as c:
+                    sayi=bellek.sil(c,int(data.get('id') or 0))
+                if not sayi: raise ValueError('Kayıt bulunamadı.')
+                return self.out({'ok':True,'deleted':sayi})
+            if path=='/api/wake/status':
+                ayar=uyandirma.ayar_oku()
+                return self.out({**ayar,'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/wake/settings':
+                kelimeler=data.get('kelimeler')
+                if kelimeler is not None and not isinstance(kelimeler,list): raise ValueError('Kelimeler liste olmalı.')
+                aktif=data.get('aktif')
+                if aktif is not None and not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
+                return self.out(uyandirma.ayar_yaz(aktif=aktif,kelimeler=kelimeler))
+            if path=='/api/mcp/status':
+                ayar=MCP.yenile()
+                return self.out({'servers':MCP.durum(),'configured':len(ayar['sunucular'])})
+            if path=='/api/mcp/tools':
+                MCP.yenile()
+                return self.out({'tools':MCP.araclar()})
+            if path=='/api/mcp/call':
+                if data.get('confirmed') is not True: raise ValueError('Araç çalıştırmak için onay gerekli.')
+                sunucu=data.get('server'); arac=data.get('tool')
+                if not isinstance(sunucu,str) or not isinstance(arac,str): raise ValueError('Sunucu ve araç adı gerekli.')
+                argumanlar=data.get('arguments')
+                if argumanlar is None: argumanlar={}
+                if not isinstance(argumanlar,dict): raise ValueError('Argümanlar nesne olmalı.')
+                MCP.yenile()
+                sonuc=MCP.cagir(sunucu,arac,argumanlar)
+                return self.out({'ok':not sonuc['hata'],'result':sonuc['metin']})
+            if path=='/api/screen/capture':
+                if data.get('confirmed') is not True: raise ValueError('Ekran görüntüsü için onay gerekli.')
+                return self.out({'image':ekran.base64_png(),'type':'image/png'})
+            if path=='/api/screen/ask':
+                if data.get('confirmed') is not True: raise ValueError('Ekranı sormak için onay gerekli.')
+                soru=str(data.get('question') or 'Ekranda ne var? Kısaca açıkla.').strip()[:600]
+                if not SAG.yukle()['base_url']:
+                    raise ValueError('Ekranı yorumlamak için görsel destekli bir sağlayıcı bağla (Ayarlar > Ücretsiz API).')
+                try:
+                    gorsel=ekran.base64_png()
+                except ValueError as hata:
+                    raise ValueError(str(hata))
+                mesajlar=[{'role':'system','content':'Ekran görüntüsünü inceleyip Türkçe, kısa ve net yanıt ver.'},
+                          {'role':'user','content':[{'type':'text','text':soru},
+                                                    {'type':'image_url','image_url':{'url':'data:image/png;base64,'+gorsel}}]}]
+                msg=SAG.sohbet(mesajlar, max_tokens=500, timeout=90)
+                return self.out({'reply':(msg.get('content') or '').strip()})
             if path=='/api/dictate/window':
                 # Canlı dikte: istemci her ~1 sn'de son birkaç saniyeyi gönderir.
                 if not isinstance(data.get('audio'),str): raise ValueError('Ses verisi gerekli.')
@@ -497,10 +581,21 @@ class Handler(BaseHTTPRequestHandler):
                     durum=dikte_oturum(oturum)
                     ipucu=dikte.ipucu(durum.metin)
                 ham=ses_baglanti.transcribe(data.get('audio'), ipucu=ipucu)
+                ayar=uyandirma.ayar_oku()
+                uyandi=False; komut=''
+                if ayar['aktif']:
+                    uyandi,komut=uyandirma.ayikla(ham,ayar['kelimeler'])
                 with DIKTE_KILIT:
                     durum=dikte_oturum(oturum)
-                    eklenen,tam=durum.ekle(ham)
-                return self.out({'text':dikte.temizle(ham),'added':eklenen,'full':tam,
+                    simdi=time.time()
+                    if uyandi: durum.uyandi=simdi
+                    # Uyandırma sözcüğü son 12 saniye içinde duyulduysa devam eden komut sayılır.
+                    devam=bool(durum.uyandi) and (simdi-durum.uyandi)<12
+                    if ayar['aktif'] and not (uyandi or devam):
+                        return self.out({'text':'','added':'','full':durum.metin,'triggered':False,
+                                         'model':ses_baglanti.model(),'final':False})
+                    eklenen,tam=durum.ekle(komut if uyandi else ham)
+                return self.out({'text':dikte.temizle(ham),'added':eklenen,'full':tam,'triggered':True,
                                  'model':ses_baglanti.model(),'final':False})
             if path=='/api/dictate/finish':
                 oturum=str(data.get('session') or 'varsayilan')[:64]
@@ -674,6 +769,11 @@ class Handler(BaseHTTPRequestHandler):
                 session=str(data.get('session') or '').strip()[:80]
                 if session and not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',session): session=''
                 if session: store_message(session,'user',last_user)
+                # Açık bilgiler ("hatırla", "benim adım", telefon…) hemen kaydedilir;
+                # ilgili eski kayıtlar bağlama eklenir.
+                with db() as c:
+                    bellek.kaydet_cikarimlar(c,last_user,source='sohbet')
+                    kisisel=bellek.baglam(c,last_user,limit=5)
                 def yanitla(text):
                     if session: store_message(session,'assistant',text)
                     return self.out({'reply':text})
@@ -697,7 +797,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Qwen3 supports both the API flag and an explicit no-thinking directive.
                     if selected.lower().startswith('qwen3'):
                         clean[-1]['content'] += '\n/no_think'
-                system=SYSTEM+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
+                kisisel=''
+                system=SYSTEM+(' '+kisisel if kisisel else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
                 if backend=='openjarvis':
                     if selected not in ('emre-cpu','emre-cpu:latest'): return self.out({'error':'OpenJarvis için önce emre-cpu modelini oluştur ve Ayarlar’dan seç.'},400)
                     # Client-supplied tools keep tool execution under Emre's validation.

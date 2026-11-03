@@ -172,3 +172,28 @@ Eksik olduğu yerler: **uyandırma sözcüğü**, **MCP**, **kalıcı anlamsal b
 - **Emre** ise bu üçünün arasında bir yerde: Türkçe, Windows, onay odaklı, test edilmiş bir **kişisel asistan**.
   Yukarıdaki 1–5 numaralı özellikler eklendiğinde, hazır projelerin günlük kullanım için sunduğu
   deneyimin büyük kısmı Türkçe olarak elde edilir.
+
+---
+
+## 9. Eklenen özellikler (2026-11-03 · “ekle” turu)
+
+Bölüm 5’teki öneri tablosunun 1–4 numaralı maddeleri Emre’ye eklendi. Beşinci madde (skill ekosistemi)
+hâlâ açık; ayrıca barge-in / akışlı TTS yok.
+
+| Öneri | Emre’de durumu | Dosya / uç |
+| --- | --- | --- |
+| Uyandırma sözcüğü | ✅ “Emre” ile başlayan cümleler yazılır, 12 sn devam penceresi, varsayılan kapalı | `uyandirma.py`, `GET /api/wake/status`, `POST /api/wake/settings`, `/api/dictate/window` → `triggered` |
+| Kalıcı bellek | ✅ Otomatik çıkarım + mükerrer engeli + Türkçe aksan duyarsız arama + sohbet bağlamı | `bellek.py`, `/api/memory*` |
+| MCP istemcisi | ✅ stdio JSON-RPC, kabuk yok, her çağrı onaylı | `mcp_istemci.py`, `mcp_ayar.json`, `/api/mcp/*` |
+| Ekran görme | ✅ Onaylı ekran görüntüsü + görsel destekli sağlayıcıya soru | `ekran.py`, `/api/screen/*`, sohbet alanındaki **▣** |
+| Skill ekosistemi | ❌ Henüz yok | — |
+| Barge-in / akışlı TTS | ❌ Henüz yok | — |
+
+Kıyasla nerede kalıyoruz:
+
+- **isair/jarvis** ve **Hermes Agent** uyandırma sözcüğünü **ses** üzerinde (openWakeWord/Porcupine) çözer;
+  Emre’de bu, Whisper metni üzerinde çalışır — bu yüzden 1–2 sn gecikme ve yazım hatasına duyarlılık var,
+  ama ek model/bağımlılık gerekmiyor ve tamamen yerel kalıyor.
+- **OpenClaw** araçları sormadan çalıştırır; Emre’de MCP çağrıları dâhil her tehlikeli işlem `confirmed:true` ister.
+- **Leon / Hermes** skill mağazasına sahip; Emre’nin eşdeğeri `kodlar/` geliştirici alanı ve
+  `ledger_tools`/`hatirlatici` gibi yerleşik modüller. Bir “skill” dizini + `SKILL.md` yükleyici sıradaki adım olabilir.

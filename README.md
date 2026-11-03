@@ -63,10 +63,10 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-80 test; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması ve yerel ses işçisi zaman aşımı davranışını kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**239 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu) ve ekran görüntüsü modülünü kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
-`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (23 kontrol).
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (40 kontrol).
 
 ```bash
 python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
@@ -174,6 +174,73 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Yeni özellikler (2026-11-03 · Jarvis turu)
+
+`JARVIS_INCELEME.md` incelemesindeki ilk dört öneri eklendi. Hepsi **isteğe bağlı**, hepsi **onay** ya da kapatma anahtarı arkasında.
+
+### 1. Uyandırma sözcüğü (wake word)
+
+- Canlı dikte açıkken, ayar açıksa **yalnızca “Emre” ile başlayan cümleler** yazılır. Sözcük duyulduktan sonra **12 saniye** boyunca söylenenler beklemeden akar (toplu yazma yok).
+- Uyandırma sözü **metinden** ayıklanır; “emreye/emreler” gibi kelimeler tetiklemez (kelime sınırı).
+- Varsayılan **kapalı**; Ayarlar › Bellek sekmesinden açılır, kelimeler `emre, hey emre` gibi virgülle yazılır (en fazla 6 kelime).
+- Ayar dosyası `uyandirma_ayar.json` (yerel, `.gitignore` içinde).
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/wake/status` | `{aktif, kelimeler, ses_modeli}` |
+| `POST /api/wake/settings` | `{aktif?}`, `{kelimeler?}` → güncel ayar |
+| `POST /api/dictate/window` | yanıtta `triggered`: cümle uyandırma sözcüğüyle mi geldi |
+
+### 2. Kalıcı kişisel bellek
+
+- Sohbette açık bilgiler otomatik çıkarılır: “hatırla/not al/kaydet”, “benim adım X”, “X’in telefonu N”, “ben X seviyorum”.
+- Aynı metin ikinci kez kaydedilmez (`hits` sayacı artar); en fazla 5000 kayıt, kayıt başına 500 karakter.
+- Sohbet sırasında yalnızca **ilgili** birkaç kayıt sistem istemine eklenir (semantik değil, kelime araması + Türkçe aksan duyarsız eşleşme).
+- Veri `emre.sqlite3` içinde, `memories` tablosunda; dışarıya gönderilmez.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/memory?q=&limit=` | `{items,total}` (q boşsa son kayıtlar) |
+| `POST /api/memory/add` | `{text, subject?, kind?}` |
+| `POST /api/memory/delete` | `{id, confirmed:true}` |
+
+### 3. MCP (Model Context Protocol) araçları
+
+- Proje kökündeki **`mcp_ayar.json`** dosyası okunur; şablon: `mcp_ayar.ornek.json`.
+- Sunucular **stdout/stdin JSON-RPC** ile çalışır; **kabuk (shell) kullanılmaz**, komut ve argümanlar öğe öğe verilir.
+- Her araç çağrısı **`confirmed:true`** ister; arayüz her çağrıdan önce sorar. Sunucu başına 20 sn başlatma, istek başına 60 sn zaman aşımı, en fazla 8 sunucu.
+
+```json
+{
+  "sunucular": [
+    {"ad": "dosyalar", "komut": "python",
+     "argumanlar": ["-m", "mcp_server_filesystem", "C:\\Users\\SERVER\\Belgeler"],
+     "env": {}}
+  ]
+}
+```
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/mcp/status` | `{servers:[{ad,calisiyor,arac_sayisi}], configured}` |
+| `GET /api/mcp/tools` | `{tools:[{sunucu, ad, aciklama, girdi}]}` (sunucu açılamazsa `hata`) |
+| `POST /api/mcp/call` | `{server, tool, arguments, confirmed:true}` → `{ok, result}` |
+
+### 4. Ekranı sor (ekran görme)
+
+- Sohbet alanındaki **▣** düğmesi ekran görüntüsünü alır, onay ister ve bağlı **görsel destekli** sağlayıcıya sorar.
+- Görüntü diske yazılmaz; 6 MB sınırı vardır. Windows’ta PowerShell + `System.Drawing` (ek bağımlılık yok), diğer platformlarda Pillow.
+- Görsel destekli sağlayıcı bağlı değilse açık Türkçe hata verir; sessizce başarısız olmaz.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/screen/capture` | `{confirmed:true}` → `{image, type}` (base64 PNG) |
+| `POST /api/screen/ask` | `{question, confirmed:true}` → `{reply}` |
+
+### Testler
+
+`tests/test_uyandirma.py` (15), `tests/test_bellek.py` (15), `tests/test_mcp_istemci.py` (15, gerçek stdio alt süreç), `tests/test_ekran.py` (6), `test_server.py` +14 → toplam **239 test**. Arayüz E2E **40/40** (bellek, uyandırma anahtarı ve ekran onayı dâhil).
 
 ## Güncelleme (GitHub'daki yeni sürümü alma)
 

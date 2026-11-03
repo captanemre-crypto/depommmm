@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 import saglayici  # noqa: E402
 import server  # noqa: E402
+import uyandirma  # noqa: E402
 
 
 class SahteSaglayici(BaseHTTPRequestHandler):
@@ -83,10 +84,14 @@ class ServerTestCase(unittest.TestCase):
         self.original_sag = server.SAG
         server.DB = Path(self.tmp.name) / 'test.sqlite3'
         server.SAG = saglayici.Saglayici(Path(self.tmp.name) / 'saglayici_ayar.json')
+        # Uyandırma ayarı da geçici dosyada tutulur; gerçek ayar dosyasına dokunulmaz.
+        self.original_wake = uyandirma.AYAR
+        uyandirma.AYAR = Path(self.tmp.name) / 'uyandirma_ayar.json'
 
     def tearDown(self):
         server.DB = self.original_db
         server.SAG = self.original_sag
+        uyandirma.AYAR = self.original_wake
         self.tmp.cleanup()
 
     def raw(self, path, data=None, token='test-anahtar', origin=None, method=None):
@@ -391,6 +396,115 @@ class ServerTestCase(unittest.TestCase):
         veri = self.api('/api/dictate/status', {})
         self.assertIn('sessions', veri)
         self.assertIn('typing_supported', veri)
+
+    # --- kişisel bellek ----------------------------------------------------
+    def test_memory_add_list_delete(self):
+        ekle = self.api('/api/memory/add', {'text': 'Ahmet 5000 TL borçlu', 'subject': 'Ahmet', 'kind': 'borc'})
+        self.assertTrue(ekle['ok'])
+        liste = self.api('/api/memory', {'q': 'ahmet'})
+        self.assertTrue(any('5000' in k['text'] for k in liste['items']))
+        self.api('/api/memory/delete', {'id': ekle['id']}, expect=400)
+        self.api('/api/memory/delete', {'id': ekle['id'], 'confirmed': True})
+        self.assertEqual(self.api('/api/memory', {'q': 'ahmet'})['items'], [])
+
+    def test_memory_requires_text(self):
+        veri = self.api('/api/memory/add', {'text': 5}, expect=400)
+        self.assertIn('metni', veri['error'].lower())
+
+    def test_memory_delete_unknown_id(self):
+        self.api('/api/memory/delete', {'id': 9999, 'confirmed': True}, expect=400)
+
+    def test_chat_stores_explicit_memory(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'hatırla: kira 15.000 TL'}],
+                               'backend': 'api'})
+        kayitlar = self.api('/api/memory', {})['items']
+        self.assertTrue(any('kira' in k['text'] for k in kayitlar))
+
+    # --- uyandırma sözcüğü -------------------------------------------------
+    def test_wake_status_defaults_off(self):
+        veri = self.api('/api/wake/status', {})
+        self.assertFalse(veri['aktif'])
+        self.assertIn('emre', veri['kelimeler'])
+
+    def test_wake_settings_update(self):
+        veri = self.api('/api/wake/settings', {'aktif': True, 'kelimeler': ['emre']})
+        self.assertTrue(veri['aktif'])
+        self.assertEqual(self.api('/api/wake/status', {})['kelimeler'], ['emre'])
+        self.api('/api/wake/settings', {'kelimeler': []}, expect=400)
+
+    def test_wake_blocks_unaddressed_speech(self):
+        import ses_baglanti
+        self.api('/api/wake/settings', {'aktif': True, 'kelimeler': ['emre']})
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='bugün hava güzel'):
+            veri = self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'wake1'})
+        self.assertFalse(veri['triggered'])
+        self.assertEqual(veri['added'], '')
+        self.api('/api/wake/settings', {'aktif': False})
+
+    def test_wake_accepts_addressed_speech(self):
+        import ses_baglanti
+        self.api('/api/wake/settings', {'aktif': True, 'kelimeler': ['emre']})
+        with mock.patch.object(ses_baglanti, 'transcribe', return_value='emre yarın toplantı'):
+            veri = self.api('/api/dictate/window', {'audio': 'x' * 10, 'session': 'wake2'})
+        self.assertTrue(veri['triggered'])
+        self.assertIn('toplantı', veri['added'])
+        self.assertNotIn('emre', veri['added'].lower())
+        self.api('/api/wake/settings', {'aktif': False})
+
+    # --- MCP ---------------------------------------------------------------
+    def test_mcp_status_and_tools_with_fake_server(self):
+        import mcp_istemci
+        kok = Path(__file__).resolve().parent
+        ayar = Path(server.DB).with_name('mcp_test.json')
+        ayar.write_text(json.dumps({'sunucular': [
+            {'ad': 'sahte', 'komut': sys.executable,
+             'argumanlar': [str(kok / 'yardimci' / 'sahte_mcp.py')]}]}), encoding='utf-8')
+        eski = server.MCP
+        server.MCP = mcp_istemci.Yonetici(ayar)
+        try:
+            durum = self.api('/api/mcp/status', {})
+            self.assertEqual(durum['configured'], 1)
+            araclar = self.api('/api/mcp/tools', {})['tools']
+            self.assertTrue(any(a.get('ad') == 'echo' for a in araclar))
+            self.api('/api/mcp/call', {'server': 'sahte', 'tool': 'echo', 'arguments': {}}, expect=400)
+            sonuc = self.api('/api/mcp/call', {'server': 'sahte', 'tool': 'echo',
+                                               'arguments': {'metin': 'selam'}, 'confirmed': True})
+            self.assertTrue(sonuc['ok'])
+            self.assertIn('selam', sonuc['result'])
+        finally:
+            for sunucu in server.MCP.sunucular.values():
+                sunucu.kapat()
+            server.MCP = eski
+
+    def test_mcp_call_validates_arguments(self):
+        # Argüman biçimi, sunucu tanımlı olmasa bile önce doğrulanır.
+        hata = self.api('/api/mcp/call', {'server': 'x', 'tool': 'y', 'arguments': [], 'confirmed': True}, expect=400)
+        self.assertIn('Argüman', hata['error'])
+
+    # --- ekran -------------------------------------------------------------
+    def test_screen_capture_requires_confirmation(self):
+        hata = self.api('/api/screen/capture', {}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_screen_ask_needs_provider(self):
+        hata = self.api('/api/screen/ask', {'confirmed': True, 'question': 'ne var'}, expect=400)
+        self.assertIn('sağlayıcı', hata['error'])
+
+    def test_screen_capture_returns_base64_when_confirmed(self):
+        import ekran
+        with mock.patch.object(ekran, 'base64_png', return_value='QUJD'):
+            veri = self.api('/api/screen/capture', {'confirmed': True})
+        self.assertEqual(veri['image'], 'QUJD')
+        self.assertEqual(veri['type'], 'image/png')
+
+    def test_screen_ask_returns_model_reply(self):
+        import ekran
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(ekran, 'base64_png', return_value='QUJD'):
+            veri = self.api('/api/screen/ask', {'confirmed': True, 'question': 'Ne görüyorsun?'})
+        self.assertTrue(veri['reply'])
+        self.assertNotIn('QUJD', veri['reply'])
 
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')

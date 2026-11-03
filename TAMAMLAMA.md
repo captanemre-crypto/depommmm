@@ -170,3 +170,26 @@ Bilinçli sınırlar:
 - Dikte metni **pano kullanmaz**, tuş kombinasyonu göndermez; yalnızca harf ve (istenirse) Enter.
 - Canlı yazım varsayılan olarak **kapalı**; kullanıcı açmadan başka uygulamaya yazılmaz.
 - Whisper `base` modeli 1 sn'lik pencerelerde hızlı ama Türkçede zayıf; `small` önerilir (gecikme ~1–2 sn).
+
+## Ek tur: Jarvis karşılaştırmasındaki ilk dört öneri (2026-11-03)
+
+**İstek:** `JARVIS_INCELEME.md` incelemesindeki önerilerden “ekle” talimatı.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| N1 | `uyandirma.py`: “Emre” ile başlayan cümleleri ayıklama (`ayikla`), kelime sınırı (emreye/emreler tetiklemez), en fazla 6 kelime, `uyandirma_ayar.json`, varsayılan **kapalı** | ✅ |
+| N2 | Dikte kapısı: `/api/dictate/window` → `triggered`; uyandırmadan sonra **12 sn** devam penceresi; uyandırma sözü metinden çıkarılır | ✅ |
+| N3 | `bellek.py`: SQLite `memories` tablosu, kural tabanlı çıkarım (hatırla/not al/adım/telefon/seviyorum), mükerrer engeli, Türkçe aksan duyarsız arama (`arama` sütunu + eski DB göçü), 5000 kayıt sınırı | ✅ |
+| N4 | Sohbet entegrasyonu: ilgili bellek kayıtları sistem istemine eklenir, açık bilgiler yanıttan **önce** kaydedilir | ✅ |
+| N5 | `mcp_istemci.py`: stdio JSON-RPC (`initialize` → `tools/list` → `tools/call`), kabuk yok, 8 sunucu / 20 sn başlatma / 60 sn istek, `mcp_ayar.json` + `mcp_ayar.ornek.json` | ✅ |
+| N6 | `ekran.py`: Windows PowerShell + `System.Drawing`, diğer platformlarda Pillow; 6 MB sınırı, diske yazmaz | ✅ |
+| N7 | Uçlar: `GET /api/memory`, `POST /api/memory/{add,delete}`, `GET /api/wake/status`, `POST /api/wake/settings`, `GET /api/mcp/{status,tools}`, `POST /api/mcp/call`, `POST /api/screen/{capture,ask}` | ✅ |
+| N8 | Arayüz: **Bellek** sekmesi (arama/ekle/sil + uyandırma anahtarı ve kelimeleri), **MCP araçları** sekmesi (durum + araç listesi + onaylı çağrı), sohbet alanında **▣ Ekranı sor** düğmesi | ✅ |
+| N9 | Testler: `test_uyandirma` (15), `test_bellek` (15), `test_mcp_istemci` (15), `test_ekran` (6), `test_server` +14 → **239 test**; arayüz E2E **40/40** | ✅ |
+
+Bilinçli sınırlar:
+
+- Uyandırma sözcüğü **metin** üzerinde çalışır (cihaz içi akustik model yok); Whisper metni gecikmeli geldiği için ~1–2 sn gecikme olabilir.
+- Bellek araması anlamsal (vektör) değil, kelime + aksan normalizasyonu; Türkçe ekler için kök eşleşmesi yok.
+- MCP sunucuları yerel komutlardır; ağdan gelen bir MCP sunucusuna bağlanma yoktur. Her çağrı onay ister.
+- Ekran görüntüsü sağlayıcıya gönderilir; sağlayıcı seçiminde gizlilik maddesine dikkat.

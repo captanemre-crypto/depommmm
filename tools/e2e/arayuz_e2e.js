@@ -181,7 +181,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await check('ayarlar: tüm sekmeler açılıyor', async () => {
     [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
     await sleep(400);
-    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'arenaApiTab', 'ollamaTab']) {
+    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'memoryTab', 'mcpTab', 'arenaApiTab', 'ollamaTab']) {
       const before = problems.length;
       $(id).click();
       await sleep(500);
@@ -189,6 +189,57 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       assert(bad.length === 0, `${id} sekmesinde hata: ` + JSON.stringify(bad).slice(0, 300));
       assert($('settingsBody').textContent.trim().length > 20, `${id} içeriği boş`);
     }
+  });
+
+  await check('bellek: arayüzden ekle, ara ve sil', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(300);
+    $('memoryTab').click();
+    await sleep(600);
+    const body = $('settingsBody');
+    const inputs = [...body.querySelectorAll('input[type="text"], input:not([type])')];
+    assert(inputs.length >= 2, 'bellek alanları yok');
+    const metin = inputs.find(i => /Yeni kayıt/.test(i.placeholder));
+    assert(metin, 'yeni kayıt alanı yok');
+    metin.value = 'E2E kira hatırlatması 9000 TL';
+    const ekleBtn = [...body.querySelectorAll('button')].find(b => b.textContent === 'Belleğe ekle');
+    assert(ekleBtn, 'belleğe ekle düğmesi yok');
+    ekleBtn.click();
+    await sleep(700);
+    assert(/E2E kira hatırlatması/.test(body.textContent), 'kayıt listede görünmedi: ' + body.textContent.slice(0, 200));
+    const kayitlar = await (await request('/api/memory?q=E2E%20kira')).json();
+    assert(kayitlar.items.length >= 1, 'sunucuda kayıt yok');
+    await request('/api/memory/delete', { body: JSON.stringify({ id: kayitlar.items[0].id, confirmed: true }), headers: { 'Content-Type': 'application/json' } });
+    const sonra = await (await request('/api/memory?q=E2E%20kira')).json();
+    assert(sonra.items.length === 0, 'kayıt silinmedi');
+  });
+
+  await check('uyandırma: ayar aç/kapa arayüzden çalışıyor', async () => {
+    $('memoryTab').click();
+    await sleep(600);
+    const toggle = $('wakeToggle');
+    assert(toggle, 'uyandırma anahtarı yok');
+    toggle.checked = true;
+    toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await sleep(500);
+    const durum = await (await request('/api/wake/status')).json();
+    assert(durum.aktif === true, 'uyandırma açılmadı');
+    toggle.checked = false;
+    toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await sleep(500);
+    assert((await (await request('/api/wake/status')).json()).aktif === false, 'uyandırma kapanmadı');
+  });
+
+  await check('ekranı sor: onay olmadan istek gitmiyor', async () => {
+    const btn = $('screenAsk');
+    assert(btn, 'ekranı sor düğmesi yok');
+    let sorulan = false;
+    const eskiConfirm = window.confirm;
+    window.confirm = () => { sorulan = true; return false; };
+    btn.click();
+    await sleep(200);
+    window.confirm = eskiConfirm;
+    assert(sorulan, 'ekran görüntüsü için onay istenmedi');
   });
 
   await check('geliştirici: dosya kaydet ve geri oku', async () => {
