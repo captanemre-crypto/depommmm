@@ -222,12 +222,18 @@ Yol haritasındaki son açık başlıklar kapatıldı; bu tur yeni özellik değ
   tepsi, `.bat` dosyaları, global kısayol, etkin pencereye yazma, uygulama açma ve ekran görüntüsü gibi
   Linux CI'nın kapsayamadığı adımlar tek tek “beklenen davranış” ile listelendi.
 
-### 7. CI iyileştirmesi
+### 7. Otomatik başlatma betiği düzeltmesi
+
+- Windows açılışı için üretilen `emre_arkaplan.vbs` **her çağrıda yeniden yazılıyordu**; nedeni metin
+  kipinde okuma sırasında satır sonlarının `\r\n` → `\n` çevrilmesiydi. Artık karşılaştırma ve yazma
+  bayt düzeyinde yapılıyor: içerik aynıysa dosyaya dokunulmuyor, Windows'ta satır sonları da bozulmuyor.
+
+### 8. CI iyileştirmesi
 
 - `ruff` zaten koşuyordu; sözdizimi kontrolü artık **tüm Python dosyalarını** kapsıyor
   (`python -m compileall -q .`), yeni modüller (belge/posta/takvim/sesli_yanit) da denetleniyor.
 
-### 8. Telefondan erişim (C5) — kod değişikliği yok
+### 9. Telefondan erişim (C5) — kod değişikliği yok
 
 - Sunucu **yalnızca `127.0.0.1`** dinlemeye devam ediyor.
 - Güvenli yol adım adım yazıldı: **[`UZAK_ERISIM.md`](UZAK_ERISIM.md)** — Tailscale özel ağı + SSH tüneli,

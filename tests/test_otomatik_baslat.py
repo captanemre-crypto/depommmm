@@ -1,5 +1,6 @@
 """Windows açılışında otomatik başlatma testleri (kısayol gerçekten oluşturulmaz)."""
 import os
+import pathlib
 import sys
 import tempfile
 import unittest
@@ -50,15 +51,29 @@ class BaslangicTest(unittest.TestCase):
     def test_background_script_written_once(self):
         kok = Path(self.tmp.name) / 'proje'
         kok.mkdir()
-        yol = otomatik_baslat.arka_plan_betigi(kok)
+        # Dosya zaman damgası (mtime) bazı dosya sistemlerinde kaba ya da geriye
+        # atlayabildiği için CI'da güvenilir değildi. Bunun yerine gerçekten
+        # yazma çağrısı yapılıp yapılmadığını sayıyoruz: içerik değişmediyse
+        # ikinci çağrı dosyaya dokunmamalı.
+        gercek_yaz = pathlib.Path.write_bytes
+        yazilanlar = []
+
+        def sayan(yol_, *a, **k):
+            yazilanlar.append(str(yol_))
+            return gercek_yaz(yol_, *a, **k)
+
+        with mock.patch.object(pathlib.Path, 'write_bytes', sayan):
+            yol = otomatik_baslat.arka_plan_betigi(kok)
+            otomatik_baslat.arka_plan_betigi(kok)
+
+        self.assertEqual(yazilanlar, [str(yol)], 'değişmemişse yeniden yazmamalı')
         self.assertTrue(yol.is_file())
-        icerik = yol.read_text(encoding='utf-8')
+        icerik = yol.read_bytes().decode('utf-8')
         self.assertIn('server.py', icerik)
         self.assertIn('kabuk.Run', icerik)
         self.assertIn(', 0, False', icerik)  # gizli pencere
-        ilk = yol.stat().st_mtime_ns
-        otomatik_baslat.arka_plan_betigi(kok)
-        self.assertEqual(yol.stat().st_mtime_ns, ilk)  # değişmemişse yazmaz
+        # Metin kipinde yazılsaydı Windows'ta satır sonları '\\r\\r\\n' olurdu.
+        self.assertNotIn('\r\r\n', icerik)
 
     def test_pythonw_preferred(self):
         kok = Path(self.tmp.name) / 'py'

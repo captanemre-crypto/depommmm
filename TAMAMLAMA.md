@@ -366,6 +366,8 @@ Bilinçli sınırlar:
 | X10 | `WINDOWS_DOGRULAMA.md`: Windows'ta elle doğrulama listesi (11 bölüm) | ✅ |
 | X11 | CI: sözdizimi kontrolü artık tüm Python dosyalarını kapsıyor (`compileall -q .`) | ✅ |
 | X12 | E2E +3 → **63/63**; toplam **580 test** | ✅ |
+| X13 | `emre_arkaplan.vbs` her başlatmada yeniden yazılıyordu (metin kipinde okuma `\r\n`→`\n` çevirisi yüzünden karşılaştırma hiç eşleşmiyordu); bayt düzeyinde karşılaştırma + yazma, Windows'ta `\r\r\n` bozulması da giderildi | ✅ |
+| X14 | `test_background_script_written_once` mtime yerine yazma sayımına dayanıyor (CI'da kırılgandı) | ✅ |
 
 Bilinçli sınırlar:
 

@@ -62,8 +62,13 @@ def arka_plan_betigi(kok=ROOT) -> Path:
         f'kabuk.CurrentDirectory = "{kok}"\r\n'
         f'kabuk.Run {q} & "{pythonw()}" & {q} & " server.py", 0, False\r\n'
     )
-    if not yol.is_file() or yol.read_text(encoding='utf-8', errors='replace') != icerik:
-        yol.write_text(icerik, encoding='utf-8')
+    # Karşılaştırma ve yazma **bayt** düzeyinde yapılır. Metin kipinde
+    # `read_text` evrensel satır sonu çevirisi yaptığı için ('\r\n' -> '\n')
+    # içerik hiç değişmese de her çağrıda yeniden yazılıyordu; Windows'ta ise
+    # `write_text` mevcut '\r\n' dizilerini '\r\r\n' hâline getiriyordu.
+    veri = icerik.encode('utf-8')
+    if not yol.is_file() or yol.read_bytes() != veri:
+        yol.write_bytes(veri)
     return yol
 
 
