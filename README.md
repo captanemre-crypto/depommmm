@@ -63,10 +63,10 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**239 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu) ve ekran görüntüsü modülünü kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**291 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi ve otomatik başlatma modüllerini kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
-`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (40 kontrol).
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (44 kontrol).
 
 ```bash
 python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
@@ -174,6 +174,52 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Sistem entegrasyonu (2026-11-03 · ikinci tur)
+
+Emre'yi "açıp kapatılan bir program" olmaktan çıkarır: bilgisayarla birlikte başlar,
+dikteyi her uygulamadan klavye kısayoluyla yönetir ve hatırlatıcıları tarayıcı kapalıyken de bildirir.
+Üçü de **Ayarlar › Sistem** sekmesinden yönetilir.
+
+### 1. Bilgisayar açılınca arka planda başlama
+
+- Başlangıç klasörüne `EMRE.lnk` kısayolu kurulur; kısayol, proje kökünde üretilen
+  `emre_arkaplan.vbs` dosyasını `wscript` ile sessizce çalıştırır → `pythonw server.py`
+  **konsol penceresi açmadan** başlar.
+- Kayıt defterine dokunulmaz, yönetici izni gerekmez, yalnızca kullanıcının kendi Başlangıç klasörü kullanılır.
+- Kurulum/kaldırma **`confirmed:true`** ister. Yalnızca Windows'ta desteklenir; diğer platformlarda açık hata verir.
+
+### 2. Global kısayol ile dikte (varsayılan `Ctrl+Alt+D`)
+
+- `RegisterHotKey` ile sistem genelinde dinlenir; basıldığında Emre'de bir "dikte isteği" oluşur.
+  Açık sayfa bunu **~1 saniye içinde** görüp dikteyi başlatır/durdurur.
+- Sayfa kapalıysa (isteğe bağlı ayar açıksa) tarayıcı `?dikte=1` adresiyle açılır ve dikte kendiliğinden başlar.
+- Kısayol **hiçbir komut çalıştırmaz**; yalnızca dikteyi açar/kapatır.
+- Varsayılan **kapalı**; `ctrl+alt+d`, `ctrl+shift+e`, `shift+f5` gibi biçimler kabul edilir
+  (en az bir değiştirici tuş, geçersiz biçim `400` ile reddedilir).
+
+### 3. Hatırlatıcıların sunucu tarafında çalışması
+
+- Sunucuda 20 saniyede bir çalışan bir işçi, süresi gelmiş hatırlatıcıları yakalar
+  (`EMRE_BILDIRIM_ARALIK` ile değiştirilebilir), veritabanına bildirim yazar ve her hatırlatıcıyı
+  **yalnızca bir kez** bildirir (`reminders.notified`).
+- Açıksa Windows'ta masaüstü balonu + kısa uyarı sesi gösterilir (PowerShell `NotifyIcon`, ek bağımlılık yok).
+- Sayfa kapalıyken oluşan bildirimler birikir; Emre açıldığında **"kaçırdığın bildirimler"** olarak gösterilir.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/system/status` | otomatik başlatma, kısayol ve bildirim durumu |
+| `POST /api/system/autostart` | `{aktif, confirmed:true}` → kısayolu kurar/kaldırır |
+| `POST /api/system/hotkey` | `{aktif, kisayol?, tarayici?}` → kısayolu kaydeder/başlatır |
+| `POST /api/system/notifications` | `{aktif}` → masaüstü bildirimi aç/kapa |
+| `GET /api/hotkey/poll?since=N` | `{seq, basildi, aktif}` (sayfa 1,5 sn'de bir yoklar) |
+| `GET /api/notifications?since=N` | okunmamış bildirimler |
+| `POST /api/notifications/seen` | `{ids:[...]}` veya tümünü okundu işaretler |
+
+### Testler
+
+`tests/test_kisayol.py` (15), `tests/test_bildirim.py` (11), `tests/test_otomatik_baslat.py` (12),
+`test_server.py` +13 → toplam **291 test**. Arayüz E2E **44/44**.
 
 ## Yeni özellikler (2026-11-03 · Jarvis turu)
 

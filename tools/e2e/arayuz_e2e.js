@@ -181,7 +181,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await check('ayarlar: tüm sekmeler açılıyor', async () => {
     [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
     await sleep(400);
-    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'memoryTab', 'mcpTab', 'arenaApiTab', 'ollamaTab']) {
+    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'memoryTab', 'mcpTab', 'systemTab', 'arenaApiTab', 'ollamaTab']) {
       const before = problems.length;
       $(id).click();
       await sleep(500);
@@ -240,6 +240,65 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     await sleep(200);
     window.confirm = eskiConfirm;
     assert(sorulan, 'ekran görüntüsü için onay istenmedi');
+  });
+
+  await check('sistem: kısayol ayarı kaydediliyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(300);
+    $('systemTab').click();
+    await sleep(700);
+    const kutu = $('hotkeyInput');
+    assert(kutu, 'kısayol alanı yok');
+    kutu.value = 'ctrl+shift+e';
+    const kaydet = [...$('settingsBody').querySelectorAll('button')].find(b => b.textContent === 'Kısayolu kaydet');
+    assert(kaydet, 'kısayol kaydet düğmesi yok');
+    kaydet.click();
+    await sleep(600);
+    const durum = await (await request('/api/system/status')).json();
+    assert(durum.hotkey.kisayol === 'ctrl+shift+e', 'kısayol kaydedilmedi: ' + JSON.stringify(durum.hotkey));
+    assert(durum.hotkey.gorunen === 'Ctrl+Shift+E', 'görünen ad yanlış: ' + durum.hotkey.gorunen);
+  });
+
+  await check('sistem: geçersiz kısayol reddediliyor', async () => {
+    const res = await request('/api/system/hotkey', {
+      body: JSON.stringify({ aktif: false, kisayol: 'meta+q' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    assert(res.status === 400, 'geçersiz kısayol kabul edildi: ' + res.status);
+  });
+
+  await check('sistem: bildirim anahtarı ve durum ucu', async () => {
+    const once = await (await request('/api/system/status')).json();
+    assert(typeof once.notifications.aktif === 'boolean', 'bildirim durumu yok');
+    const kapali = await (await request('/api/system/notifications', {
+      body: JSON.stringify({ aktif: false }),
+      headers: { 'Content-Type': 'application/json' },
+    })).json();
+    assert(kapali.aktif === false, 'bildirim kapatılamadı');
+    await request('/api/system/notifications', {
+      body: JSON.stringify({ aktif: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  await check('sistem: hatırlatıcı bildirimi arayüzde görünüyor', async () => {
+    const gecmis = new Date(Date.now() - 600000).toISOString().slice(0, 16);
+    await request('/api/reminders', {
+      body: JSON.stringify({ text: 'E2E sistem bildirimi', due: gecmis }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    // Sunucu tarafı işçi (E2E'de 3 sn'de bir) hatırlatıcıyı yakalamalı.
+    let bulundu = null;
+    for (let i = 0; i < 12 && !bulundu; i++) {
+      await sleep(1000);
+      const sonuc = await (await request('/api/notifications?since=0')).json();
+      bulundu = (sonuc.items || []).find(x => /E2E sistem bildirimi/.test(x.text)) || null;
+    }
+    assert(bulundu, 'sunucu tarafı hatırlatıcı bildirimi oluşmadı');
+    await request('/api/notifications/seen', {
+      body: JSON.stringify({ ids: [bulundu.id] }),
+      headers: { 'Content-Type': 'application/json' },
+    });
   });
 
   await check('geliştirici: dosya kaydet ve geri oku', async () => {

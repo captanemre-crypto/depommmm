@@ -21,12 +21,15 @@ from urllib.parse import unquote_plus, urlparse
 
 import arena_bridge
 import bellek
+import bildirim
 import dikte
 import dikte_yaz
 import ekran
 import hatirlatici
+import kisayol
 import ledger_tools
 import mcp_istemci
+import otomatik_baslat
 import saglayici
 import ses_baglanti
 import telegram_bot
@@ -40,10 +43,31 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.1'
+VERSION = '2026-11-03.2'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
+
+VARSAYILAN_AYARLAR = {
+    'kisayol_aktif': '0',
+    'kisayol_tus': kisayol.VARSAYILAN,
+    'kisayol_tarayici': '1',
+    'bildirim_aktif': '1',
+}
+
+
+def ayar_al(conn, ad, varsayilan=''):
+    """settings tablosundan tek bir ayar okur; yoksa varsayılanı döndürür."""
+    try:
+        satir = conn.execute('SELECT value FROM settings WHERE key=?', (ad,)).fetchone()
+    except sqlite3.Error:
+        return varsayilan
+    return satir[0] if satir else varsayilan
+
+
+def ayar_yaz(conn, ad, deger):
+    conn.execute('INSERT INTO settings(key,value) VALUES(?,?) '
+                 'ON CONFLICT(key) DO UPDATE SET value=excluded.value', (ad, str(deger)))
 
 
 def _init_schema(conn, path):
@@ -57,6 +81,8 @@ def _init_schema(conn, path):
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, session TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS telegram_messages (id INTEGER PRIMARY KEY, update_id INTEGER UNIQUE, chat_id INTEGER, sender TEXT, text TEXT, date INTEGER, read INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS telegram_state (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL, seen INTEGER DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session, id);
         CREATE INDEX IF NOT EXISTS idx_ledger_person ON ledger(person);
     """)
@@ -66,6 +92,10 @@ def _init_schema(conn, path):
         conn.execute('ALTER TABLE ledger ADD COLUMN source TEXT')
     if 'raw_text' not in columns:
         conn.execute('ALTER TABLE ledger ADD COLUMN raw_text TEXT')
+    # Hatırlatıcının bir kez bildirildiğini işaretleyen kolon (A3)
+    rcolumns = {row[1] for row in conn.execute('PRAGMA table_info(reminders)')}
+    if 'notified' not in rcolumns:
+        conn.execute('ALTER TABLE reminders ADD COLUMN notified INTEGER DEFAULT 0')
     _INITIALIZED.add(path)
 
 
@@ -105,6 +135,95 @@ DIKTE = {}
 DIKTE_KILIT = threading.RLock()  # dikte_oturum() aynı kilidi içeriden kullanır
 DIKTE_AZAMI_OTURUM = 32
 DIKTE_AZAMI_KARAKTER = 8000
+
+
+# --- Global kısayol (dikteyi her uygulamadan başlatma) ----------------------
+# Kısayol basıldığında sıra numarası artar; açık sayfa bunu görüp dikteyi açar.
+KISAYOL_DURUM = {'seq': 0, 'son': 0.0, 'son_yoklama': 0.0}
+KISAYOL_KILIT = threading.Lock()
+KISAYOL_ESKI_PENCERE = 15.0  # sayfa bu süredir yoklamıyorsa tarayıcı açılır
+
+
+def _kisayol_geri_cagri():
+    """Kısayol basıldı: sıra numarasını artır, gerekirse tarayıcıyı aç."""
+    simdi = time.time()
+    with KISAYOL_KILIT:
+        KISAYOL_DURUM['seq'] += 1
+        KISAYOL_DURUM['son'] = simdi
+        sayfa_yok = (simdi - KISAYOL_DURUM['son_yoklama']) > KISAYOL_ESKI_PENCERE
+    if sayfa_yok:
+        try:
+            with db() as c:
+                ac = ayar_al(c, 'kisayol_tarayici', '1') == '1'
+            if ac:
+                import webbrowser
+                webbrowser.open('http://127.0.0.1:8765/?dikte=1')
+        except Exception:
+            pass
+
+
+KISAYOL = kisayol.Kisayol(_kisayol_geri_cagri)
+
+
+# --- Hatırlatıcı arka plan işçisi -------------------------------------------
+# Tarayıcı kapalı olsa da süresi gelen hatırlatıcılar burada yakalanır: veritabanına
+# bildirim yazılır, istenirse masaüstü balonu ve bip sesi gösterilir. Her hatırlatıcı
+# yalnızca bir kez bildirilir (`reminders.notified`).
+try:
+    BILDIRIM_ARALIK = max(int(os.getenv('EMRE_BILDIRIM_ARALIK', '20')), 1)
+except ValueError:
+    BILDIRIM_ARALIK = 20
+BILDIRIM_DURDUR = threading.Event()
+_BILDIRIM_ISCI = None
+
+
+def bildirim_tara(simdi=None):
+    """Süresi gelmiş ve henüz bildirilmemiş hatırlatıcıları işler."""
+    simdi = simdi or datetime.now()
+    esik = simdi.strftime('%Y-%m-%dT%H:%M:59')
+    with db() as c:
+        satirlar = c.execute('SELECT id,text,due FROM reminders '
+                             'WHERE done=0 AND notified=0 AND due<=?', (esik,)).fetchall()
+        for rid, metin, due in satirlar:
+            c.execute('UPDATE reminders SET notified=1 WHERE id=?', (rid,))
+            c.execute('INSERT INTO notifications(kind,title,text,created) VALUES (?,?,?,?)',
+                      ('reminder', 'Hatırlatıcı', metin, datetime.now().isoformat(timespec='seconds')))
+        masaustu = ayar_al(c, 'bildirim_aktif', '1') == '1'
+    if satirlar and masaustu:
+        try:
+            bildirim.cal()
+            bildirim.goster('Emre hatırlatıyor', ' · '.join(m for _, m, _ in satirlar))
+        except Exception:
+            pass
+    return [{'id': r[0], 'text': r[1], 'due': r[2]} for r in satirlar]
+
+
+def _bildirim_dongusu():
+    while not BILDIRIM_DURDUR.wait(BILDIRIM_ARALIK):
+        try:
+            bildirim_tara()
+        except Exception:
+            pass  # arka plan işçisi hatası sunucuyu düşürmemeli
+
+
+def arka_planlari_baslat():
+    """Hatırlatıcı işçisini ve (açıksa) global kısayolu başlatır."""
+    global _BILDIRIM_ISCI
+    with db() as c:
+        kisayol_acik = ayar_al(c, 'kisayol_aktif', '0') == '1'
+        tus = ayar_al(c, 'kisayol_tus', kisayol.VARSAYILAN)
+    if _BILDIRIM_ISCI is None or not _BILDIRIM_ISCI.is_alive():
+        BILDIRIM_DURDUR.clear()
+        _BILDIRIM_ISCI = threading.Thread(target=_bildirim_dongusu, daemon=True,
+                                          name='emre-hatirlatici')
+        _BILDIRIM_ISCI.start()
+    if kisayol_acik:
+        try:
+            KISAYOL.metin = tus
+            KISAYOL.baslat()
+        except ValueError as hata:
+            print('Global kısayol açılamadı:', hata, flush=True)
+    return {'kisayol': KISAYOL.durum(), 'bildirim': True}
 
 
 class DikteOturum:
@@ -400,6 +519,40 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'items':kayitlar,'total':len(kayitlar)})
             if path=='/api/wake/status':
                 return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/system/status':
+                with db() as c:
+                    bildirim_acik=ayar_al(c,'bildirim_aktif','1')=='1'
+                    kisayol_acik=ayar_al(c,'kisayol_aktif','0')=='1'
+                    tarayici=ayar_al(c,'kisayol_tarayici','1')=='1'
+                    tus=ayar_al(c,'kisayol_tus',kisayol.VARSAYILAN)
+                    bekleyen=c.execute('SELECT COUNT(*) FROM notifications WHERE seen=0').fetchone()[0]
+                durum=dict(KISAYOL.durum())
+                durum['acik']=kisayol_acik
+                if not durum['aktif']:
+                    durum['kisayol']=tus
+                    durum['gorunen']=kisayol.bicim(tus)
+                return self.out({'autostart':otomatik_baslat.durum(ROOT),
+                                 'hotkey':durum,'hotkey_tarayici':tarayici,
+                                 'notifications':{'aktif':bildirim_acik,'bekleyen':bekleyen},
+                                 'version':VERSION})
+            if path=='/api/hotkey/poll':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: since=max(int(query.get('since',0)),0)
+                except ValueError: since=0
+                with KISAYOL_KILIT:
+                    KISAYOL_DURUM['son_yoklama']=time.time()
+                    seq=KISAYOL_DURUM['seq']
+                return self.out({'seq':seq,'basildi':seq>since,'aktif':KISAYOL.durum()['aktif']})
+            if path=='/api/notifications':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: since=max(int(query.get('since',0)),0)
+                except ValueError: since=0
+                with db() as c:
+                    rows=c.execute('SELECT id,kind,title,text,created FROM notifications '
+                                   'WHERE seen=0 AND id>? ORDER BY id DESC LIMIT 20',(since,)).fetchall()
+                    son=c.execute('SELECT COALESCE(MAX(id),0) FROM notifications').fetchone()[0]
+                return self.out({'items':[{'id':r[0],'kind':r[1],'title':r[2],'text':r[3],'created':r[4]}
+                                          for r in rows],'last':son})
             if path=='/api/mcp/status':
                 ayar=MCP.yenile()
                 return self.out({'servers':MCP.durum(),'configured':len(ayar['sunucular'])})
@@ -886,6 +1039,53 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError: raise ValueError('Tarih biçimi geçersiz; YYYY-AA-GG SS:DD kullan.')
                 with db() as c: c.execute('INSERT INTO reminders(text,due) VALUES (?,?)',(text,due))
                 return self.out({'ok':True})
+            if path=='/api/notifications/seen':
+                ids=data.get('ids')
+                if ids is not None and not isinstance(ids,list):
+                    raise ValueError('Kimlikler liste olmalı.')
+                with db() as c:
+                    if ids:
+                        temiz=[int(x) for x in ids if isinstance(x,(int,str)) and str(x).isdigit()][:50]
+                        c.executemany('UPDATE notifications SET seen=1 WHERE id=?',[(i,) for i in temiz])
+                    else: c.execute('UPDATE notifications SET seen=1')
+                return self.out({'ok':True})
+            if path=='/api/system/autostart':
+                if data.get('confirmed') is not True: raise ValueError('Açılış ayarı için onay gerekli.')
+                aktif=data.get('aktif')
+                if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
+                if aktif: sonuc=otomatik_baslat.kur(ROOT)
+                else: sonuc=otomatik_baslat.kaldir(ROOT)
+                return self.out(sonuc)
+            if path=='/api/system/hotkey':
+                aktif=data.get('aktif')
+                if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
+                tus=data.get('kisayol')
+                tarayici=data.get('tarayici')
+                with db() as c:
+                    if tarayici is not None:
+                        if not isinstance(tarayici,bool): raise ValueError('Tarayıcı alanı doğru/yanlış olmalı.')
+                        ayar_yaz(c,'kisayol_tarayici','1' if tarayici else '0')
+                    if isinstance(tus,str) and tus.strip():
+                        kisayol.coz(tus.strip())  # geçersizse 400
+                        ayar_yaz(c,'kisayol_tus',tus.strip()[:40])
+                    guncel=ayar_al(c,'kisayol_tus',kisayol.VARSAYILAN)
+                if aktif:
+                    if not KISAYOL.destekli(): raise ValueError('Global kısayol yalnızca Windows\'ta çalışır.')
+                    if KISAYOL.durum()['aktif'] and guncel!=KISAYOL.metin: KISAYOL.yeniden_basla(guncel)
+                    elif not KISAYOL.durum()['aktif']:
+                        KISAYOL.metin=guncel
+                        KISAYOL.baslat()
+                    with db() as c: ayar_yaz(c,'kisayol_aktif','1')
+                else:
+                    KISAYOL.durdur()
+                    with db() as c: ayar_yaz(c,'kisayol_aktif','0')
+                durum=dict(KISAYOL.durum()); durum['acik']=bool(aktif)
+                return self.out(durum)
+            if path=='/api/system/notifications':
+                aktif=data.get('aktif')
+                if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
+                with db() as c: ayar_yaz(c,'bildirim_aktif','1' if aktif else '0')
+                return self.out({'aktif':aktif})
             if path=='/api/reminders/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
                 with db() as c: c.execute('DELETE FROM reminders WHERE id=?',(int_field(data,'id',1,2**53,label='Kayıt numarası'),))
@@ -924,6 +1124,8 @@ if __name__=='__main__':
     if TOKEN:
         BOT.start(TOKEN)
         print('Telegram arka plan yoklaması açık.',flush=True)
+    arka_planlari_baslat()
+    print('Hatırlatıcı işçisi açık (tarayıcı kapalıyken de bildirir).',flush=True)
     print('EMRE: http://127.0.0.1:8765 | Model:',MODEL,flush=True)
     print('Yalnızca bu bilgisayardan erişim. Durdurmak için Ctrl+C.',flush=True)
     try:

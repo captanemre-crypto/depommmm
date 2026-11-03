@@ -54,3 +54,6 @@ uyandirma_ayar.json
 
 # MCP sunucu tanımı (kişisel yollar içerebilir; şablon: mcp_ayar.ornek.json)
 mcp_ayar.json
+
+# Otomatik başlatma betiği (otomatik_baslat.py üretir)
+emre_arkaplan.vbs

@@ -193,3 +193,26 @@ Bilinçli sınırlar:
 - Bellek araması anlamsal (vektör) değil, kelime + aksan normalizasyonu; Türkçe ekler için kök eşleşmesi yok.
 - MCP sunucuları yerel komutlardır; ağdan gelen bir MCP sunucusuna bağlanma yoktur. Her çağrı onay ister.
 - Ekran görüntüsü sağlayıcıya gönderilir; sağlayıcı seçiminde gizlilik maddesine dikkat.
+
+## Ek tur: sistem entegrasyonu (2026-11-03 · ikinci tur)
+
+**İstek:** “ekleyelim” — `YOL_HARITASI.md` A bloğunun ilk üç maddesi.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| S1 | `otomatik_baslat.py`: Başlangıç klasörüne `EMRE.lnk`, sessiz `emre_arkaplan.vbs` (pythonw, konsol yok), kur/kaldır/durum, kayıt defterine dokunmaz | ✅ |
+| S2 | `kisayol.py`: `RegisterHotKey` ile global kısayol (varsayılan `ctrl+alt+d`), `coz()` doğrulaması, kayıt hatası Türkçe, Windows dışında açık hata | ✅ |
+| S3 | Kısayol → dikte: `/api/hotkey/poll` sıra numarası; açık sayfa 1,5 sn'de bir yoklar ve dikteyi açar/kapatır; sayfa kapalıysa isteğe bağlı `?dikte=1` ile tarayıcı açılır | ✅ |
+| S4 | `bildirim.py`: Windows PowerShell `NotifyIcon` balonu, Linux'ta `notify-send`, uyarı sesi; hata akışı bozmaz | ✅ |
+| S5 | Sunucu hatırlatıcı işçisi: 20 sn'de bir tarama, `reminders.notified` ile tek bildirim, `notifications` tablosu, `EMRE_BILDIRIM_ARALIK` | ✅ |
+| S6 | Uçlar: `/api/system/{status,autostart,hotkey,notifications}`, `/api/hotkey/poll`, `/api/notifications`, `/api/notifications/seen` | ✅ |
+| S7 | Arayüz: **Ayarlar › Sistem** sekmesi (otomatik başlatma, kısayol + tuş + tarayıcı seçeneği, bildirim anahtarı), sayfa içi bildirim akışı | ✅ |
+| S8 | Testler: `test_kisayol` (15), `test_bildirim` (11), `test_otomatik_baslat` (12), `test_server` +13 → **291 test**; E2E **44/44** | ✅ |
+
+Bilinçli sınırlar:
+
+- Otomatik başlatma ve global kısayol **yalnızca Windows**; diğer platformlarda açık hata (sessiz başarısızlık yok).
+- Otomatik başlatma kayıt defteri/Hizmetler kullanmaz; kullanıcı oturumu açıldığında çalışır (oturum açmadan önce değil).
+- Kısayol yalnızca dikteyi açar/kapatır; başka işlem yapmaz. Tarayıcı kapalıyken dikte, sayfa açılana kadar başlamaz.
+- Masaüstü bildirimi odak çalmayan balondur; Windows bildirim ayarlarında "rahatsız etme" açıksa görünmeyebilir.
+- Hatırlatıcı işçisi sunucu çalışırken aktiftir; Emre tamamen kapalıyken bildirim üretilmez (bir sonraki açılışta birikenler gösterilir).

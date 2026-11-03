@@ -32,7 +32,7 @@
 
 .chat-layout{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px}.chat-history{border:1px solid #20353e;border-radius:10px;padding:14px;background:#071014;align-self:start}.chat-history-head{display:flex;justify-content:space-between;align-items:center}.chat-history-head b{font-size:13px}.history-row{display:flex;align-items:center;gap:4px;margin-top:8px}.history-choice{border:0;background:transparent;color:#a9bfc4;text-align:left;border-radius:6px;padding:10px;min-width:0;flex:1;cursor:pointer}.history-choice.active{background:#103039;color:#baf9f0}.history-choice span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.history-choice small{display:block;color:#77949a;margin-top:4px}.history-delete{background:transparent;color:#7d969d;border:0;cursor:pointer;padding:8px}.history-delete:hover{color:#f18780}#chatHolder .messages{min-height:280px;max-height:55vh}@media(max-width:650px){.chat-layout{grid-template-columns:1fr}.chat-history{max-height:190px;overflow:auto}}
 </style></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-icon"></div><div>EMREE<small>KİŞİSEL ASİSTAN</small></div></div><div class="navlabel">ÇALIŞMA ALANI</div><nav class="nav"><button class="active" data-section="Ana sayfa"><span class="nav-icon">⌂</span>Ana sayfa</button><button data-section="Sohbet"><span class="nav-icon">◌</span>Sohbet</button><button data-section="Keşfet"><span class="nav-icon">⌕</span>Keşfet</button><button data-section="Hatırlatıcılar"><span class="nav-icon">◷</span>Hatırlatıcılar</button><button data-section="Defter"><span class="nav-icon">▤</span>Defter</button><button data-section="Telegram"><span class="nav-icon">➤</span>Telegram</button><button data-section="Uygulamalar"><span class="nav-icon">▦</span>Uygulamalar</button><button data-section="Geliştirici"><span class="nav-icon">⌘</span>Geliştirici</button><button data-section="Ayarlar"><span class="nav-icon">⚙</span>Ayarlar</button></nav></aside><main class="main"><div class="content"><section class="hero"><canvas id="energy" width="500" height="500" aria-label="Mercan turuncusu enerji küresi animasyonu"></canvas></section><section class="web-panel" id="features" hidden><div class="web-head"><h2 id="featureTitle"></h2><button type="button" class="iconbtn" id="closeFeatures">Kapat ✕</button></div><div id="featureBody" style="padding:16px"></div></section><section class="web-panel" id="cameraPanel" hidden><div class="web-head"><div><h2>Kamera önizlemesi</h2><span class="hint">Bu bir görüntülü arama değil; yalnızca kendi kameranı gösterir.</span></div><button type="button" class="iconbtn" id="closeCamera">Kamerayı kapat ✕</button></div><video id="video" autoplay playsinline muted style="width:100%;max-height:400px;background:#03090c"></video></section><section class="web-panel" id="arena" hidden><div class="web-head"><div><h2>Arena bağlantısı</h2><span class="hint">Tarayıcı üzerinden, onaylı soru gönderimi</span></div><button type="button" class="iconbtn" id="closeArena">Kapat ✕</button></div><div style="padding:0 16px 16px"><p class="hint">Önce Arena tarayıcısını aç; giriş ve güvenlik doğrulamasını kendin tamamla. Soru yalnızca onayından sonra gönderilir.</p><button type="button" class="iconbtn" id="arenaNormal">Normal Edge’de aç</button> <button type="button" class="iconbtn" id="arenaStart">Otomasyon penceresini aç</button><p class="hint">Normal Edge kendi oturumunu kullanır; Emre bu pencereden yanıtları otomatik okuyamaz.</p><p id="arenaStatus" class="hint">Bağlantı durumu bilinmiyor.</p><textarea id="arenaQuestion" placeholder="Arena’ya sorulacak soru" style="width:100%;min-height:90px;padding:12px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;font:inherit"></textarea><button type="button" class="iconbtn" id="arenaSend" style="margin-top:10px">Onayla ve gönder</button><p class="hint">Bulunan yanıtın tamamlandığını ve doğru olduğunu Arena ekranından kontrol et. Site değişiklikleri otomasyonu bozabilir.</p><div id="arenaAnswer" style="white-space:pre-wrap;line-height:1.6;color:#d3e9e8"></div></div></section><div id="sohbet" style="height:28px"></div><div class="chat"><div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Sohbet"><div class="msg"><div class="avatar">E</div><div><strong>EMRE</strong>Merhaba, ben Emre.</div></div></div><section class="web-panel" id="dictation" hidden><div class="web-head"><div><h2>Canlı dikte</h2><span class="hint">Konuştuklarını anında yazar · yerel Whisper, ses dışarı gitmez</span></div><button type="button" class="iconbtn" id="dictateClose">Kapat ✕</button></div><div style="padding:0 16px 16px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="iconbtn" id="dictateToggle">Dikteyi başlat</button><span class="hint" id="dictateState">Kapalı</span></div><label style="display:block;margin:10px 0 4px;color:#a6c1c3;font-size:12px">Hedef pencere (boş bırakılırsa etkin pencere)</label><input id="dictateTarget" placeholder="ör. Antigravity" style="width:100%;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px" value=""><label style="display:block;margin:10px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateLive"> Konuştukça etkin pencereye yaz (canlı yazım)</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateEnter"> Her cümleden sonra Enter gönder</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictateAnswer"> Durdurduğumda Emre cevap versin</label><label style="display:block;margin:6px 5px;color:#a6c1c3;font-size:12px"><input type="checkbox" id="dictatePolish"> Durdurduğumda yazımı ve noktalamayı yapay zekâ düzeltsin (ücretsiz API bağlıysa)</label><textarea id="dictateText" readonly placeholder="Konuştukların burada anında belirecek…" style="width:100%;min-height:110px;margin-top:10px;background:#02090c;color:#d3e9e8;border:1px solid #29424a;border-radius:7px;padding:12px;font:inherit;resize:vertical"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="iconbtn" id="dictateType">Aktif pencereye yaz</button><button type="button" class="iconbtn" id="dictateSend">Sohbete gönder</button><button type="button" class="iconbtn" id="dictateClear">Temizle</button></div><p class="hint" id="dictateHint">Konuşurken metin ~1 saniye içinde görünür; cümle bitmesini beklemez. Yazma yalnızca “canlı yazım” açıkken veya düğmeye bastığında yapılır.</p></div></section>
-<form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button type="button" class="iconbtn" id="dictateOpen" aria-label="Canlı dikte" title="Canlı dikte: konuş, anında yaz">⌨</button><button type="button" class="iconbtn" id="screenAsk" aria-label="Ekranı sor" title="Ekranı görüntüleyip soru sor">▣</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div><div class="chat-history-head" style="margin-top:14px"><b>Sunucu geçmişi</b><button id="historyRefresh" class="iconbtn">↻</button></div><p class="hint">Bu bilgisayarda kalıcı</p><div id="serverHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="providerTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ücretsiz API</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button><button class="settings-tab" id="memoryTab" role="tab" aria-selected="false" aria-controls="settingsBody">Bellek</button><button class="settings-tab" id="mcpTab" role="tab" aria-selected="false" aria-controls="settingsBody">MCP araçları</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off" data-durum="ses">Kontrol ediliyor…</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off" data-durum="internet">Kontrol ediliyor…</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off" data-durum="telegram">Kontrol ediliyor…</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off" data-durum="cihaz">Kontrol ediliyor…</b></div><div class="statusrow"><span>✧ &nbsp; Yapay zekâ</span><b class="off" data-durum="yapayzeka">Kontrol ediliyor…</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder" id="upcomingReminders"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
+<form class="composer" id="form"><input id="input" placeholder="EMRE'e bir şeyler yaz..." autocomplete="off" aria-label="Mesaj"><button type="button" class="iconbtn" id="mic" aria-label="Mikrofon">◉</button><button type="button" class="iconbtn" id="dictateOpen" aria-label="Canlı dikte" title="Canlı dikte: konuş, anında yaz">⌨</button><button type="button" class="iconbtn" id="screenAsk" aria-label="Ekranı sor" title="Ekranı görüntüleyip soru sor">▣</button><button class="iconbtn send" aria-label="Gönder">➤</button></form></div></div><section id="simplePage" class="content" hidden><div class="settings-head"><h1 id="simpleTitle"></h1><button class="iconbtn" id="simpleBack">← Ana sayfa</button></div><div id="simpleBody" class="settings-card"></div></section><section id="chatPage" class="content" hidden><div class="settings-head"><h1>Sohbet</h1><button class="iconbtn" id="chatBack">← Ana sayfa</button></div><div class="chat-layout"><aside class="chat-history"><div class="chat-history-head"><b>Konuşmalar</b><button id="newChat" class="iconbtn">＋ Yeni</button></div><p class="hint">Bu tarayıcıda saklanır</p><div id="chatHistoryList"></div><div class="chat-history-head" style="margin-top:14px"><b>Sunucu geçmişi</b><button id="historyRefresh" class="iconbtn">↻</button></div><p class="hint">Bu bilgisayarda kalıcı</p><div id="serverHistoryList"></div></aside><div id="chatHolder"></div></div></section><section id="discoverPage" class="content" hidden><div class="settings-head"><h1>Keşfet</h1><button class="iconbtn" id="discoverBack">← Ana sayfa</button></div><div id="arenaHolder"></div></section><section id="appsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · UYGULAMALAR</div><h1>Uygulamalar</h1><p>Windows uygulamalarına tek yerden eriş.</p></div><button class="iconbtn" id="appsBack">← Ana sayfa</button></div><div class="apps-grid"><button class="apps-card" data-app="notepad"><span>▤</span><b>Not Defteri</b><small>Metin ve notlar</small><em>Aç ↗</em></button><button class="apps-card" data-app="calculator"><span>▦</span><b>Hesap Makinesi</b><small>Hızlı hesaplamalar</small><em>Aç ↗</em></button><button class="apps-card" data-app="paint"><span>◉</span><b>Paint</b><small>Çizim ve görseller</small><em>Aç ↗</em></button><button class="apps-card" data-app="explorer"><span>▱</span><b>Dosya Gezgini</b><small>Dosya ve klasörler</small><em>Aç ↗</em></button></div><p class="hint" style="margin-top:22px">Uygulama yalnızca onayınla bu Windows bilgisayarda açılır. Uygulama içindeki işlemler henüz kontrol edilmez.</p></section><section id="developerPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · GELİŞTİRİCİ</div><h1>Kod çalışma alanı</h1><p>Kod yaz, dosyalarını düzenle ve Emre’den öneri iste.</p></div><button class="iconbtn" id="devBack">← Ana sayfa</button></div><div class="settings-card"><p>Dosyalar yalnızca <b>kodlar</b> klasörüne kaydedilir. Kod otomatik çalıştırılmaz.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><select id="devFiles" class="iconbtn" aria-label="Dosyalar"><option value="">Kayıtlı dosyalar</option></select><button id="devOpen" class="iconbtn">Dosyayı aç</button><button id="devRefresh" class="iconbtn">Listeyi yenile</button></div><input id="devName" placeholder="Dosya adı: ornek.py" style="display:block;width:100%;margin:14px 0 8px;background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:11px"><textarea id="devCode" spellcheck="false" placeholder="Kodunu buraya yaz..." style="width:100%;min-height:330px;resize:vertical;background:#02090c;color:#cceddd;border:1px solid #29424a;border-radius:7px;padding:15px;font:13px/1.6 Consolas,monospace"></textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="devSave" class="iconbtn">Dosyayı kaydet</button><button id="devAsk" class="iconbtn">Emre’ye kodu sor</button></div><p class="hint">Desteklenen dosyalar: py, js, html, css, json, txt, md. Model önerileri hatalı olabilir; çalıştırmadan önce kontrol et.</p></div></section><section id="ledgerPage" class="ledger-page" hidden></section><section id="settingsPage" class="content" hidden><div class="settings-head"><div><div class="eyebrow">EMRE · KONTROL MERKEZİ</div><h1>Ayarlar</h1><p>Model ve bağlantı tercihlerini buradan yönet.</p></div><button class="iconbtn" id="settingsBack">← Ana sayfaya dön</button></div><div class="settings-tabs" role="tablist" aria-label="Ayar sekmeleri"><button class="settings-tab active" id="ollamaTab" role="tab" aria-selected="true" aria-controls="settingsBody">Ollama modeli</button><button class="settings-tab" id="providerTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ücretsiz API</button><button class="settings-tab" id="openjarvisTab" role="tab" aria-selected="false" aria-controls="settingsBody">OpenJarvis</button><button class="settings-tab" id="browserAccessTab" role="tab" aria-selected="false" aria-controls="settingsBody">Tarayıcı erişimi</button><button class="settings-tab" id="voiceTab" role="tab" aria-selected="false" aria-controls="settingsBody">Ses</button><button class="settings-tab" id="telegramTab" role="tab" aria-selected="false" aria-controls="settingsBody">Telegram</button><button class="settings-tab" id="arenaApiTab" role="tab" aria-selected="false" aria-controls="settingsBody">Arena API testi</button><button class="settings-tab" id="memoryTab" role="tab" aria-selected="false" aria-controls="settingsBody">Bellek</button><button class="settings-tab" id="mcpTab" role="tab" aria-selected="false" aria-controls="settingsBody">MCP araçları</button><button class="settings-tab" id="systemTab" role="tab" aria-selected="false" aria-controls="settingsBody">Sistem</button></div><div id="settingsBody" class="settings-card" role="tabpanel" aria-labelledby="ollamaTab"></div></section></main><aside class="right"><div class="right-head">Sistem durumu <span class="pill">PROTOTİP</span></div><div class="sidecard"><h3>Bağlantılar</h3><div class="statusrow"><span>◉ &nbsp; Sesli asistan</span><b class="off" data-durum="ses">Kontrol ediliyor…</b></div><div class="statusrow"><span>⌕ &nbsp; İnternet erişimi</span><b class="off" data-durum="internet">Kontrol ediliyor…</b></div><div class="statusrow"><span>➤ &nbsp; Telegram</span><b class="off" data-durum="telegram">Kontrol ediliyor…</b></div><div class="statusrow"><span>▦ &nbsp; Cihaz kontrolü</span><b class="off" data-durum="cihaz">Kontrol ediliyor…</b></div><div class="statusrow"><span>✧ &nbsp; Yapay zekâ</span><b class="off" data-durum="yapayzeka">Kontrol ediliyor…</b></div></div><div class="sidecard"><h3>Yaklaşan hatırlatıcılar</h3><div class="reminder" id="upcomingReminders"><span class="cal">◷</span><div><b>Hatırlatıcıları görüntüle</b><p>Sol menüden hatırlatıcı ekleyebilirsin.</p></div></div><button class="add" data-action="Hatırlatıcı ekle">＋ &nbsp; Hatırlatıcı ekle</button></div><div class="sidecard"><h3>Geliştirici modu</h3><p class="hint">Kod yazma ve geliştirme önerileri için ayrılmış alan.</p><div class="statusrow"><span>Değişiklik onayı</span><b>Gerekli</b></div></div><div class="privacy"><b>◇ &nbsp; Kontrol sende</b>Mesaj gönderme, cihaz kontrolü ve kod değişiklikleri gibi işlemler onayına sunulacak şekilde tasarlanır.</div></aside></div><button id="voiceToggle" type="button" aria-pressed="false" title="Sesli dinlemeyi aç" style="position:fixed;bottom:16px;left:16px;z-index:10;border:1px solid #37747a;background:#102c35;color:#bcebea;border-radius:22px;padding:9px 12px;font-size:11px">◉ &nbsp; Ses kapalı</button><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
 
 let timer,stream=null,recognition=null, listening=false, pendingSearch=false, speechActive=false, lastVoiceText="", lastVoiceAt=0;
 function notify(text){const el=document.getElementById('toast');el.textContent=text;el.style.display='block';clearTimeout(timer);timer=setTimeout(()=>el.style.display='none',3500)}
@@ -252,6 +252,8 @@ async function dkDurdur(){
   if(document.getElementById('dictateAnswer').checked&&sonMetin){dkSifirla();command(sonMetin)}
 }
 document.getElementById('dictateOpen').onclick=()=>{const p=document.getElementById('dictation');if(p.hidden){dkAc()}else{p.hidden=true}};
+/* Global kısayol tarayıcıyı ?dikte=1 ile açtıysa dikte kendiliğinden başlar. */
+if(new URLSearchParams(location.search).get('dikte')==='1'){dkAc();setTimeout(()=>{if(!dk.calisiyor)dkBaslat().catch(()=>{})},600)}
 document.getElementById('dictateClose').onclick=()=>{if(dk.calisiyor)dkDurdur();document.getElementById('dictation').hidden=true};
 document.getElementById('dictateToggle').onclick=()=>{dk.calisiyor?dkDurdur():dkBaslat()};
 document.getElementById('dictateType').onclick=async()=>{
@@ -655,6 +657,133 @@ document.getElementById('mcpTab').onclick=async()=>{
   body.append(durum,tara,aracKutusu,sonuc);
   tara.click();
 };
+
+
+/* ===================== SİSTEM (otomatik başlatma · kısayol · bildirim) == */
+document.getElementById('systemTab').onclick=async()=>{
+  selectSettingsTab('systemTab');
+  const body=document.getElementById('settingsBody');body.replaceChildren();
+  body.append(element('h2','Sistem'),
+    element('p','Emre’yi bilgisayar açılınca arka planda başlat, dikteyi klavye kısayoluyla yönet ve '+
+      'hatırlatıcıları tarayıcı kapalıyken de al.'));
+  const durum=element('p','Durum okunuyor…');durum.className='hint';
+  body.append(durum);
+
+  /* --- otomatik başlatma --- */
+  const acilisKutu=document.createElement('input');acilisKutu.type='checkbox';acilisKutu.id='autostartToggle';
+  const acilisEtiket=document.createElement('label');
+  acilisEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  acilisEtiket.append(acilisKutu,document.createTextNode(' Bilgisayar açılınca Emre arka planda başlasın'));
+  const acilisBilgi=element('p','');acilisBilgi.className='hint';
+  body.append(element('h3','Otomatik başlatma'),acilisEtiket,acilisBilgi);
+  acilisKutu.onchange=async()=>{
+    try{
+      const r=await api('/api/system/autostart',{aktif:acilisKutu.checked,confirmed:true});
+      acilisKutu.checked=!!r.kurulu;
+      acilisBilgi.textContent=r.kurulu?'Kuruldu: '+r.yol:'Otomatik başlatma kapalı.';
+      notify(r.kurulu?'Bilgisayar açılınca Emre başlayacak.':'Otomatik başlatma kapatıldı.');
+    }catch(e){acilisKutu.checked=!acilisKutu.checked;acilisBilgi.textContent=e.message;notify(e.message)}
+  };
+
+  /* --- global kısayol --- */
+  const kisayolKutu=document.createElement('input');kisayolKutu.type='checkbox';kisayolKutu.id='hotkeyToggle';
+  const kisayolEtiket=document.createElement('label');
+  kisayolEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  kisayolEtiket.append(kisayolKutu,document.createTextNode(' Global kısayol ile dikteyi aç/kapat'));
+  const tusGirdi=field('Kısayol: ctrl+alt+d');
+  tusGirdi.id='hotkeyInput';tusGirdi.style.width='min(260px,100%)';
+  const tarayiciKutu=document.createElement('input');tarayiciKutu.type='checkbox';tarayiciKutu.id='hotkeyBrowser';
+  const tarayiciEtiket=document.createElement('label');
+  tarayiciEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:6px 0';
+  tarayiciEtiket.append(tarayiciKutu,document.createTextNode(' Sayfa kapalıysa kısayol tarayıcıyı açsın'));
+  const kisayolBilgi=element('p','');kisayolBilgi.className='hint';
+  const kaydet=button('Kısayolu kaydet',async()=>{
+    try{
+      const r=await api('/api/system/hotkey',{aktif:kisayolKutu.checked,kisayol:tusGirdi.value.trim(),
+        tarayici:tarayiciKutu.checked});
+      kisayolBilgi.textContent=r.aktif?('Etkin: '+r.gorunen):'Kısayol kapalı.';
+      notify('Kısayol ayarı kaydedildi.');
+    }catch(e){notify(e.message);kisayolBilgi.textContent=e.message}
+  });
+  body.append(element('h3','Global kısayol'),kisayolEtiket,tusGirdi,tarayiciEtiket,kaydet,kisayolBilgi,
+    (()=>{const p=element('p','Kısayol yalnızca Windows’ta çalışır ve yalnızca dikteyi başlatır/durdurur; '+
+      'hiçbir komut çalıştırmaz. Bu sayfa açıkken ~1 saniye içinde tepki verir.');p.className='hint';return p})());
+
+  /* --- hatırlatıcı bildirimleri --- */
+  const bildirimKutu=document.createElement('input');bildirimKutu.type='checkbox';bildirimKutu.id='notifyToggle';
+  const bildirimEtiket=document.createElement('label');
+  bildirimEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  bildirimEtiket.append(bildirimKutu,document.createTextNode(' Hatırlatıcı zamanı gelince masaüstü bildirimi göster'));
+  const bildirimBilgi=element('p','');bildirimBilgi.className='hint';
+  bildirimKutu.onchange=async()=>{
+    try{
+      const r=await api('/api/system/notifications',{aktif:bildirimKutu.checked});
+      bildirimBilgi.textContent=r.aktif?'Masaüstü bildirimi açık.':'Yalnızca sayfa içinde gösterilir.';
+    }catch(e){bildirimKutu.checked=!bildirimKutu.checked;notify(e.message)}
+  };
+  body.append(element('h3','Hatırlatıcı bildirimleri'),bildirimEtiket,bildirimBilgi,
+    (()=>{const p=element('p','Hatırlatıcıları sunucu kontrol eder: tarayıcı kapalı olsa da süresi gelen '+
+      'hatırlatıcı kaydedilir ve bir sonraki açılışta gösterilir. Bildirim yalnızca bilgisayarında görünür.');p.className='hint';return p})());
+
+  try{
+    const r=await api('/api/system/status');
+    acilisKutu.checked=!!r.autostart.kurulu;
+    acilisKutu.disabled=!r.autostart.destekli;
+    acilisBilgi.textContent=r.autostart.destekli
+      ? (r.autostart.kurulu?'Kurulu: '+r.autostart.yol:'Kurulu değil.')
+      : 'Bu platformda desteklenmiyor (yalnızca Windows).';
+    kisayolKutu.checked=!!r.hotkey.acik;
+    kisayolKutu.disabled=!r.hotkey.destekli;
+    tusGirdi.value=r.hotkey.kisayol||'ctrl+alt+d';
+    tarayiciKutu.checked=r.hotkey_tarayici!==false;
+    kisayolBilgi.textContent=r.hotkey.destekli
+      ? (r.hotkey.aktif?'Etkin: '+r.hotkey.gorunen:(r.hotkey.hata||'Kısayol kapalı.'))
+      : 'Global kısayol yalnızca Windows’ta çalışır.';
+    bildirimKutu.checked=!!r.notifications.aktif;
+    bildirimBilgi.textContent=r.notifications.aktif
+      ? 'Masaüstü bildirimi açık'+(r.notifications.bekleyen?' · okunmamış '+r.notifications.bekleyen+' bildirim':'')
+      : 'Yalnızca sayfa içinde gösterilir.';
+    durum.textContent='Sürüm '+r.version;
+  }catch(e){durum.textContent=e.message}
+};
+
+/* Global kısayol: sunucudaki sıra numarası artınca dikteyi aç/kapat. */
+let kisayolSeq=-1;
+async function kisayolYokla(){
+  if(!apiToken)return;
+  try{
+    const r=await api('/api/hotkey/poll?since='+Math.max(kisayolSeq,0));
+    if(kisayolSeq<0){kisayolSeq=r.seq;return}
+    if(r.basildi){
+      kisayolSeq=r.seq;
+      if(typeof dk==='undefined')return;
+      dkAc();
+      if(dk.calisiyor){await dkDurdur();notify('Dikte durduruldu (kısayol).')}
+      else{await dkBaslat();notify('Dikte başladı (kısayol).')}
+    }
+  }catch(e){}
+}
+setInterval(kisayolYokla,1500);
+
+/* Sunucu tarafı hatırlatıcı bildirimleri (tarayıcı kapalıyken birikenler dâhil). */
+let bildirimSeq=0;
+async function bildirimYokla(){
+  if(!apiToken)return;
+  try{
+    const r=await api('/api/notifications?since=0');
+    if(!r.items.length)return;
+    const yeniler=r.items.filter(x=>x.id>bildirimSeq).sort((a,b)=>a.id-b.id);
+    if(!yeniler.length)return;
+    bildirimSeq=Math.max(...r.items.map(x=>x.id));
+    for(const n of yeniler){
+      notify(n.title+': '+n.text);
+      if('Notification' in window&&Notification.permission==='granted')new Notification(n.title,{body:n.text,tag:'emre-'+n.id});
+    }
+    await api('/api/notifications/seen',{ids:yeniler.map(n=>n.id)});
+  }catch(e){}
+}
+setInterval(bildirimYokla,15000);
+bildirimYokla();
 
 /* ===================== EKRANI SOR ======================================== */
 document.getElementById('screenAsk').onclick=async()=>{

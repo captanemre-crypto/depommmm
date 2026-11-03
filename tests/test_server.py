@@ -11,6 +11,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
@@ -505,6 +506,102 @@ class ServerTestCase(unittest.TestCase):
             veri = self.api('/api/screen/ask', {'confirmed': True, 'question': 'Ne görüyorsun?'})
         self.assertTrue(veri['reply'])
         self.assertNotIn('QUJD', veri['reply'])
+
+    # --- sistem: otomatik başlatma, kısayol, bildirim ------------------------
+    def test_system_status_shape(self):
+        veri = self.api('/api/system/status')
+        self.assertIn('autostart', veri)
+        self.assertIn('hotkey', veri)
+        self.assertIn('notifications', veri)
+        self.assertFalse(veri['autostart']['destekli'] if sys.platform != 'win32' else False)
+
+    def test_autostart_requires_confirmation(self):
+        hata = self.api('/api/system/autostart', {'aktif': True}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_autostart_toggle_is_passed_to_module(self):
+        import otomatik_baslat
+        with mock.patch.object(otomatik_baslat, 'kur', return_value={'destekli': True, 'kurulu': True}) as kur, \
+                mock.patch.object(otomatik_baslat, 'kaldir', return_value={'destekli': True, 'kurulu': False}) as kaldir:
+            self.assertTrue(self.api('/api/system/autostart', {'aktif': True, 'confirmed': True})['kurulu'])
+            self.assertFalse(self.api('/api/system/autostart', {'aktif': False, 'confirmed': True})['kurulu'])
+        kur.assert_called_once()
+        kaldir.assert_called_once()
+
+    def test_autostart_rejects_bad_type(self):
+        hata = self.api('/api/system/autostart', {'aktif': 'evet', 'confirmed': True}, expect=400)
+        self.assertIn('doğru/yanlış', hata['error'])
+
+    def test_hotkey_invalid_shortcut_rejected(self):
+        hata = self.api('/api/system/hotkey', {'aktif': False, 'kisayol': 'meta+d'}, expect=400)
+        self.assertIn('Bilinmeyen', hata['error'])
+
+    def test_hotkey_enable_on_unsupported_platform(self):
+        if sys.platform == 'win32':
+            self.skipTest("Windows'ta kısayol gerçekten kaydedilir.")
+        hata = self.api('/api/system/hotkey', {'aktif': True}, expect=400)
+        self.assertIn('Windows', hata['error'])
+
+    def test_hotkey_settings_persist_when_disabled(self):
+        sonuc = self.api('/api/system/hotkey', {'aktif': False, 'kisayol': 'ctrl+shift+e', 'tarayici': False})
+        self.assertFalse(sonuc['aktif'])
+        durum = self.api('/api/system/status')
+        self.assertEqual(durum['hotkey']['kisayol'], 'ctrl+shift+e')
+        self.assertEqual(durum['hotkey']['gorunen'], 'Ctrl+Shift+E')
+        self.assertFalse(durum['hotkey_tarayici'])
+
+    def test_hotkey_poll_increments_sequence_only_on_press(self):
+        ilk = self.api('/api/hotkey/poll?since=0')
+        self.assertFalse(ilk['basildi'])
+        server._kisayol_geri_cagri()
+        ikinci = self.api('/api/hotkey/poll?since=%d' % ilk['seq'])
+        self.assertTrue(ikinci['basildi'])
+        self.assertEqual(ikinci['seq'], ilk['seq'] + 1)
+        ucuncu = self.api('/api/hotkey/poll?since=%d' % ikinci['seq'])
+        self.assertFalse(ucuncu['basildi'])
+
+    def test_notifications_toggle(self):
+        self.assertTrue(self.api('/api/system/status')['notifications']['aktif'])
+        self.api('/api/system/notifications', {'aktif': False})
+        self.assertFalse(self.api('/api/system/status')['notifications']['aktif'])
+        self.api('/api/system/notifications', {'aktif': True})
+        self.api('/api/system/notifications', {'aktif': 'evet'}, expect=400)
+
+    def test_due_reminder_creates_single_notification(self):
+        gecmis = (datetime.now() - timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M')
+        self.api('/api/reminders', {'text': 'E2E kira', 'due': gecmis})
+        with mock.patch.object(server.bildirim, 'goster') as goster, \
+                mock.patch.object(server.bildirim, 'cal'):
+            ilk = server.bildirim_tara()
+            ikinci = server.bildirim_tara()
+        self.assertEqual(len(ilk), 1)
+        self.assertEqual(ikinci, [])  # aynı hatırlatıcı iki kez bildirilmez
+        goster.assert_called_once()
+        veri = self.api('/api/notifications?since=0')
+        self.assertTrue(any('E2E kira' in k['text'] for k in veri['items']))
+        self.api('/api/notifications/seen', {})
+        self.assertEqual(self.api('/api/notifications?since=0')['items'], [])
+
+    def test_future_reminder_is_not_notified(self):
+        gelecek = (datetime.now() + timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M')
+        self.api('/api/reminders', {'text': 'ileride', 'due': gelecek})
+        self.assertEqual(server.bildirim_tara(), [])
+
+    def test_done_reminder_is_not_notified(self):
+        gecmis = (datetime.now() - timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M')
+        self.api('/api/reminders', {'text': 'bitti', 'due': gecmis})
+        kayit = self.api('/api/reminders')['reminders'][-1]
+        self.api('/api/reminders/done', {'id': kayit['id']})
+        self.assertEqual(server.bildirim_tara(), [])
+
+    def test_desktop_notification_can_be_disabled(self):
+        self.api('/api/system/notifications', {'aktif': False})
+        gecmis = (datetime.now() - timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M')
+        self.api('/api/reminders', {'text': 'sessiz', 'due': gecmis})
+        with mock.patch.object(server.bildirim, 'goster') as goster:
+            server.bildirim_tara()
+        goster.assert_not_called()
+        self.assertTrue(any('sessiz' in k['text'] for k in self.api('/api/notifications?since=0')['items']))
 
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')
