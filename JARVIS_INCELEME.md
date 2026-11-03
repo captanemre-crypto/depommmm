@@ -177,8 +177,9 @@ Eksik olduğu yerler: **uyandırma sözcüğü**, **MCP**, **kalıcı anlamsal b
 
 ## 9. Eklenen özellikler (2026-11-03 · “ekle” turu)
 
-Bölüm 5’teki öneri tablosunun 1–4 numaralı maddeleri Emre’ye eklendi. Beşinci madde (skill ekosistemi)
-hâlâ açık; ayrıca barge-in / akışlı TTS yok.
+Bölüm 5’teki öneri tablosunun tamamı Emre’ye eklendi (kapanış turu: 2026-11-03).
+Skill ekosistemi, akışlı TTS + barge-in, belge okuma, takvim/posta, günlük özet, komut paleti,
+tema ve görsel üretimi artık mevcut.
 
 | Öneri | Emre’de durumu | Dosya / uç |
 | --- | --- | --- |
@@ -186,8 +187,13 @@ hâlâ açık; ayrıca barge-in / akışlı TTS yok.
 | Kalıcı bellek | ✅ Otomatik çıkarım + mükerrer engeli + Türkçe aksan duyarsız arama + sohbet bağlamı | `bellek.py`, `/api/memory*` |
 | MCP istemcisi | ✅ stdio JSON-RPC, kabuk yok, her çağrı onaylı | `mcp_istemci.py`, `mcp_ayar.json`, `/api/mcp/*` |
 | Ekran görme | ✅ Onaylı ekran görüntüsü + görsel destekli sağlayıcıya soru | `ekran.py`, `/api/screen/*`, sohbet alanındaki **▣** |
-| Skill ekosistemi | ❌ Henüz yok | — |
-| Barge-in / akışlı TTS | ❌ Henüz yok | — |
+| Skill ekosistemi | ✅ `beceriler/<ad>/SKILL.md`, `!ad` komutu, panel | `beceriler.py`, `/api/skills*` |
+| Barge-in / akışlı TTS | ✅ Cümle cümle okuma + sen konuşunca susma | `sesli_yanit.py`, `/api/tts/split`, Ayarlar › Ses |
+| Belge okuma | ✅ PDF/DOCX/txt/md/csv/html + belgeye soru (kaynak numaralı) | `belge.py`, `/api/docs/*` |
+| Takvim / posta | ✅ `.ics` ve `.eml`/`.mbox` salt okunur (IMAP/SMTP yok) | `takvim.py`, `posta.py`, `/api/calendar`, `/api/mail` |
+| Günlük özet | ✅ Ana sayfada “Bugün” kartı | `/api/today` |
+| Komut paleti · tema | ✅ `/`, `Ctrl+K`, `?`; Koyu/Açık/Sistem + yazı boyutu | `index.html` |
+| Görsel üretimi | ✅ Sağlayıcının `/images/generations` ucu (onaylı) | `saglayici.gorsel()`, `/api/image/generate` |
 
 Kıyasla nerede kalıyoruz:
 
@@ -195,5 +201,6 @@ Kıyasla nerede kalıyoruz:
   Emre’de bu, Whisper metni üzerinde çalışır — bu yüzden 1–2 sn gecikme ve yazım hatasına duyarlılık var,
   ama ek model/bağımlılık gerekmiyor ve tamamen yerel kalıyor.
 - **OpenClaw** araçları sormadan çalıştırır; Emre’de MCP çağrıları dâhil her tehlikeli işlem `confirmed:true` ister.
-- **Leon / Hermes** skill mağazasına sahip; Emre’nin eşdeğeri `kodlar/` geliştirici alanı ve
-  `ledger_tools`/`hatirlatici` gibi yerleşik modüller. Bir “skill” dizini + `SKILL.md` yükleyici sıradaki adım olabilir.
+- **Leon / Hermes** skill mağazasına sahip; Emre'de eşdeğeri `beceriler/<ad>/SKILL.md` dizini
+  (`!ad` ile elle çalıştırma, onay zorunlu) ve `kodlar/` geliştirici alanı. Otomatik beceri *indirme* yoktur:
+  beceri dosyasını sen eklersin, Emre kendi başına kod çalıştırmaz.

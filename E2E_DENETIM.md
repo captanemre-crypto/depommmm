@@ -1,5 +1,12 @@
 # EMRE — Uçtan Uca (E2E) Tarama Raporu
 
+> **Güncel durum (2026-11-03, kapanış turu):** Bu belge ikinci tur taramasının (2026-11-02) kaydıdır.
+> O tarihten sonra eklenen özelliklerle birlikte güncel sayılar: **579 birim/HTTP testi**,
+> **60 arayüz E2E kontrolü**, `ruff check .` temiz. Yeni kontroller: belge yükleme/silme/belgeye soru,
+> takvim yolu + etkinlik listesi, ses ayarları (akışlı seslendirme/söz kesme), “Bugün” kartı,
+> komut paleti (`/`, `Ctrl+K`), tema/yazı boyutu, görsel üretim paneli, `?` kısayol yardımı,
+> uzun sohbet DOM sınırı. Ayrıntı: `README.md` son üç bölüm ve `TAMAMLAMA.md` altıncı–sekizinci turlar.
+
 Tarih: 2026-11-02 · Önceki rapor: `DENETIM.md` (statik tarama)
 Bu rapor, uygulamayı **çalıştırarak** yapılan ikinci tur taramanın sonuçlarını ve kalan eksikleri içerir.
 

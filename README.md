@@ -63,7 +63,7 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**568 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, günlük özet, görsel üretimi, akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**579 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği, sağlayıcı yedek modeli, günlük özet, görsel üretimi, arayüz erişilebilirliği (kontrast), akışlı seslendirme/söz kesme, belge okuma ve belgeye soru sorma, `.ics` takvim ve `.eml`/`.mbox` posta okumayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
 `tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (51 kontrol).
@@ -174,6 +174,48 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Kapanış turu: erişilebilirlik, uzun sohbet ve erişim rehberi (2026-11-03 · sekizinci tur)
+
+Yol haritasındaki son açık başlıklar kapatıldı; bu tur yeni özellik değil, **kalite ve güvenlik** turudur.
+
+### 1. Erişilebilirlik: WCAG AA kontrast + otomatik test
+
+- Koyu temada okunurluğu düşük olan yardımcı metinler düzeltildi:
+  palet alt yazısı `3.87 → 5.96`, “Bugün” kartı saat satırı `4.28 → 5.78`, palet küçük yazı `3.93 → 5.10`.
+- Yeni `tests/test_arayuz_erisim.py` (11 test) renk çiftlerini **tarayıcı çalıştırmadan** hesaplar:
+  13 koyu tema + 5 açık tema çifti ≥ 4.5:1 olmalı. Renk değiştirilirse test uyarır.
+- Aynı test dosyası yapısal kontrolleri de yapar: palet `role="dialog"` + `aria-modal`, `Bugün` kartının
+  `aria-labelledby` bağlantısı, 12+ ayar sekmesinin `role="tab"` işaretleri, `?` kısayol yardımının varlığı,
+  “henüz hazırlanmadı” gibi yarım kalmış metinlerin **bulunmaması**.
+
+### 2. Uzun sohbet: DOM sınırı
+
+- Sohbet görünümünde en fazla **300 mesaj** tutulur; daha eskiler DOM'dan çıkarılır.
+  Sunucu geçmişi ve tarayıcı kaydı silinmez; üstte “Daha eski mesajlar bu görünümden kaldırıldı…”
+  bilgi satırı görünür.
+- Böylece saatlerce açık kalan pencerede bellek/düzen bozulması ve kaydırma yavaşlaması önlenir.
+
+### 3. `?` kısayol yardımı
+
+- Klavyeden `?` (Shift + `/`) kısayol panelini açar: `/`, `Ctrl+K`, `?`, `Esc`, `↑ ↓ · Enter`,
+  `Ctrl+Alt+D` (global dikte) ve mikrofon düğmesi.
+- Palete **Kısayollar** komutu da eklendi (16 komut).
+
+### 4. Temizlik
+
+- Navigasyonda ulaşılamayan “bölümü henüz hazırlanmadı” ve “özelliği henüz bağlı değil” yedek mesajları kaldırıldı;
+  artık her menü öğesi gerçek bir ekrana gider.
+
+### 5. Telefondan erişim (C5) — kod değişikliği yok
+
+- Sunucu **yalnızca `127.0.0.1`** dinlemeye devam ediyor.
+- Güvenli yol adım adım yazıldı: **[`UZAK_ERISIM.md`](UZAK_ERISIM.md)** — Tailscale özel ağı + SSH tüneli,
+  Emre yine yerel adreste kalır. Port yönlendirme ve herkese açık tüneller açıkça **önerilmiyor**.
+
+### Testler
+
+`tests/test_arayuz_erisim.py` +11 → **579 test**. Arayüz E2E **60/60** (yeni kontroller: `?` yardımı, uzun sohbet sınırı).
 
 ## Bugün özeti, komut paleti, tema ve görsel üretimi (2026-11-03 · yedinci tur)
 

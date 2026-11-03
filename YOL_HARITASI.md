@@ -5,7 +5,7 @@ Her maddede: neden gerekli, bugün ne var/ne yok, tahmini emek (S ≤ 1 gün, M 
 
 Mevcut durum (özet): sohbet (Ollama + ücretsiz API), Türkçe sesli giriş, canlı dikte + etkin pencereye yazma,
 uyandırma sözcüğü (metin tabanlı), kişisel bellek, MCP araçları, ekranı sor, defter, hatırlatıcılar,
-Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 568 test + 58 E2E kontrol.
+Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) prototipi, 579 test + 60 E2E kontrol.
 
 ---
 
@@ -37,7 +37,7 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | ~~C2~~ ✅ | **Bellek dışa/içe aktarma ve yaşlandırma** | **Eklendi:** JSON yedek indir/geri yükle, `unut:` komutu, 180 gün yaşlandırma | S |
 | ~~C3~~ ✅ | **Sağlayıcı yedeği ve kota sayacı** | **Eklendi:** 429/402/5xx’te tek denemeli yedek model, günlük istek/hata sayacı | M |
 | ~~C4~~ ✅ | **Açılışta kendi kendini kontrol** | **Eklendi:** `tanilama.py` 10 kontrol + Ayarlar › Sistem paneli | S |
-| C5 | **Telefondan erişim** | README’de bilinçli sınır. Ancak Tailscale/ZeroTier + token ile mümkün; **önerilmez** (yüzey alanı büyür) — **bilinçli olarak yapılmadı**, gerekçe aşağıda | L |
+| C5 | **Telefondan erişim** | **Kod değişikliği yapılmadı (bilinçli).** Rehber eklendi: [`UZAK_ERISIM.md`](UZAK_ERISIM.md) — Tailscale + SSH tüneli ile sunucu yine `127.0.0.1` dinler | L |
 
 ## D. Deneyim / kozmetik
 
@@ -55,8 +55,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 - CAPTCHA/giriş atlatma, gerçek para işlemi, AI’nın önerdiği komutu otomatik çalıştırma.
 - Tarayıcı erişimi “tam” modunu etkinleştirme; şu an yalnızca hazırlık tercihi.
 - **C5 — telefondan erişim**: sunucu yalnızca `127.0.0.1` dinler. Dışarı açmak token + TLS + yama yönetimi gerektirir
-  ve “yalnızca bu bilgisayar” sınırını bozar. İhtiyaç olursa önerilen yol: ayrı bir tünel (Tailscale/WireGuard)
-  kurup Emre'yi yine `127.0.0.1` üzerinde bırakmak. Kod tarafında değişiklik yapılmadı.
+  ve “yalnızca bu bilgisayar” sınırını bozar. Kod tarafında değişiklik **yapılmadı**; güvenli yol
+  [`UZAK_ERISIM.md`](UZAK_ERISIM.md) içinde adım adım anlatıldı (Tailscale + SSH tüneli).
 
 ## Önerilen sıra
 
@@ -66,6 +66,9 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 5. ~~**B2** (akışlı TTS + barge-in)~~ ✅ — tam çift yönlü ses.
 6. ~~**B3** (belge okuma)~~ ✅ · ~~**B4** (takvim/e-posta)~~ ✅.
 7. ~~**D1** (bugün özeti) + **D2** (komut paleti) + **D3** (tema/yazı boyutu) + **B5** (görsel üretimi)~~ ✅ (2026-11-03).
-   **Yol haritasındaki tüm maddeler kapandı**; yalnızca “bilinçli olarak yapılmayacaklar” listesi (C5, tam tarayıcı erişimi) açık.
+8. ~~**Kapanış turu**: WCAG AA kontrast düzeltmeleri + kontrast testi, uzun sohbet DOM sınırı,
+   `?` kısayol yardımı, C5 erişim rehberi~~ ✅ (2026-11-03).
+   **Yol haritasındaki her madde kapandı.** Açık kalan tek başlık “bilinçli olarak yapılmayacaklar”:
+   tam tarayıcı erişimi ve sunucuyu dışarı açmak.
 
 Yaklaşık toplam: A bloğu ~1,5 hafta, B1–B2 ~1 hafta, C1–C4 ~3 gün.

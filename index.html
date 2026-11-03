@@ -36,14 +36,14 @@
 .today-panel{margin:16px 0 10px;border:1px solid #1d343f;border-radius:14px;background:linear-gradient(180deg,#08131a,#050c11);padding:16px 18px}
 .today-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .today-head h2{font-size:15px;margin:0;color:#cfe9e6;letter-spacing:.04em}
-.today-head small{color:#5f7d89;font-size:11px}
+.today-head small{color:#7294a0;font-size:11px}
 .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
 .today-card{border:1px solid #1b2f39;border-radius:10px;padding:12px;background:#081217;min-height:100px}
 .today-card h3{margin:0 0 6px;font-size:11px;color:#6fd7d2;text-transform:uppercase;letter-spacing:.08em}
 .today-card ul{margin:0;padding-left:15px;color:#c6dde0;font-size:12.5px;line-height:1.55;max-height:132px;overflow:auto}
-.today-card .bos{color:#6d8794;font-size:12px;margin:0}
+.today-card .bos{color:#7e97a3;font-size:12px;margin:0}
 .today-num{font-size:21px;font-weight:700;color:#eafcfb;display:block;line-height:1.25}
-.today-num em{font-style:normal;font-size:11px;color:#6d8794;font-weight:400}
+.today-num em{font-style:normal;font-size:11px;color:#7e97a3;font-weight:400}
 .today-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 
 /* ===== D2: komut paleti =================================================== */
@@ -54,8 +54,8 @@
 .palette-list{max-height:46vh;overflow:auto;margin:0;padding:6px;list-style:none}
 .palette-list li{padding:10px 12px;border-radius:8px;color:#cfe3e6;display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px}
 .palette-list li[aria-selected="true"]{background:#0e2b33;color:#eafcfb;outline:1px solid #2d6b74}
-.palette-list small{color:#6d8794}
-.palette-hint{padding:8px 14px 12px;color:#5c7581;font-size:11px}
+.palette-list small{color:#8fa7b0}
+.palette-hint{padding:8px 14px 12px;color:#7b95a1;font-size:11px}
 
 /* ===== D3: açık tema ===================================================== */
 body[data-tema="acik"]{--bg:#eef3f5;--panel:#fff;--line:#cfdde3;--muted:#4e6a76;--text:#0d1b21;background:#eef3f5;color:#0d1b21}
@@ -83,7 +83,7 @@ body{font-size:var(--yazi,14px)}
 let bargeSayac=0;
 let timer,stream=null,recognition=null, listening=false, pendingSearch=false, speechActive=false, lastVoiceText="", lastVoiceAt=0;
 function notify(text){const el=document.getElementById('toast');el.textContent=text;el.style.display='block';clearTimeout(timer);timer=setTimeout(()=>el.style.display='none',3500)}
-let restoringChat=false;function add(name,text,cls=''){const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),body=document.createElement('div'),strong=document.createElement('strong');row.className='msg '+cls;av.className='avatar';av.textContent=name==='Sen'?'S':'E';strong.textContent=name;body.append(strong,document.createTextNode(text));row.append(av,body);messages.append(row);messages.scrollTop=messages.scrollHeight;if(!restoringChat){try{let saved=JSON.parse(localStorage.getItem('emre-chat')||'[]');saved.push({name,text,cls});localStorage.setItem('emre-chat',JSON.stringify(saved.slice(-200)));persistActiveChat()}catch(e){notify('Sohbet geçmişi kaydedilemedi.')}}}
+let restoringChat=false;function add(name,text,cls=''){const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),body=document.createElement('div'),strong=document.createElement('strong');row.className='msg '+cls;av.className='avatar';av.textContent=name==='Sen'?'S':'E';strong.textContent=name;body.append(strong,document.createTextNode(text));row.append(av,body);messages.append(row);while(messages.children.length>300&&messages.firstElementChild){messages.firstElementChild.remove()}if(messages.children.length===300&&!document.getElementById('eskiNotu')){const not=document.createElement('div');not.id='eskiNotu';not.className='hint';not.textContent='Daha eski mesajlar bu görünümden kaldırıldı; sunucu geçmişinde duruyor (Sohbet › Sunucu geçmişi).';messages.prepend(not)}messages.scrollTop=messages.scrollHeight;if(!restoringChat){try{let saved=JSON.parse(localStorage.getItem('emre-chat')||'[]');saved.push({name,text,cls});localStorage.setItem('emre-chat',JSON.stringify(saved.slice(-200)));persistActiveChat()}catch(e){notify('Sohbet geçmişi kaydedilemedi.')}}}
 function speechPlainText(text){return String(text).replace(/```[\s\S]*?(?:```|$)/g,' ').replace(/`[^`]*`/g,' ').replace(/\{\s*"(?:name|arguments|tool_calls)"[\s\S]*?\}/gi,' ').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/gi,' ').replace(/\[\d+\]/g,' ').replace(/<[^>]+>/g,' ').replace(/(^|\n)\s{0,3}#{1,6}\s*/g,'$1').replace(/[*_~]+/g,'').replace(/\s+/g,' ').trim()}
 let ttsContext=null,ttsSource=null,ttsCancel=null,ttsGeneration=0;async function playLocalSpeech(text,kuyruk){text=speechPlainText(text);if(!text){notify('Okunacak düz metin yok.');return}const current=++ttsGeneration;if(ttsCancel){ttsCancel();ttsCancel=null}if(ttsSource){try{ttsSource.stop()}catch(e){}ttsSource=null}const voice=localStorage.getItem('emre-tts-voice');if(!voice){notify('Ayarlar > Ses bölümünden yerel Türkçe ses seç.');return}speechActive=true;try{let ctx=ttsContext||new (window.AudioContext||window.webkitAudioContext)();ttsContext=ctx;await ctx.resume();let data=await api('/api/tts/speak',{text:text.slice(0,1500),voice});if(current!==ttsGeneration)return;let bytes=Uint8Array.from(atob(data.audio),c=>c.charCodeAt(0));if(localStorage.getItem('emre-reverb')!=='1'){let url=URL.createObjectURL(new Blob([bytes],{type:'audio/wav'}));await new Promise((resolve,reject)=>{let player=new Audio(url);function cleanup(){player.onended=null;player.onerror=null;URL.revokeObjectURL(url);if(current===ttsGeneration)ttsCancel=null}ttsCancel=()=>{player.pause();cleanup();resolve()};player.onended=()=>{cleanup();resolve()};player.onerror=()=>{cleanup();reject(new Error('Ses oynatılamadı.'))};player.play().catch(err=>{cleanup();reject(err)})});return}let audio=await ctx.decodeAudioData(bytes.buffer);if(current!==ttsGeneration)return;let source=ctx.createBufferSource(),dry=ctx.createGain(),wet=ctx.createGain(),convolver=ctx.createConvolver();let length=Math.floor(ctx.sampleRate*.85),impulse=ctx.createBuffer(2,length,ctx.sampleRate);for(let ch=0;ch<2;ch++){let arr=impulse.getChannelData(ch);for(let i=Math.floor(.025*ctx.sampleRate);i<length;i++)arr[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.18))}convolver.buffer=impulse;dry.gain.value=1;wet.gain.value=localStorage.getItem('emre-reverb')==='1'?.08:0;source.buffer=audio;source.connect(dry);dry.connect(ctx.destination);if(localStorage.getItem('emre-reverb')==='1'){source.connect(convolver);convolver.connect(wet);wet.connect(ctx.destination)}ttsSource=source;await new Promise(resolve=>{source.onended=resolve;source.start()});if(current===ttsGeneration)ttsSource=null}catch(e){if(current===ttsGeneration)notify('Yerel ses: '+e.message)}finally{if(current===ttsGeneration&&!kuyruk)speechActive=false}}
 let akisSeslendi=false;
@@ -330,7 +330,7 @@ document.getElementById('dictatePolish').checked=localStorage.getItem('emre-dict
 document.getElementById('dictatePolish').onchange=(e)=>localStorage.setItem('emre-dictate-polish',e.target.checked?'1':'0');
 window.addEventListener('beforeunload',()=>{if(dk.ctx)try{dk.ctx.close()}catch(e){}});
 
-document.getElementById('mic').onclick=()=>toggle.click();document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{if(b.dataset.section==='Keşfet')openArena();else if(b.dataset.section==='Sohbet'){showChatPage()}else if(b.dataset.section==='Telegram')showTelegram();else if(b.dataset.section==='Hatırlatıcılar')showReminders();else if(b.dataset.section==='Defter')showLedger();else if(b.dataset.section==='Ayarlar')showSettings();else if(b.dataset.section==='Geliştirici')showDeveloper();else if(b.dataset.section==='Uygulamalar')showApps();else if(b.dataset.section!=='Ana sayfa')notify(b.dataset.section+' bölümü henüz hazırlanmadı.');else window.scrollTo({top:0,behavior:'smooth'})});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>b.dataset.action==='Hatırlatıcı ekle'?showReminders():notify(b.dataset.action+' özelliği henüz bağlı değil.'));
+document.getElementById('mic').onclick=()=>toggle.click();document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{if(b.dataset.section==='Keşfet')openArena();else if(b.dataset.section==='Sohbet'){showChatPage()}else if(b.dataset.section==='Telegram')showTelegram();else if(b.dataset.section==='Hatırlatıcılar')showReminders();else if(b.dataset.section==='Defter')showLedger();else if(b.dataset.section==='Ayarlar')showSettings();else if(b.dataset.section==='Geliştirici')showDeveloper();else if(b.dataset.section==='Uygulamalar')showApps();else window.scrollTo({top:0,behavior:'smooth'})});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>b.dataset.action==='Hatırlatıcı ekle'?showReminders():showChatPage());
 
 
 const apiToken=document.querySelector('meta[name="emre-token"]')?.content;let conversation=[],busy=false;try{conversation=JSON.parse(localStorage.getItem('emre-context')||'[]').slice(-12)}catch(e){conversation=[]}
@@ -1642,6 +1642,37 @@ function showGorsel(){
   }),durum,sonuc);
 }
 
+/* ===================== KISAYOLLAR YARDIMI ================================ */
+function showKisayollar(){
+  const body=panel('Kısayollar');
+  body.append(element('p','Klavyeden hızlı erişim. Kısayollar yalnızca bir metin alanına yazmıyorken çalışır; '+
+    'yazarken yanlışlıkla panel açılmaz.'));
+  const satirlar=[
+    ['/','Komut paletini aç'],
+    ['Ctrl + K','Komut paletini aç (⌘K da olur)'],
+    ['?','Bu yardım panelini aç'],
+    ['Esc','Açık paneli / paleti kapat'],
+    ['↑ ↓ · Enter','Palette gezin ve komutu çalıştır'],
+    ['Ctrl + Alt + D','Her yerden canlı dikte (Windows, Ayarlar › Sistem)'],
+    ['Mikrofon düğmesi','Sesli dinlemeyi aç/kapat'],
+  ];
+  const tablo=document.createElement('div');
+  tablo.style.cssText='display:grid;gap:6px;margin-top:12px';
+  for(const [tus,aciklama] of satirlar){
+    const satir=document.createElement('div');
+    satir.style.cssText='display:flex;gap:12px;align-items:baseline;flex-wrap:wrap';
+    const k=element('code',tus);
+    k.style.cssText='min-width:120px;background:#0d1c23;border:1px solid #24414d;border-radius:6px;padding:4px 8px;color:#8fe9e2;font-size:12px';
+    satir.append(k,element('span',aciklama));
+    tablo.append(satir);
+  }
+  body.append(tablo,ipucuNotu());
+}
+function ipucuNotu(){
+  const p=element('p','İpucu: Yazarken `/` karakteri metne girer; palet için Ctrl+K kullanabilirsin.');
+  p.className='hint';return p;
+}
+
 /* ===================== D2 · KOMUT PALETİ ================================= */
 const PALETTE_KOMUTLAR=[
   {ad:'Sohbete git',detay:'yazışma ekranı',calistir:()=>showChatPage()},
@@ -1659,6 +1690,7 @@ const PALETTE_KOMUTLAR=[
   {ad:'Bugünü yenile',detay:'ana sayfa özeti',calistir:()=>{returnHome();bugunYukle()}},
   {ad:'Mikrofonu aç / kapat',detay:'sesli dinleme',calistir:()=>document.getElementById('mic').click()},
   {ad:'Sistemi tanı',detay:'yerel kontroller',calistir:()=>{showSettings();setTimeout(()=>document.getElementById('systemTab').click(),80)}},
+  {ad:'Kısayollar',detay:'klavye kısayolları ve ipuçları',calistir:()=>showKisayollar()},
 ];
 let paletteSecim=0,paletteSonuc=[];
 function paletteCiz(){
@@ -1714,6 +1746,7 @@ document.addEventListener('keydown',(e)=>{
   const yaziyor=/^(INPUT|TEXTAREA|SELECT)$/.test(hedef.tagName||'')||hedef.isContentEditable;
   if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){e.preventDefault();paletteAc();return}
   if(e.key==='/'&&!yaziyor&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();paletteAc();return}
+  if(e.key==='?'&&!yaziyor&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();showKisayollar();return}
   if(e.key==='Escape'){
     const kutu=document.getElementById('palette');
     if(kutu&&!kutu.hidden){paletteKapat();return}

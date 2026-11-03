@@ -28,13 +28,14 @@ Ek olarak: **`/api/chat` sıralaması düzeltildi** — Ollama model kontrolü k
 
 ```bash
 ruff check .                                  # All checks passed
-python3 -m unittest discover -s tests -t .    # Ran 568 tests ... OK
-cd tools/e2e && npm test                      # 58/58 kontrol, JS hatası yok
+python3 -m unittest discover -s tests -t .    # Ran 579 tests ... OK
+cd tools/e2e && npm test                      # 60/60 kontrol, JS hatası yok
 ```
 
 | Paket | Test sayısı |
 |---|---|
 | `tests/test_server.py` (HTTP) | 152 |
+| `tests/test_arayuz_erisim.py` (kontrast + yapı) | 11 |
 | `tests/test_saglayici.py` (sağlayıcı + görsel) | 44 |
 | `tests/test_belge.py` | 35 |
 | `tests/test_beceriler.py` | 28 |
@@ -60,7 +61,7 @@ cd tools/e2e && npm test                      # 58/58 kontrol, JS hatası yok
 | `tests/test_yerel_isci.py` | 6 |
 | `tests/test_arena_bridge.py` | 5 |
 | `tests/test_piper_indir.py` | 5 |
-| **Toplam** | **568** |
+| **Toplam** | **579** |
 
 E2E paketi: 30 kontrol (menü, defter, hatırlatıcı, sohbetten hatırlatıcı, sunucu geçmişi, CSV/yedek indirme, ayarlar sekmeleri, geliştirici, mikrofon, 403, erişilebilirlik, Escape, sürüm, Telegram durumu, token'ın depolanmaması).
 
@@ -346,6 +347,27 @@ Bilinçli sınırlar:
 - Görsel üretimi sağlayıcıya bağlıdır; ücretsiz modellerin çoğu desteklemez. Sağlayıcı görseli URL olarak dönerse indirilmez.
 - Üretilen görsel yalnızca tarayıcıda gösterilir; diske yazılmaz, veritabanına girmez (istenirse kullanıcı indirir).
 - Tema seçimi sunucuda saklanmaz; tarayıcı değişirse varsayılan koyu temaya döner.
+
+## Ek tur: kapanış — erişilebilirlik, uzun sohbet, kısayol yardımı, erişim rehberi (2026-11-03 · sekizinci tur)
+
+**İstek:** “kalanları bitir”. Bu turda yeni özellik yerine kalan kalite ve güvenlik başlıkları kapatıldı.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| X1 | WCAG AA kontrast düzeltmeleri (palet alt yazısı 3.87→5.96, Bugün kartı saati 4.28→5.78, palet küçük yazı 3.93→5.10) | ✅ |
+| X2 | `tests/test_arayuz_erisim.py`: 18 renk çifti için kontrast testi + 9 yapısal/aria kontrolü (tarayıcısız) | ✅ |
+| X3 | Uzun sohbet: DOM'da en fazla 300 mesaj + “eski mesajlar kaldırıldı” bilgi satırı | ✅ |
+| X4 | `?` kısayol yardım paneli + palette “Kısayollar” komutu (16 komut) | ✅ |
+| X5 | Ulaşılamayan “henüz hazırlanmadı / henüz bağlı değil” yedek mesajlarının kaldırılması | ✅ |
+| X6 | [`UZAK_ERISIM.md`](UZAK_ERISIM.md): telefondan erişimin güvenli yolu (Tailscale + SSH tüneli); sunucu yine `127.0.0.1` | ✅ |
+| X7 | Testler: +11 → **579 test**; E2E +2 → **60/60** (`?` yardımı, uzun sohbet sınırı); `ruff` temiz | ✅ |
+
+Bilinçli sınırlar:
+
+- **Tam tarayıcı erişimi** hâlâ yalnızca hazırlık tercihi; Emre tarayıcıyı sürmez (CAPTCHA/giriş atlatma yasak).
+- Sunucu `0.0.0.0`'a alınmadı, port yönlendirme/herkese açık tünel önerilmiyor (bkz. `UZAK_ERISIM.md`).
+- Veritabanı şifrelemesi yok (SQLCipher standart kütüphane ilkesini bozar); disk şifrelemesi (BitLocker) README'de öneriliyor.
+- Lisans dosyası hukuki bir karar olduğu için eklenmedi.
 
 Bilinçli sınırlar:
 

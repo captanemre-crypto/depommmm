@@ -912,6 +912,31 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert(/sağlayıcı|bağla/i.test($('simpleBody').textContent), 'sağlayıcı uyarısı yok: ' + $('simpleBody').textContent.slice(-160));
   });
 
+
+  await check('"?": kısayol yardım paneli açılıyor', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ana sayfa').click();
+    await sleep(500);
+    d.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: '?', bubbles: true }));
+    await sleep(500);
+    assert(!$('simplePage').hidden, 'yardım paneli açılmadı');
+    assert(/Kısayollar/.test($('simpleTitle').textContent), 'başlık yanlış: ' + $('simpleTitle').textContent);
+    const metin = $('simpleBody').textContent;
+    assert(/Ctrl \+ K/.test(metin), 'Ctrl+K satırı yok');
+    assert(/Ctrl \+ Alt \+ D/.test(metin), 'global dikte kısayolu yazmıyor');
+    $('simpleBack').click();
+    await sleep(300);
+  });
+
+  await check('uzun sohbet: DOM en fazla 300 mesaj tutuyor ve bilgi satırı ekliyor', async () => {
+    for (let i = 0; i < 320; i++) window.add('EMRE', 'uzun sohbet denemesi ' + i);
+    await sleep(600);
+    const adet = $('messages').children.length;
+    assert(adet <= 305, 'DOM sınırı aşıldı: ' + adet);
+    assert($('eskiNotu'), 'eski mesaj bilgi satırı yok');
+    assert(/Daha eski mesajlar/.test($('eskiNotu').textContent), 'bilgi satırı metni yanlış');
+    window.localStorage.removeItem('emre-chat');
+  });
+
   // localStorage'da token saklanmıyor mu?
   await check('güvenlik: token localStorage/sessionStorage içinde değil', () => {
     const dump = JSON.stringify(Object.entries(window.localStorage)) + JSON.stringify(Object.entries(window.sessionStorage));
