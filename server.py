@@ -47,7 +47,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.4'
+VERSION = '2026-11-03.5'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -67,6 +67,33 @@ def ayar_al(conn, ad, varsayilan=''):
     except sqlite3.Error:
         return varsayilan
     return satir[0] if satir else varsayilan
+
+
+def kota_artir(basarili=True, yedek=False):
+    """Günlük sağlayıcı kullanım sayacı (yerel, yalnızca istatistik)."""
+    gun = datetime.now().strftime('%Y-%m-%d')
+    try:
+        with db() as c:
+            c.execute('INSERT INTO provider_usage(day,requests,errors,fallback) VALUES (?,1,0,?) '
+                      'ON CONFLICT(day) DO UPDATE SET requests=requests+1, '
+                      'errors=errors+excluded.errors, fallback=fallback+excluded.fallback',
+                      (gun, 1 if yedek else 0))
+            if not basarili:
+                c.execute('UPDATE provider_usage SET errors=errors+1 WHERE day=?', (gun,))
+    except Exception:
+        pass
+
+
+def kota_ozet(gun=7):
+    """Son `gun` günün kullanım özeti."""
+    gun = max(1, min(int(gun or 7), 90))
+    with db() as c:
+        satirlar = c.execute('SELECT day,requests,errors,fallback FROM provider_usage '
+                             'ORDER BY day DESC LIMIT ?', (gun,)).fetchall()
+        bugun = c.execute('SELECT requests,errors,fallback FROM provider_usage WHERE day=?',
+                          (datetime.now().strftime('%Y-%m-%d'),)).fetchone() or (0, 0, 0)
+    return {'bugun': {'requests': bugun[0], 'errors': bugun[1], 'fallback': bugun[2]},
+            'gunler': [{'gun': r[0], 'requests': r[1], 'errors': r[2], 'fallback': r[3]} for r in satirlar]}
 
 
 def _denetle(kind, action, detail='', status='ok'):
@@ -97,6 +124,8 @@ def _init_schema(conn, path):
         CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, action TEXT NOT NULL,
             detail TEXT NOT NULL DEFAULT "", status TEXT NOT NULL DEFAULT "ok", created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS provider_usage (day TEXT PRIMARY KEY, requests INTEGER NOT NULL DEFAULT 0,
+            errors INTEGER NOT NULL DEFAULT 0, fallback INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL, seen INTEGER DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session, id);
         CREATE INDEX IF NOT EXISTS idx_ledger_person ON ledger(person);
@@ -421,6 +450,27 @@ def beceri_cagrisi(metin):
     return sonuc['reply'], ad
 
 
+_UNUT = re.compile(r'^(?:bunu\s+)?unut\s*[:,]?\s*(?P<konu>.{2,200})$', re.I)
+
+
+def unutma_cagrisi(metin):
+    """“unut: X” / “bunu unut: X” yazılmışsa kaydı siler; (yanıt, silinen) döndürür."""
+    eslesme = _UNUT.match(' '.join(str(metin or '').split()))
+    if not eslesme:
+        return None, 0
+    try:
+        sonuc = None
+        with db() as c:
+            sonuc = bellek.unut(c, eslesme.group('konu'))
+    except ValueError as hata:
+        return f'Unutulamadı: {hata}', 0
+    if not sonuc['silinen']:
+        return f'“{eslesme.group("konu")}” ile eşleşen bir bellek kaydı bulunamadı.', 0
+    _denetle('bellek', 'bellek kaydı unutuldu', f'{sonuc["silinen"]} kayıt')
+    ilk = sonuc['kayitlar'][0]['text'][:80]
+    return f'{sonuc["silinen"]} kayıt silindi: {ilk}', sonuc['silinen']
+
+
 def web_baglami(last_user, istenen=None):
     """Gerekiyorsa web araması yapar: (sistem_metni, kaynaklar)."""
     with db() as c:
@@ -499,6 +549,9 @@ class Handler(BaseHTTPRequestHandler):
             self.sse({'type':'done','reply':metin,'sources':kaynaklar})
 
         # Açık beceri çağrısı (!beceri ...) ve kural tabanlı işlemler modelden önce çözülür.
+        unut_yanit, _ = unutma_cagrisi(last_user)
+        if unut_yanit is not None:
+            return tek_parca(unut_yanit)
         beceri_yanit, _ = beceri_cagrisi(last_user)
         if beceri_yanit is not None:
             return tek_parca(beceri_yanit)
@@ -530,8 +583,15 @@ class Handler(BaseHTTPRequestHandler):
         parcalar=[]
         try:
             if backend=='api':
-                for parca in SAG.sohbet_akis(mesajlar, model=api_model, max_tokens=500, timeout=120):
-                    parcalar.append(parca); self.sse({'type':'delta','text':parca})
+                try:
+                    for parca in SAG.sohbet_akis(mesajlar, model=api_model, max_tokens=500, timeout=120):
+                        parcalar.append(parca); self.sse({'type':'delta','text':parca})
+                except ValueError as hata:
+                    kota_artir(basarili=False)
+                    if saglayici.gecici_hata(hata):
+                        _denetle('saglayici','kota/hız sınırı (akış)',str(hata)[:120],'hata')
+                    raise
+                kota_artir(basarili=True)
             else:
                 for parca in ollama_akis(selected, mesajlar):
                     parcalar.append(parca); self.sse({'type':'delta','text':parca})
@@ -689,6 +749,14 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c:
                     kayitlar=bellek.ara(c,sorgu,limit=limit) if sorgu else bellek.hepsi(c,limit=limit)
                 return self.out({'items':kayitlar,'total':len(kayitlar)})
+            if path=='/api/memory/export':
+                with db() as c: yedek=bellek.disa_aktar(c)
+                return self.out(yedek)
+            if path=='/api/provider/usage':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: gun=max(int(query.get('days',7)),1)
+                except ValueError: gun=7
+                return self.out(kota_ozet(gun))
             if path=='/api/wake/status':
                 return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
             if path=='/api/skills':
@@ -1141,6 +1209,8 @@ class Handler(BaseHTTPRequestHandler):
                 def yanitla(text, kaynaklar=None):
                     if session: store_message(session,'assistant',text)
                     return self.out({'reply':text,'sources':kaynaklar or []})
+                unut_yanit, _silinen = unutma_cagrisi(last_user)
+                if unut_yanit is not None: return yanitla(unut_yanit)
                 beceri_yanit, beceri_adi = beceri_cagrisi(last_user)
                 if beceri_yanit is not None: return yanitla(beceri_yanit)
                 direct=ledger_tools.create_account_from_text(last_user,db)
@@ -1180,7 +1250,13 @@ class Handler(BaseHTTPRequestHandler):
                         msg=SAG.sohbet([{'role':'system','content':system}]+clean, model=api_model,
                                        tools=ledger_tools.TOOLS, max_tokens=500, timeout=120)
                     except ValueError as hata:
+                        kota_artir(basarili=False)
+                        if saglayici.gecici_hata(hata):
+                            _denetle('saglayici','kota/hız sınırı',str(hata)[:120],'hata')
                         raise ValueError('Ücretsiz API ('+SAG.yukle()['base_url']+' · '+str(api_model or SAG.yukle()['model'])+'): '+str(hata))
+                    kota_artir(basarili=True, yedek=bool(msg.get('_yedek_model')))
+                    if msg.get('_yedek_model'):
+                        _denetle('saglayici','yedek model kullanıldı',f"{msg.get('_asil_model')} → {msg.get('_yedek_model')}")
                 elif backend=='ollama':
                     result=request_json(OLLAMA+'/api/chat',{'model':selected,'messages':[{'role':'system','content':system}]+clean,'tools':ledger_tools.TOOLS,'stream':False,'think':False,'options':{'num_ctx':4096,'num_predict':400,'num_gpu':0}}, timeout=300)
                     msg=result.get('message',{})
@@ -1263,6 +1339,35 @@ class Handler(BaseHTTPRequestHandler):
                         c.executemany('UPDATE notifications SET seen=1 WHERE id=?',[(i,) for i in temiz])
                     else: c.execute('UPDATE notifications SET seen=1')
                 return self.out({'ok':True})
+            if path=='/api/memory/import':
+                if data.get('confirmed') is not True: raise ValueError('Bellek geri yükleme için onay gerekli.')
+                mod=str(data.get('mode') or 'birlestir').strip().lower()
+                yedek=data.get('backup')
+                if isinstance(yedek,str):
+                    try: yedek=json.loads(yedek)
+                    except ValueError: raise ValueError('Yedek JSON biçimi geçersiz.')
+                with db() as c:
+                    sonuc=bellek.ice_aktar(c,yedek,mod=mod)
+                _denetle('bellek','bellek yedeği geri yüklendi',f'{sonuc["eklenen"]} eklendi · {mod}')
+                return self.out({'ok':True,**sonuc})
+            if path=='/api/memory/forget':
+                sorgu=str(data.get('q') or '').strip()
+                if data.get('confirmed') is not True: raise ValueError('Unutmak için onay gerekli.')
+                with db() as c: sonuc=bellek.unut(c,sorgu)
+                if not sonuc['silinen']: raise ValueError('Eşleşen kayıt bulunamadı.')
+                _denetle('bellek','bellek kayıtları unutuldu',f'{sonuc["silinen"]} kayıt · {sorgu}')
+                return self.out({'ok':True,'deleted':sonuc['silinen']})
+            if path=='/api/memory/archive':
+                if data.get('confirmed') is not True: raise ValueError('Arşivleme için onay gerekli.')
+                with db() as c: sonuc=bellek.arsivle(c,data.get('gun') or bellek.VARSAYILAN_ARSIV_GUN)
+                _denetle('bellek','bellek yaşlandırıldı',f'{sonuc["silinen"]} kayıt · {sonuc["gun"]} gün')
+                return self.out({'ok':True,**sonuc})
+            if path=='/api/provider/fallback':
+                model=data.get('model','')
+                if not isinstance(model,str): raise ValueError('Model adı metin olmalı.')
+                SAG.yedek_ayarla(model)
+                _denetle('saglayici','yedek model ayarlandı',model or '(kaldırıldı)')
+                return self.out({'ok':True,'status':SAG.durum()})
             if path=='/api/skills/run':
                 if data.get('confirmed') is not True: raise ValueError('Beceri çalıştırmak için onay gerekli.')
                 ad=str(data.get('ad') or '').strip().lower()

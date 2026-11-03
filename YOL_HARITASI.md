@@ -34,8 +34,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | # | Eksik | Notlar | Emek |
 | --- | --- | --- | --- |
 | ~~C1~~ ✅ | **Araç çağrısı denetim izi** | **Eklendi:** `audit` tablosu + Ayarlar › Sistem › Denetim izi (sırlar maskeli, 2000 kayıt) | S |
-| C2 | **Bellek dışa/içe aktarma ve yaşlandırma** | JSON yedeği, eski kayıtları arşivleme, “bunu unut” komutu | S |
-| C3 | **Sağlayıcı yedeği ve kota sayacı** | 429/401’de ikinci ücretsiz modele otomatik geçiş; günlük istek sayacı | M |
+| ~~C2~~ ✅ | **Bellek dışa/içe aktarma ve yaşlandırma** | **Eklendi:** JSON yedek indir/geri yükle, `unut:` komutu, 180 gün yaşlandırma | S |
+| ~~C3~~ ✅ | **Sağlayıcı yedeği ve kota sayacı** | **Eklendi:** 429/402/5xx’te tek denemeli yedek model, günlük istek/hata sayacı | M |
 | ~~C4~~ ✅ | **Açılışta kendi kendini kontrol** | **Eklendi:** `tanilama.py` 10 kontrol + Ayarlar › Sistem paneli | S |
 | C5 | **Telefondan erişim** | README’de bilinçli sınır. Ancak Tailscale/ZeroTier + token ile mümkün; **önerilmez** (yüzey alanı büyür) | L |
 
@@ -61,6 +61,6 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 2. ~~A5 (akışlı yanıt) + A4 (web araması)~~ ✅ (2026-11-03'te eklendi).
 4. ~~B1 (skill sistemi) + C1 (denetim izi) + C4 (tanılama)~~ ✅ (2026-11-03'te eklendi).
 5. **B2** (akışlı TTS + barge-in) — tam çift yönlü ses.
-6. **C2 + C3 + C5** — bellek yedeği, sağlayıcı yedeği, (isteğe bağlı) dış erişim.
+6. ~~C2 + C3~~ ✅ (2026-11-03'te eklendi). Sırada: **B2** (akışlı TTS + barge-in), **B3** (belge okuma), **B4** (takvim/e-posta).
 
 Yaklaşık toplam: A bloğu ~1,5 hafta, B1–B2 ~1 hafta, C1–C4 ~3 gün.

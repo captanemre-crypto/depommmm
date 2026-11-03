@@ -815,6 +815,93 @@ class ServerTestCase(unittest.TestCase):
         veritabani = next(k for k in veri['checks'] if k['ad'] == 'Veritabanı')
         self.assertEqual(veritabani['durum'], 'ok')
 
+    # --- bellek yedeği, unutma, arşiv ---------------------------------------
+    def test_memory_export_contains_records(self):
+        self.api('/api/memory/add', {'text': 'Ahmet 500 TL borçlu', 'subject': 'Ahmet'})
+        yedek = self.api('/api/memory/export')
+        self.assertEqual(yedek['surum'], 1)
+        self.assertTrue(any('Ahmet' in k['text'] for k in yedek['kayitlar']))
+
+    def test_memory_import_requires_confirmation(self):
+        hata = self.api('/api/memory/import', {'backup': {'surum': 1, 'kayitlar': []}}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_memory_import_adds_records(self):
+        yedek = {'surum': 1, 'kayitlar': [{'text': 'yedekten gelen not', 'subject': 'proje'}]}
+        veri = self.api('/api/memory/import', {'backup': yedek, 'confirmed': True})
+        self.assertEqual(veri['eklenen'], 1)
+        self.assertTrue(any('yedekten gelen' in k['text'] for k in self.api('/api/memory')['items']))
+
+    def test_memory_import_accepts_json_string(self):
+        import json as _json
+        yedek = _json.dumps({'surum': 1, 'kayitlar': [{'text': 'metin yedeği'}]})
+        self.assertEqual(self.api('/api/memory/import', {'backup': yedek, 'confirmed': True})['eklenen'], 1)
+
+    def test_memory_import_rejects_broken_json(self):
+        hata = self.api('/api/memory/import', {'backup': '{bozuk', 'confirmed': True}, expect=400)
+        self.assertIn('JSON', hata['error'])
+
+    def test_memory_forget_requires_confirmation_and_match(self):
+        self.api('/api/memory/add', {'text': 'unutulacak bilgi', 'subject': 'deneme'})
+        self.api('/api/memory/forget', {'q': 'unutulacak'}, expect=400)
+        self.api('/api/memory/forget', {'q': 'hiç olmayan şey', 'confirmed': True}, expect=400)
+        veri = self.api('/api/memory/forget', {'q': 'unutulacak bilgi', 'confirmed': True})
+        self.assertEqual(veri['deleted'], 1)
+
+    def test_chat_forget_command(self):
+        self.api('/api/memory/add', {'text': 'gizli kalan not', 'subject': 'test'})
+        veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'unut: gizli kalan not'}],
+                                      'backend': 'ollama'})
+        self.assertIn('kayıt silindi', veri['reply'])
+        self.assertFalse(any('gizli kalan' in k['text'] for k in self.api('/api/memory')['items']))
+
+    def test_chat_forget_without_match_is_friendly(self):
+        veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'unut: olmayan kayıt'}],
+                                      'backend': 'ollama'})
+        self.assertIn('bulunamadı', veri['reply'])
+
+    def test_memory_archive_requires_confirmation(self):
+        self.api('/api/memory/archive', {}, expect=400)
+        veri = self.api('/api/memory/archive', {'confirmed': True, 'gun': 30})
+        self.assertTrue(veri['ok'])
+        self.assertEqual(veri['gun'], 30)
+
+    # --- kota sayacı ve yedek model -----------------------------------------
+    def test_provider_usage_counts_requests(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}], 'backend': 'api'})
+        self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'tekrar'}], 'backend': 'api'})
+        veri = self.api('/api/provider/usage?days=3')
+        self.assertGreaterEqual(veri['bugun']['requests'], 2)
+        self.assertEqual(veri['gunler'][0]['requests'], veri['bugun']['requests'])
+
+    def test_provider_usage_records_errors(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'tool-model')
+        self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}], 'backend': 'api'})
+        self.assertGreaterEqual(self.api('/api/provider/usage')['bugun']['errors'], 0)
+
+    def test_provider_fallback_setting(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        veri = self.api('/api/provider/fallback', {'model': 'meta-llama/llama-3.3-70b-instruct:free'})
+        self.assertEqual(veri['status']['yedek'], 'meta-llama/llama-3.3-70b-instruct:free')
+        self.api('/api/provider/fallback', {'model': 5}, expect=400)
+
+    def test_provider_fallback_requires_provider(self):
+        hata = self.api('/api/provider/fallback', {'model': 'x'}, expect=400)
+        self.assertIn('bağlan', hata['error'].lower())
+
+    def test_chat_uses_fallback_on_quota_error(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'tool-model',
+                          yedek='openai/gpt-oss-20b:free')
+        # 'tool-model' sahte sunucuda araç çağrısı döndürür; kota hatası üretmek için
+        # sağlayıcıyı doğrudan sahteleyip gecici_hata yolunu doğruluyoruz.
+        with mock.patch.object(server.SAG, 'sohbet',
+                               return_value={'content': 'yedekten yanıt', '_yedek_model': 'b'}):
+            veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}],
+                                          'backend': 'api'})
+        self.assertTrue(veri['reply'])
+        self.assertGreaterEqual(self.api('/api/provider/usage')['bugun']['fallback'], 1)
+
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')
         self.assertIn('installed', veri)

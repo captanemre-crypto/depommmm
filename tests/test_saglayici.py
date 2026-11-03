@@ -52,10 +52,10 @@ class SahteSaglayici(BaseHTTPRequestHandler):
     def do_POST(self):
         uzunluk = int(self.headers.get('Content-Length', '0'))
         govde = json.loads(self.rfile.read(uzunluk) or b'{}')
+        if govde.get('model') == 'hata-model':
+            return self._json(429, {'error': {'message': 'kota doldu'}})
         if govde.get('stream'):
             SahteSaglayici.kayitlar.append(('STREAM', self.path, dict(self.headers)))
-            if govde.get('model') == 'hata-model':
-                return self._json(429, {'error': {'message': 'kota doldu'}})
             return self._akis(['Merhaba', ' dünya', '.'])
         SahteSaglayici.kayitlar.append(('POST', self.path, govde))
         if self.headers.get('Authorization') == 'Bearer gecersiz':
@@ -345,6 +345,83 @@ class AkisTest(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             list(kapali.sohbet_akis([{'role': 'user', 'content': 'x'}]))
         self.assertIn('ulaşılamadı', str(ctx.exception))
+
+
+class YedekModelTest(unittest.TestCase):
+    """Kota/hız sınırında yedek modele geçiş."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), SahteSaglayici)
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        cls.base = f'http://127.0.0.1:{cls.httpd.server_address[1]}/v1'
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.yol = Path(self.tmp.name) / 'ayar.json'
+        self.sag = saglayici.Saglayici(self.yol)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_fallback_saved_and_read(self):
+        self.sag.kaydet(self.base, 'k', 'openai/gpt-oss-20b:free', yedek='meta-llama/llama-3.3-70b-instruct:free')
+        self.assertEqual(self.sag.yukle()['yedek'], 'meta-llama/llama-3.3-70b-instruct:free')
+        self.assertEqual(self.sag.durum()['yedek'], 'meta-llama/llama-3.3-70b-instruct:free')
+
+    def test_saving_without_fallback_preserves_existing(self):
+        self.sag.kaydet(self.base, 'k', 'openai/gpt-oss-20b:free', yedek='X')
+        self.sag.kaydet(self.base, 'k', 'openai/gpt-oss-20b:free')
+        self.assertEqual(self.sag.yukle()['yedek'], 'X')
+
+    def test_fallback_requires_provider(self):
+        with self.assertRaises(ValueError):
+            saglayici.Saglayici(Path(self.tmp.name) / 'bos.json').yedek_ayarla('X')
+
+    def test_invalid_fallback_rejected(self):
+        self.sag.kaydet(self.base, 'k', 'openai/gpt-oss-20b:free')
+        with self.assertRaises(ValueError):
+            self.sag.yedek_ayarla('kötü\nmodel')
+
+    def test_quota_error_switches_to_fallback(self):
+        self.sag.kaydet(self.base, 'k', 'hata-model', yedek='openai/gpt-oss-20b:free')
+        # hata-model 429 döner, yedek model ise normal yanıt verir (akışsız yol).
+        mesaj = self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
+        self.assertTrue(mesaj.get('content'))
+        self.assertEqual(mesaj.get('_yedek_model'), 'openai/gpt-oss-20b:free')
+        self.assertEqual(mesaj.get('_asil_model'), 'hata-model')
+
+    def test_quota_error_without_fallback_raises(self):
+        self.sag.kaydet(self.base, 'k', 'hata-model')
+        with self.assertRaises(ValueError) as ctx:
+            self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
+        self.assertIn('kota', str(ctx.exception).lower())
+
+    def test_fallback_not_used_for_non_transient_errors(self):
+        self.sag.kaydet('http://127.0.0.1:9/v1', 'k', 'model', yedek='başka-model')
+        with self.assertRaises(ValueError) as ctx:
+            self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
+        self.assertIn('ulaşılamadı', str(ctx.exception))
+
+    def test_stream_switches_to_fallback_before_first_chunk(self):
+        self.sag.kaydet(self.base, 'k', 'hata-model', yedek='openai/gpt-oss-20b:free')
+        self.assertEqual(''.join(self.sag.sohbet_akis([{'role': 'user', 'content': 'x'}])), 'Merhaba dünya.')
+
+    def test_gecici_hata_classification(self):
+        self.assertTrue(saglayici.gecici_hata('Ücretsiz kota veya hız sınırı doldu (429).'))
+        self.assertTrue(saglayici.gecici_hata('Sağlayıcı şu anda hizmet vermiyor (503).'))
+        self.assertFalse(saglayici.gecici_hata('API anahtarı kabul edilmedi (401).'))
+        self.assertFalse(saglayici.gecici_hata('Sağlayıcıya ulaşılamadı.'))
+
+    def test_fallback_same_as_primary_not_retried(self):
+        self.sag.kaydet(self.base, 'k', 'hata-model', yedek='hata-model')
+        with self.assertRaises(ValueError):
+            self.sag.sohbet([{'role': 'user', 'content': 'selam'}])
 
 if __name__ == '__main__':
     unittest.main()

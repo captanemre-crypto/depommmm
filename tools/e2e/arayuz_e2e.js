@@ -374,6 +374,49 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     });
   });
 
+  await check('bellek: yedek indir, unut ve geri yükle', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(300);
+    $('memoryTab').click();
+    await sleep(700);
+    const govde = $('settingsBody');
+    const inputs = [...govde.querySelectorAll('input')];
+    const metin = inputs.find(i => /Yeni kayıt/.test(i.placeholder));
+    metin.value = 'E2E unutulacak kayıt';
+    [...govde.querySelectorAll('button')].find(b => b.textContent === 'Belleğe ekle').click();
+    await sleep(700);
+    const yedek = await (await request('/api/memory/export')).json();
+    assert(yedek.kayitlar.some(k => /E2E unutulacak kayıt/.test(k.text)), 'yedekte kayıt yok');
+    const unut = await (await request('/api/memory/forget', {
+      body: JSON.stringify({ q: 'E2E unutulacak kayıt', confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    })).json();
+    assert(unut.deleted >= 1, 'kayıt unutulmadı');
+    // Yedeği geri yükle: kayıt yeniden gelmeli
+    const geri = await (await request('/api/memory/import', {
+      body: JSON.stringify({ backup: yedek, confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    })).json();
+    assert(geri.eklenen >= 1, 'geri yükleme eklemedi: ' + JSON.stringify(geri));
+    const liste = await (await request('/api/memory?q=E2E%20unutulacak')).json();
+    assert(liste.items.length >= 1, 'geri yüklenen kayıt bulunamadı');
+    await request('/api/memory/forget', {
+      body: JSON.stringify({ q: 'E2E unutulacak kayıt', confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  await check('sistem: kota sayacı ve yedek model alanı', async () => {
+    $('systemTab').click();
+    await sleep(900);
+    const kota = $('quotaBox');
+    assert(kota && /Bugün/.test(kota.textContent), 'kota kutusu yok: ' + (kota ? kota.textContent : '-'));
+    const yedek = $('fallbackInput');
+    assert(yedek, 'yedek model alanı yok');
+    const kullanim = await (await request('/api/provider/usage?days=7')).json();
+    assert(typeof kullanim.bugun.requests === 'number', 'kota ucu bozuk');
+  });
+
   await check('beceriler: liste ve onaylı çalıştırma', async () => {
     [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
     await sleep(300);

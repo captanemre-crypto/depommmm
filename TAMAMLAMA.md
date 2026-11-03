@@ -268,3 +268,24 @@ Bilinçli sınırlar:
 - Beceri çıktısı 4000 karakterle sınırlı; uzun çıktılar kırpılır.
 - Denetim izi yalnızca bu bilgisayarda; dışa aktarma/senkron yok. Silme onay ister.
 - Tanılama yalnızca okuma yapar (tek istisna: yazma testi için geçici dosya).
+
+## Ek tur: bellek yedeği + sağlayıcı dayanıklılığı (2026-11-03 · beşinci tur)
+
+**İstek:** “yapalım” — `YOL_HARITASI.md` C2 ve C3.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| U1 | `bellek.disa_aktar/ice_aktar/yedek_json`: sürümlü JSON yedeği, `birlestir`/`degistir` modları, mükerrer atlama, 5000 kayıt sınırı | ✅ |
+| U2 | `bellek.unut()` + sohbette `unut: …` komutu; `bellek.arsivle()` (hits=0 ve N günden eski) | ✅ |
+| U3 | Uçlar: `/api/memory/export`, `/api/memory/import`, `/api/memory/forget`, `/api/memory/archive` | ✅ |
+| U4 | `saglayici`: `yedek` alanı, `yedek_ayarla()`, `gecici_hata()` sınıflandırması, sohbet ve akışta tek denemeli yedek geçiş | ✅ |
+| U5 | Kota sayacı: `provider_usage` tablosu, `kota_artir()/kota_ozet()`, `/api/provider/usage`, `/api/provider/fallback` | ✅ |
+| U6 | Arayüz: Bellek sekmesinde yedek indir / geri yükle / yaşlandır; Sistem sekmesinde kota satırı + yedek model alanı | ✅ |
+| U7 | Testler: `test_bellek` +12, `test_saglayici` +10, `test_server` +14 → **436 test**; E2E **51/51** | ✅ |
+
+Bilinçli sınırlar:
+
+- Yedek dosyası **şifrelenmez**; kişisel notlar düz metindir. Paylaşmadan önce içeriğini kontrol et.
+- Geri yükleme yalnızca `kayitlar` listesini işler; bağlantı grafiği yedeğe yazılır ama geri yüklemede yeniden kurulmaz.
+- Yedek model aynı sağlayıcı/anahtar üzerinden çağrılır (ayrı sağlayıcıya otomatik geçiş yok).
+- Kota sayacı Emre'nin kendi isteklerini sayar; sağlayıcı panelindeki gerçek kota ile birebir aynı olmayabilir.

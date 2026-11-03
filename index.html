@@ -662,6 +662,47 @@ document.getElementById('memoryTab').onclick=async()=>{
   body.append(arama,liste,bilgi,ekleMetin,konu,kaydet,
     (()=>{const p=element('p','Bellek yalnızca bu bilgisayarda, Emre veritabanında tutulur; '+
       'dış servise gönderilmez. Sohbet sırasında yalnızca konuyla ilgili birkaç kayıt bağlama eklenir.');p.className='hint';return p})());
+
+  /* --- yedekleme / geri yükleme / unutma --- */
+  body.append(element('h3','Yedekleme ve temizlik'));
+  const yedekBilgi=element('p','');yedekBilgi.className='hint';
+  const dosyaSec=document.createElement('input');
+  dosyaSec.type='file';dosyaSec.accept='application/json,.json';dosyaSec.style.display='none';
+  dosyaSec.onchange=async()=>{
+    const dosya=dosyaSec.files&&dosyaSec.files[0];
+    if(!dosya)return;
+    try{
+      const metin=await dosya.text();
+      if(!confirm('“'+dosya.name+'” dosyasındaki kayıtlar belleğe eklensin mi? (Aynı metinler atlanır.)'))return;
+      const r=await api('/api/memory/import',{backup:metin,mode:'birlestir',confirmed:true});
+      yedekBilgi.textContent=r.eklenen+' kayıt eklendi, '+r.atlanan+' kayıt atlandı.';
+      yukle(arama.value.trim());
+    }catch(e){yedekBilgi.textContent='Geri yükleme hatası: '+e.message}
+    finally{dosyaSec.value=''}
+  };
+  const indir=button('Yedeği indir (JSON)',async()=>{
+    try{
+      const veri=await api('/api/memory/export');
+      const metin=JSON.stringify(veri,null,2);
+      const adres=URL.createObjectURL(new Blob([metin],{type:'application/json'}));
+      const a=document.createElement('a');
+      a.href=adres;a.download='emre-bellek-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.append(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(adres),4000);
+      yedekBilgi.textContent=veri.kayitlar.length+' kayıt yedeklendi.';
+    }catch(e){yedekBilgi.textContent='Yedek hatası: '+e.message}
+  });
+  const geri=button('Yedekten geri yükle',()=>dosyaSec.click());
+  const arsiv=button('Eski kayıtları temizle',async()=>{
+    if(!confirm('Hiç kullanılmamış ve 6 aydan eski kayıtlar silinsin mi?'))return;
+    try{
+      const r=await api('/api/memory/archive',{confirmed:true,gun:180});
+      yedekBilgi.textContent=r.silinen+' kayıt silindi.';yukle(arama.value.trim());
+    }catch(e){yedekBilgi.textContent=e.message}
+  });
+  body.append(indir,geri,arsiv,dosyaSec,yedekBilgi,
+    (()=>{const p=element('p','Yedek dosyası yalnızca senin bilgisayarına iner; içinde kişisel notların olur, '+
+      'paylaşırken dikkat et. Geri yükleme aynı metinleri iki kez eklemez.');p.className='hint';return p})());
   yukle('');
 
   /* --- uyandırma sözcüğü --- */
@@ -836,6 +877,33 @@ document.getElementById('systemTab').onclick=async()=>{
     (()=>{const p=element('p','Hatırlatıcıları sunucu kontrol eder: tarayıcı kapalı olsa da süresi gelen '+
       'hatırlatıcı kaydedilir ve bir sonraki açılışta gösterilir. Bildirim yalnızca bilgisayarında görünür.');p.className='hint';return p})());
 
+  /* --- sağlayıcı kotası ve yedek model --- */
+  body.append(element('h3','Yapay zekâ kotası'));
+  const kotaKutu=element('p','');kotaKutu.id='quotaBox';kotaKutu.className='hint';
+  const yedekGirdi=field('Yedek model (ör. meta-llama/llama-3.3-70b-instruct:free)');
+  yedekGirdi.id='fallbackInput';yedekGirdi.style.width='min(460px,100%)';
+  const yedekBilgi2=element('p','');yedekBilgi2.className='hint';
+  const yedekKaydet=button('Yedek modeli kaydet',async()=>{
+    try{
+      const r=await api('/api/provider/fallback',{model:yedekGirdi.value.trim()});
+      yedekBilgi2.textContent=r.status.yedek?('Yedek model: '+r.status.yedek):'Yedek model kaldırıldı.';
+      notify('Yedek model kaydedildi.');
+    }catch(e){yedekBilgi2.textContent=e.message}
+  });
+  async function kotaYukle(){
+    try{
+      const r=await api('/api/provider/usage?days=7');
+      const gunler=(r.gunler||[]).map(g=>g.gun.slice(5)+': '+g.requests+(g.errors?' ('+g.errors+' hata)':'')).join(' · ');
+      kotaKutu.textContent='Bugün '+r.bugun.requests+' istek'+
+        (r.bugun.errors?', '+r.bugun.errors+' hata':'')+
+        (r.bugun.fallback?', '+r.bugun.fallback+' yedek model':'')+
+        (gunler?' — '+gunler:'');
+    }catch(e){kotaKutu.textContent=e.message}
+  }
+  body.append(kotaKutu,yedekGirdi,yedekKaydet,yedekBilgi2,
+    (()=>{const p=element('p','Kota veya hız sınırı (429) alındığında Emre bir kez yedek modelle dener. '+
+      'Sayaç yalnızca bu bilgisayarda tutulur; ücretsiz servislerin kotası değişebilir.');p.className='hint';return p})());
+
   /* --- tanılama --- */
   const taniKutu=document.createElement('div');taniKutu.id='diagnoseBox';
   taniKutu.style.cssText='margin:8px 0 4px;font-size:13px;line-height:1.5';
@@ -879,6 +947,14 @@ document.getElementById('systemTab').onclick=async()=>{
       ? (r.hotkey.aktif?'Etkin: '+r.hotkey.gorunen:(r.hotkey.hata||'Kısayol kapalı.'))
       : 'Global kısayol yalnızca Windows’ta çalışır.';
     if(r.web)webKutu.checked=!!r.web.aktif;
+    try{
+      const p=await api('/api/provider/status');
+      yedekGirdi.value=p.yedek||'';yedekGirdi.disabled=!p.configured;
+      yedekBilgi2.textContent=p.configured
+        ? (p.yedek?('Yedek model: '+p.yedek):'Yedek model tanımlı değil.')
+        : 'Önce Ayarlar › Ücretsiz API bölümünden bir sağlayıcıya bağlan.';
+    }catch(e){yedekBilgi2.textContent=e.message}
+    kotaYukle();
     webBilgi.textContent=webKutu.checked?'Web araması açık; yanıtların altında kaynaklar gösterilir.':'Web araması kapalı.';
     bildirimKutu.checked=!!r.notifications.aktif;
     bildirimBilgi.textContent=r.notifications.aktif

@@ -8,12 +8,16 @@ Tasarım
 - Otomatik kayıt yalnızca **açık** kalıplarda yapılır ("hatırla", "not al",
   "benim adım", "X'in telefonu ...") — modelin tahminleri değil.
 """
+import json
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 
 AZAMI_KAYIT = 5000
 AZAMI_UZUNLUK = 500
+YEDEK_SURUM = 1
+AZAMI_ICEAKTARMA = 5000
+VARSAYILAN_ARSIV_GUN = 180
 
 
 def _sade(metin):
@@ -162,3 +166,80 @@ def kaydet_cikarimlar(c, metin, source='sohbet'):
         ekle(c, text, kind=kind, subject=subject, source=source)
         yazilan.append(text)
     return yazilan
+
+
+# --- yedekleme, geri yükleme, unutma, yaşlandırma ---------------------------
+def disa_aktar(c):
+    """Belleği JSON'a uygun bir sözlüğe çevirir (yedek dosyası)."""
+    kayitlar = [dict(zip(('id', 'kind', 'subject', 'text', 'source', 'created', 'hits'), r)) for r in
+                c.execute('SELECT id,kind,subject,text,source,created,hits FROM memories ORDER BY id')]
+    baglantilar = [dict(zip(('kaynak', 'hedef', 'iliski'), r)) for r in
+                   c.execute('SELECT kaynak,hedef,iliski FROM baglantilar')]
+    return {'surum': YEDEK_SURUM, 'tarih': datetime.now().isoformat(timespec='seconds'),
+            'kayitlar': kayitlar, 'baglantilar': baglantilar}
+
+
+def ice_aktar(c, veri, mod='birlestir'):
+    """Yedekten geri yükler. mod='birlestir' (varsayılan) veya 'degistir'."""
+    if not isinstance(veri, dict):
+        raise ValueError('Yedek biçimi geçersiz.')
+    if int(veri.get('surum') or 0) > YEDEK_SURUM:
+        raise ValueError('Bu yedek daha yeni bir Emre sürümünden; güncelleme gerekli.')
+    kayitlar = veri.get('kayitlar')
+    if not isinstance(kayitlar, list):
+        raise ValueError('Yedekte “kayitlar” listesi yok.')
+    if len(kayitlar) > AZAMI_ICEAKTARMA:
+        raise ValueError(f'Yedek çok büyük (en fazla {AZAMI_ICEAKTARMA} kayıt).')
+    if mod not in ('birlestir', 'degistir'):
+        raise ValueError('Mod “birlestir” veya “degistir” olmalı.')
+    if mod == 'degistir':
+        c.execute('DELETE FROM memories')
+        c.execute('DELETE FROM baglantilar')
+    eklenen, atlanan = 0, 0
+    for kayit in kayitlar:
+        if not isinstance(kayit, dict):
+            atlanan += 1
+            continue
+        metin = ' '.join(str(kayit.get('text') or '').split())[:AZAMI_UZUNLUK]
+        if not metin:
+            atlanan += 1
+            continue
+        ayni = c.execute('SELECT id FROM memories WHERE lower(text)=lower(?)', (metin,)).fetchone()
+        if ayni:
+            atlanan += 1
+            continue
+        tur = str(kayit.get('kind') or 'not')[:20]
+        konu = str(kayit.get('subject') or '')[:60]
+        c.execute('INSERT INTO memories(kind,subject,text,arama,source,created,hits) '
+                  'VALUES (?,?,?,?,?,?,?)',
+                  (tur, konu, metin, _sade(f'{konu} {metin}'), 'yedek',
+                   str(kayit.get('created') or datetime.now().isoformat(timespec='seconds'))[:19],
+                   int(kayit.get('hits') or 0)))
+        eklenen += 1
+    return {'eklenen': eklenen, 'atlanan': atlanan}
+
+
+def unut(c, sorgu):
+    """Eşleşen kayıtları siler: {'silinen': n, 'kayitlar': [...]} (geri bildirim için)."""
+    sorgu = ' '.join(str(sorgu or '').split())[:200]
+    if len(sorgu) < 2:
+        raise ValueError('Unutulacak bilgi en az iki karakter olmalı.')
+    kayitlar = ara(c, sorgu, limit=AZAMI_ICEAKTARMA)
+    if not kayitlar:
+        return {'silinen': 0, 'kayitlar': []}
+    for kayit in kayitlar:
+        sil(c, kayit['id'])
+    return {'silinen': len(kayitlar), 'kayitlar': kayitlar}
+
+
+def arsivle(c, gun=VARSAYILAN_ARSIV_GUN):
+    """Hiç kullanılmamış ve `gun` günden eski kayıtları siler (yaşlandırma)."""
+    gun = max(7, min(int(gun or VARSAYILAN_ARSIV_GUN), 3650))
+    esik = (datetime.now() - timedelta(days=gun)).isoformat(timespec='seconds')
+    cur = c.execute('DELETE FROM memories WHERE hits=0 AND created < ?', (esik,))
+    return {'silinen': max(cur.rowcount, 0), 'gun': gun}
+
+
+def yedek_json(c):
+    """Yedeği okunabilir JSON metni olarak döndürür."""
+    return json.dumps(disa_aktar(c), ensure_ascii=False, indent=2)

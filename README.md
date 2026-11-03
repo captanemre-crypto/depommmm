@@ -63,10 +63,10 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**399 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi ve tanılamayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**436 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi, tanılama, bellek yedeği ve sağlayıcı yedek modelini kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
-`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (49 kontrol).
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (51 kontrol).
 
 ```bash
 python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
@@ -174,6 +174,47 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Bellek yedeği ve sağlayıcı dayanıklılığı (2026-11-03 · beşinci tur)
+
+### 1. Bellek: yedekleme, geri yükleme, unutma, yaşlandırma
+
+- **Yedek indir**: tüm bellek kayıtları JSON olarak iner (`emre-bellek-YYYY-AA-GG.json`).
+  Dosya yalnızca senin bilgisayarına yazılır; içinde kişisel notların olur.
+- **Yedekten geri yükle**: JSON dosyası seçilir; aynı metinler **iki kez eklenmez** (`eklenen` / `atlanan` sayısı gösterilir).
+  `mode: "degistir"` ile mevcut bellek tamamen değiştirilebilir.
+- **Unutma**: sohbette `unut: Ahmet'in telefonu` (ya da `bunu unut: …`) yazınca eşleşen kayıtlar silinir;
+  arayüzde de tek kayıt silme var. Silmeler denetim izine yazılır.
+- **Yaşlandırma**: “Eski kayıtları temizle” hiç kullanılmamış (`hits=0`) ve 180 günden eski kayıtları siler.
+  Gün sayısı uçtan ayarlanabilir (7–3650).
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/memory/export` | `{surum, tarih, kayitlar, baglantilar}` |
+| `POST /api/memory/import` | `{backup, mode?, confirmed:true}` → `{eklenen, atlanan}` |
+| `POST /api/memory/forget` | `{q, confirmed:true}` → `{deleted}` |
+| `POST /api/memory/archive` | `{gun?, confirmed:true}` → `{silinen, gun}` |
+
+### 2. Sağlayıcı yedeği (kota dolunca devam)
+
+- **Yedek model** tanımlanabilir (Ayarlar › Sistem). Birincil model **429 / 402 / 5xx / zaman aşımı**
+  döndürdüğünde Emre **bir kez** yedek modelle dener; yanıt gelirse konuşma kesilmez.
+- Yedek modelle geçiş yalnızca **geçici** hatalarda yapılır; 401/403 veya “ulaşılamadı” hatasında denenmez
+  (anahtar sorunu yedek modelle çözülmez, kullanıcı yanlış yönlendirilmez).
+- Akışlı yolda ilk parça gelmeden hata olursa yedek modele geçilir; parça üretildikten sonra hata olursa
+  yanıt yarıda kalmaz, hata açıkça bildirilir.
+- **Kota sayacı**: günlük istek, hata ve yedek model sayısı `provider_usage` tablosunda tutulur;
+  Ayarlar › Sistem'de “Bugün N istek …” olarak görünür. Sayaç yalnızca bilgilendirir, istek engellemez.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/provider/fallback` | `{model}` → yedek modeli kaydeder (boş gönderim kaldırır) |
+| `GET /api/provider/usage?days=7` | `{bugun:{requests,errors,fallback}, gunler:[…]}` |
+
+### Testler
+
+`test_bellek.py` +12 (yedek/geri yükleme/unutma/yaşlandırma), `test_saglayici.py` +10 (yedek model, kota geçişi),
+`test_server.py` +14 → **436 test**. Arayüz E2E **51/51**.
 
 ## Beceriler, denetim izi ve tanılama (2026-11-03 · dördüncü tur)
 

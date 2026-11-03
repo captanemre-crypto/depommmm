@@ -97,6 +97,16 @@ def _anahtar_eksik(govde, metin=''):
     return 'missing api key' in parca or 'no api key' in parca or 'invalid_api_key' in parca
 
 
+# Yedek modele geçmeyi hak eden hatalar: kota, hız sınırı, geçici sunucu hatası.
+_GECICI = ('kota', '429', '402', 'hız sınırı', 'HTTP 5', '503', '502', '500', 'zaman aşımı', 'zamanında yanıt')
+
+
+def gecici_hata(mesaj) -> bool:
+    """Hata metni yedek modele geçmeyi gerektiriyor mu?"""
+    kucuk = str(mesaj or '').lower()
+    return any(anahtar.lower() in kucuk for anahtar in _GECICI)
+
+
 class Saglayici:
     def __init__(self, ayar_dosyasi=AYAR_DOSYASI):
         self.yol = Path(ayar_dosyasi)
@@ -106,13 +116,13 @@ class Saglayici:
         try:
             veri = json.loads(self.yol.read_text(encoding='utf-8'))
         except (OSError, ValueError):
-            return {'base_url': '', 'key': '', 'model': ''}
+            return {'base_url': '', 'key': '', 'model': '', 'yedek': ''}
         if not isinstance(veri, dict):
-            return {'base_url': '', 'key': '', 'model': ''}
+            return {'base_url': '', 'key': '', 'model': '', 'yedek': ''}
         return {'base_url': str(veri.get('base_url') or ''), 'key': str(veri.get('key') or ''),
-                'model': str(veri.get('model') or '')}
+                'model': str(veri.get('model') or ''), 'yedek': str(veri.get('yedek') or '')}
 
-    def kaydet(self, base_url, key, model):
+    def kaydet(self, base_url, key, model, yedek=None):
         base_url = normalize_base(base_url)
         key = (key or '').strip()
         if len(key) > 400 or '\n' in key or '\r' in key:
@@ -120,7 +130,12 @@ class Saglayici:
         model = (model or '').strip()
         if len(model) > 200 or (model and not all(k not in model for k in '\n\r\t')):
             raise ValueError('Model adı geçersiz.')
-        veri = {'base_url': base_url, 'key': key, 'model': model,
+        if yedek is None:
+            yedek = self.yukle().get('yedek', '')
+        yedek = str(yedek or '').strip()
+        if len(yedek) > 200 or (yedek and any(k in yedek for k in '\n\r\t')):
+            raise ValueError('Yedek model adı geçersiz.')
+        veri = {'base_url': base_url, 'key': key, 'model': model, 'yedek': yedek,
                 'guncelleme': datetime.now().isoformat(timespec='seconds')}
         gecici = self.yol.with_suffix('.tmp')
         gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -130,6 +145,13 @@ class Saglayici:
             pass
         gecici.replace(self.yol)
         return veri
+
+    def yedek_ayarla(self, model):
+        """Kota/hız sınırı dolduğunda denenecek yedek modeli kaydeder."""
+        veri = self.yukle()
+        if not veri['base_url']:
+            raise ValueError('Önce bir sağlayıcıya bağlan.')
+        return self.kaydet(veri['base_url'], veri['key'], veri['model'], yedek=model)
 
     def sil(self):
         try:
@@ -203,6 +225,7 @@ class Saglayici:
             'configured': bool(veri['base_url']),
             'base_url': veri['base_url'],
             'model': veri['model'],
+            'yedek': veri.get('yedek', ''),
             'key_hint': ('…' + key[-4:]) if len(key) >= 4 else ('ayarlı' if key else ''),
             'presets': [dict(p) for p in HAZIR],
         }
@@ -311,12 +334,23 @@ class Saglayici:
         if not ayar['base_url']:
             raise ValueError('Ücretsiz API sağlayıcısı ayarlanmamış. Ayarlar > Ücretsiz API bölümünden bağlan.')
         url = ayar['base_url'].rstrip('/') + '/chat/completions'
-        data = json.dumps(payload).encode('utf-8')
         basliklar = {'Accept': 'text/event-stream', 'Content-Type': 'application/json'}
         if ayar['key']:
             basliklar['Authorization'] = 'Bearer ' + ayar['key']
-        for parca in self._akis(url, data, basliklar, timeout, ayar):
-            yield parca
+        yedek = str(ayar.get('yedek') or '').strip()
+        while True:
+            data = json.dumps(payload).encode('utf-8')
+            uretilen = 0
+            try:
+                for parca in self._akis(url, data, basliklar, timeout, ayar):
+                    uretilen += 1
+                    yield parca
+                return
+            except ValueError as hata:
+                if (uretilen or not yedek or yedek == payload['model']
+                        or not gecici_hata(hata)):
+                    raise
+                payload['model'] = yedek  # kota doldu: yedek modelle baştan dene
 
     def _akis(self, url, data, basliklar, timeout, ayar):
         """SSE satırlarını çözer; `delta.content` parçalarını üretir."""
@@ -389,7 +423,15 @@ class Saglayici:
         if tools:
             payload['tools'] = tools
             payload['tool_choice'] = 'auto'
-        yanit = self._istek('/chat/completions', payload, timeout=timeout, ayar=ayar)
+        yedek = str(ayar.get('yedek') or '').strip()
+        try:
+            yanit = self._istek('/chat/completions', payload, timeout=timeout, ayar=ayar)
+        except ValueError as hata:
+            if not yedek or yedek == model or not gecici_hata(hata):
+                raise
+            # Kota/hız sınırı: bir kez yedek modelle dene.
+            payload['model'] = yedek
+            yanit = self._istek('/chat/completions', payload, timeout=timeout, ayar=ayar)
         secenekler = yanit.get('choices') if isinstance(yanit, dict) else None
         if not secenekler:
             # Bazı sağlayıcılar hata durumunu 200 ile gövdede bildirir.
@@ -400,4 +442,8 @@ class Saglayici:
         mesaj = (secenekler[0] or {}).get('message') or {}
         if not isinstance(mesaj, dict):
             raise ValueError('Sağlayıcı beklenmeyen bir yanıt biçimi döndürdü.')
+        if payload['model'] != model:
+            mesaj = dict(mesaj)
+            mesaj['_yedek_model'] = payload['model']
+            mesaj['_asil_model'] = model
         return mesaj
