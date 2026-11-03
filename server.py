@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote_plus, urlparse
 
+import arama
 import arena_bridge
 import bellek
 import bildirim
@@ -43,7 +44,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.2'
+VERSION = '2026-11-03.3'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -343,6 +344,71 @@ def request_json(url, payload=None, timeout=20):
     with urllib.request.urlopen(req, timeout=timeout) as res:
         return json.load(res)
 
+def ollama_akis(model, messages, timeout=300):
+    """Ollama'nın NDJSON akışını metin parçalarına çevirir."""
+    govde = json.dumps({'model': model, 'messages': messages, 'stream': True, 'think': False,
+                        'options': {'num_ctx': 4096, 'num_predict': 400, 'num_gpu': 0}}).encode()
+    istek = urllib.request.Request(OLLAMA + '/api/chat', data=govde,
+                                   headers={'Content-Type': 'application/json'}, method='POST')
+    with urllib.request.urlopen(istek, timeout=timeout) as yanit:
+        for ham in yanit:
+            satir = ham.decode('utf-8', 'replace').strip()
+            if not satir:
+                continue
+            try:
+                olay = json.loads(satir)
+            except ValueError:
+                continue
+            parca = (olay.get('message') or {}).get('content')
+            if isinstance(parca, str) and parca:
+                yield parca
+            if olay.get('done'):
+                break
+
+
+def sohbet_istegi(data):
+    """Sohbet isteğini doğrular; (clean, last_user, session, backend, selected, api_model) döndürür."""
+    messages = data.get('messages', [])
+    if not isinstance(messages, list):
+        raise ValueError('Mesaj listesi geçersiz.')
+    messages = messages[-12:]
+    clean = [{'role': m['role'], 'content': str(m['content'])[:6000]} for m in messages
+             if isinstance(m, dict) and m.get('role') in ('user', 'assistant')
+             and isinstance(m.get('content'), str)]
+    if not clean:
+        raise ValueError('Mesaj boş.')
+    selected = str(data.get('model') or MODEL).strip()
+    if len(selected) > 200:
+        raise ValueError('Model adı çok uzun.')
+    if not re.fullmatch(r'[\w.\-:/]{1,200}', selected):
+        raise ValueError('Model adı geçersiz.')
+    last_user = next((m['content'] for m in reversed(clean) if m['role'] == 'user'), '')
+    session = str(data.get('session') or '').strip()[:80]
+    if session and not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', session):
+        session = ''
+    backend = str(data.get('backend') or 'ollama').strip().lower()
+    if backend in ('api', 'openai', 'omnirouter', 'openrouter', 'saglayici'):
+        backend = 'api'
+    api_model = str(data.get('model') or '').strip() or None if backend == 'api' else None
+    return clean, last_user, session, backend, selected, api_model
+
+
+def web_baglami(last_user, istenen=None):
+    """Gerekiyorsa web araması yapar: (sistem_metni, kaynaklar)."""
+    with db() as c:
+        acik = ayar_al(c, 'web_arama', '1') == '1'
+    karar = istenen if istenen is not None else arama.gerekiyor_mu(last_user)
+    if not (acik and karar):
+        return '', []
+    try:
+        sonuclar = arama.ara(last_user)
+    except Exception:
+        sonuclar = []
+    if not sonuclar:
+        return '', []
+    return arama.baglam(sonuclar), [{'baslik': x['baslik'], 'url': x['url']} for x in sonuclar]
+
+
 def telegram(method, payload=None):
     if not TOKEN: raise ValueError('Telegram bot anahtarı ayarlanmamış.')
     return request_json('https://api.telegram.org/bot'+TOKEN+'/'+method, payload, timeout=15)
@@ -374,6 +440,80 @@ def windows_tts(request):
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
+    def sse_basla(self):
+        """Sunucudan tarayıcıya olay akışı (SSE) başlatır."""
+        self.send_response(200)
+        self.send_header('Content-Type','text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control','no-store')
+        self.send_header('X-Content-Type-Options','nosniff')
+        self.send_header('X-Frame-Options','DENY')
+        self.send_header('Connection','close')
+        self.end_headers()
+        self.close_connection=True
+
+    def sse(self, olay):
+        self.wfile.write(('data: '+json.dumps(olay, ensure_ascii=False)+'\n\n').encode('utf-8'))
+        self.wfile.flush()
+
+    def chat_akis(self, data):
+        """Sohbet yanıtını parça parça gönderir (SSE). Kurallı yanıtlar tek parça gelir."""
+        clean, last_user, session, backend, selected, api_model = sohbet_istegi(data)
+        if session: store_message(session,'user',last_user)
+        with db() as c:
+            bellek.kaydet_cikarimlar(c,last_user,source='sohbet')
+            kisisel=bellek.baglam(c,last_user,limit=5)
+        web_metin, kaynaklar = web_baglami(last_user, data.get('web'))
+
+        def tek_parca(metin):
+            self.sse_basla()
+            self.sse({'type':'delta','text':metin})
+            if session: store_message(session,'assistant',metin)
+            self.sse({'type':'done','reply':metin,'sources':kaynaklar})
+
+        # Kural tabanlı işlemler modelden önce çözülür (defter, hatırlatıcı).
+        for cozum in (ledger_tools.create_account_from_text(last_user,db),
+                      hatirlatici.direct_reminder_action(last_user,db),
+                      ledger_tools.direct_ledger_action(last_user,db)):
+            if cozum is not None:
+                return tek_parca(cozum)
+
+        if backend=='api':
+            if not SAG.yukle()['base_url']:
+                raise ValueError('Ücretsiz API sağlayıcısı ayarlanmamış. Ayarlar > Ücretsiz API bölümünden bağlan.')
+        elif backend=='ollama':
+            installed={m.get('name') for m in request_json(OLLAMA+'/api/tags',timeout=5).get('models',[])}
+            if selected not in installed and selected+':latest' not in installed:
+                raise ValueError('Seçilen model Ollama üzerinde kurulu değil.')
+            if selected.lower().startswith('qwen3'):
+                clean[-1]['content'] += '\n/no_think'
+        elif backend=='openjarvis':
+            raise ValueError('OpenJarvis akışlı yanıtı desteklemiyor; normal sohbeti kullan.')
+        else:
+            raise ValueError('Bilinmeyen yapay zekâ bağlantısı.')
+
+        system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kısa ve doğrudan yanıt ver.'
+        mesajlar=[{'role':'system','content':system}]+clean
+        self.sse_basla()
+        self.sse({'type':'start','sources':kaynaklar})
+        parcalar=[]
+        try:
+            if backend=='api':
+                for parca in SAG.sohbet_akis(mesajlar, model=api_model, max_tokens=500, timeout=120):
+                    parcalar.append(parca); self.sse({'type':'delta','text':parca})
+            else:
+                for parca in ollama_akis(selected, mesajlar):
+                    parcalar.append(parca); self.sse({'type':'delta','text':parca})
+        except (BrokenPipeError, ConnectionResetError):
+            return  # sekme kapatıldı; yazmayı sürdürmenin anlamı yok
+        reply=clean_reply(''.join(parcalar))
+        if not reply:
+            reply='Model boş yanıt verdi. Lütfen tekrar dene.'
+        if session: store_message(session,'assistant',reply)
+        try:
+            self.sse({'type':'done','reply':reply,'sources':kaynaklar})
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def out(self, obj, status=200):
         data=json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(status); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data)))
@@ -525,6 +665,7 @@ class Handler(BaseHTTPRequestHandler):
                     kisayol_acik=ayar_al(c,'kisayol_aktif','0')=='1'
                     tarayici=ayar_al(c,'kisayol_tarayici','1')=='1'
                     tus=ayar_al(c,'kisayol_tus',kisayol.VARSAYILAN)
+                    web_acik=ayar_al(c,'web_arama','1')=='1'
                     bekleyen=c.execute('SELECT COUNT(*) FROM notifications WHERE seen=0').fetchone()[0]
                 durum=dict(KISAYOL.durum())
                 durum['acik']=kisayol_acik
@@ -534,6 +675,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'autostart':otomatik_baslat.durum(ROOT),
                                  'hotkey':durum,'hotkey_tarayici':tarayici,
                                  'notifications':{'aktif':bildirim_acik,'bekleyen':bekleyen},
+                                 'web':{'aktif':web_acik},
                                  'version':VERSION})
             if path=='/api/hotkey/poll':
                 query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
@@ -553,6 +695,11 @@ class Handler(BaseHTTPRequestHandler):
                     son=c.execute('SELECT COALESCE(MAX(id),0) FROM notifications').fetchone()[0]
                 return self.out({'items':[{'id':r[0],'kind':r[1],'title':r[2],'text':r[3],'created':r[4]}
                                           for r in rows],'last':son})
+            if path=='/api/web/search':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                sorgu=unquote_plus(query.get('q',''))[:200].strip()
+                if not sorgu: raise ValueError('Arama metni gerekli.')
+                return self.out({'query':sorgu,'results':arama.ara(sorgu)})
             if path=='/api/mcp/status':
                 ayar=MCP.yenile()
                 return self.out({'servers':MCP.durum(),'configured':len(ayar['sunucular'])})
@@ -909,6 +1056,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not BOT.configured(): raise ValueError('Telegram bot anahtarı ayarlanmamış.')
                 BOT.start(TOKEN)
                 return self.out({'ok':True,'status':BOT.status()})
+            if path=='/api/chat/stream':
+                return self.chat_akis(data)
             if path=='/api/chat':
                 messages=data.get('messages',[])
                 if not isinstance(messages,list): raise ValueError('Mesaj listesi geçersiz.')
@@ -927,9 +1076,10 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c:
                     bellek.kaydet_cikarimlar(c,last_user,source='sohbet')
                     kisisel=bellek.baglam(c,last_user,limit=5)
-                def yanitla(text):
+                web_metin, kaynaklar = web_baglami(last_user, data.get('web'))
+                def yanitla(text, kaynaklar=None):
                     if session: store_message(session,'assistant',text)
-                    return self.out({'reply':text})
+                    return self.out({'reply':text,'sources':kaynaklar or []})
                 direct=ledger_tools.create_account_from_text(last_user,db)
                 if direct is not None: return yanitla(direct)
                 # Hatırlatıcı niyeti modelden önce kural tabanlı çözülür (A1).
@@ -950,8 +1100,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Qwen3 supports both the API flag and an explicit no-thinking directive.
                     if selected.lower().startswith('qwen3'):
                         clean[-1]['content'] += '\n/no_think'
-                kisisel=''
-                system=SYSTEM+(' '+kisisel if kisisel else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
+                system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
                 if backend=='openjarvis':
                     if selected not in ('emre-cpu','emre-cpu:latest'): return self.out({'error':'OpenJarvis için önce emre-cpu modelini oluştur ve Ayarlar’dan seç.'},400)
                     # Client-supplied tools keep tool execution under Emre's validation.
@@ -979,17 +1128,17 @@ class Handler(BaseHTTPRequestHandler):
                     if not isinstance(fn,dict): fn={}
                     try: reply=ledger_tools.execute(fn.get('name'),fn.get('arguments',{}),db,last_user)
                     except (ValueError,TypeError,KeyError) as err: reply='Kayıt yapılmadı: '+str(err)
-                    return yanitla(reply)
+                    return yanitla(reply, kaynaklar)
                 raw_content=msg.get('content','') or ''
                 # Never read a model-generated tool JSON aloud or mistake it for a successful action.
                 try: raw_json=json.loads(raw_content.strip())
                 except (ValueError,TypeError): raw_json=None
                 if (isinstance(raw_json,dict) and ('arguments' in raw_json or 'tool_calls' in raw_json)) or re.search(r'["\'](?:arguments|tool_calls)["\']\s*:', raw_content):
-                    return yanitla('İşlemi anlayamadım; kayıt oluşturulmadı. Hesap adını ve yapmak istediğin işlemi tekrar söyle.')
+                    return yanitla('İşlemi anlayamadım; kayıt oluşturulmadı. Hesap adını ve yapmak istediğin işlemi tekrar söyle.', kaynaklar)
                 reply=clean_reply(raw_content)
                 if re.search(r'(?i)kay[ıi]t (?:edildi|oluşturuldu)|kaydetti[mn]|deftere (?:ekledim|işledim)|hatırlatıcı (?:oluşturdum|ayarladım)|(?:alacak|verecek|hesap|defter|ödeme|tahsilat).{0,120}(?:gerçekleştirdim|ekledim|oluşturdum|sildim|kaydedildi|yaptım)',reply):
                     reply='Bu işlem için deftere kayıt yapılmadı. Kişiyi, tutarı ve işlem türünü açıkça belirt.'
-                return yanitla(reply)
+                return yanitla(reply, kaynaklar)
             if path=='/api/history/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
                 session=text_field(data,'session',80,label='Oturum')
@@ -1081,6 +1230,11 @@ class Handler(BaseHTTPRequestHandler):
                     with db() as c: ayar_yaz(c,'kisayol_aktif','0')
                 durum=dict(KISAYOL.durum()); durum['acik']=bool(aktif)
                 return self.out(durum)
+            if path=='/api/system/web':
+                aktif=data.get('aktif')
+                if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
+                with db() as c: ayar_yaz(c,'web_arama','1' if aktif else '0')
+                return self.out({'aktif':aktif})
             if path=='/api/system/notifications':
                 aktif=data.get('aktif')
                 if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')

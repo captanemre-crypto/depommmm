@@ -283,7 +283,91 @@ document.getElementById('mic').onclick=()=>toggle.click();document.querySelector
 
 const apiToken=document.querySelector('meta[name="emre-token"]')?.content;let conversation=[],busy=false;try{conversation=JSON.parse(localStorage.getItem('emre-context')||'[]').slice(-12)}catch(e){conversation=[]}
 async function api(path,data){if(!apiToken)throw Error('Yerel sunucu çalışmıyor. py server.py ile başlatıp http://127.0.0.1:8765 adresini aç.');let opt={headers:{'X-Emre-Token':apiToken}};if(data!==undefined){opt.method='POST';opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(data)}let res=await fetch(path,opt);if(res.status===403){throw Error('Oturum anahtarı geçersiz. Sunucu yeniden başlatılmış olabilir; sayfayı yenile (F5).')}let j=await res.json();if(!res.ok)throw Error(j.error||'İşlem başarısız');return j}
-async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await api('/api/chat',{messages:conversation,model:localStorage.getItem('emre-model')||null,backend:localStorage.getItem('emre-backend')||'ollama',session:activeChatId||''});let answer=(r.reply||'Model boş yanıt verdi.').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';answer=answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer)}catch(e){conversation.pop();let etiket=(localStorage.getItem('emre-backend')==='api')?'Yapay zekâ sağlayıcısı':'Ollama';say(etiket+' ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
+function cevapTemizle(answer){
+  answer=(answer||'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+  if(/the user (said|wants|wrote)|let me (think|check)|i need to respond/i.test(answer))
+    answer='Yanıt oluşturulurken bir sorun yaşadım. Lütfen tekrar dener misin.';
+  return answer.split(/(?<=[.!?])\s+/u).filter(sentence=>!/(?:nasıl|ne şekilde) yardımcı olabilirim|hangi konuda yardıma ihtiyac|başka bir (?:sorunuz|soru|ihtiyacınız|ihtiyacın|konuda|konu|şey)|farklı bir (?:konuda|konu|şey)|yardımcı olabileceğim (?:başka )?bir şey|bana bildirin|yardıma ihtiyacınız (?:olursa|var mı)/iu.test(sentence)).join(' ').trim()||'Anladım.';
+}
+function kaynaklarGoster(kaynaklar){
+  if(!kaynaklar||!kaynaklar.length)return;
+  const messages=document.getElementById('messages'),row=document.createElement('div');
+  row.className='msg hint';row.style.fontSize='12px';row.style.opacity='.8';
+  row.append(document.createTextNode('Kaynaklar: '));
+  kaynaklar.slice(0,5).forEach((k,i)=>{
+    if(i)row.append(document.createTextNode(' · '));
+    let url='';try{url=new URL(k.url);}catch(e){}
+    if(!url.origin)return;
+    const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';
+    a.textContent=(i+1)+'. '+(k.baslik||url.hostname).slice(0,60);a.style.color='#8fd';
+    row.append(a);
+  });
+  messages.append(row);messages.scrollTop=messages.scrollHeight;
+}
+function canliSatir(){
+  const messages=document.getElementById('messages'),row=document.createElement('div'),av=document.createElement('div'),
+    body=document.createElement('div'),strong=document.createElement('strong'),span=document.createElement('span');
+  row.className='msg';av.className='avatar';av.textContent='E';strong.textContent='EMRE';
+  body.append(strong,span);row.append(av,body);messages.append(row);messages.scrollTop=messages.scrollHeight;
+  return {yaz(t){span.textContent=t;messages.scrollTop=messages.scrollHeight},sil(){row.remove()}};
+}
+function baytCoz(baytlar){
+  if(typeof TextDecoder!=='undefined')return new TextDecoder().decode(new Uint8Array(baytlar));
+  let s='';
+  for(let i=0;i<baytlar.length;i++){
+    const b=baytlar[i];
+    if(b<0x80){s+=String.fromCharCode(b);continue}
+    let n=0,cp=0;
+    if((b&0xE0)===0xC0){n=1;cp=b&0x1F}
+    else if((b&0xF0)===0xE0){n=2;cp=b&0x0F}
+    else if((b&0xF8)===0xF0){n=3;cp=b&0x07}
+    else continue;
+    if(i+n>=baytlar.length)break;
+    for(let k=1;k<=n;k++)cp=(cp<<6)|(baytlar[i+k]&0x3F);
+    s+=String.fromCodePoint(cp);i+=n;
+  }
+  return s;
+}
+async function akisOku(veri,canli){
+  const res=await fetch('/api/chat/stream',{method:'POST',
+    headers:{'X-Emre-Token':apiToken,'Content-Type':'application/json'},body:JSON.stringify(veri)});
+  if(!res.ok){let j={};try{j=await res.json()}catch(e){}
+    throw Error(j.error||'Akış başlatılamadı ('+res.status+')')}
+  if(!res.body||!res.body.getReader)throw Error('Tarayıcı akışı desteklemiyor');
+  const okuyucu=res.body.getReader(),ham=[];
+  let islenen=0,metin='',sonuc=null;
+  for(;;){
+    const {done,value}=await okuyucu.read();
+    if(done)break;
+    if(value)for(const b of value)ham.push(b);
+    const tam=baytCoz(ham);
+    let i;
+    while((i=tam.indexOf('\n\n',islenen))>=0){
+      const blok=tam.slice(islenen,i);islenen=i+2;
+      for(const satir of blok.split('\n')){
+        if(!satir.startsWith('data:'))continue;
+        let olay;try{olay=JSON.parse(satir.slice(5).trim())}catch(e){continue}
+        if(olay.type==='delta'){metin+=olay.text;canli.yaz(metin)}
+        else if(olay.type==='done'){sonuc=olay}
+        else if(olay.type==='error'){throw Error(olay.message||'Akış hatası')}
+      }
+    }
+  }
+  if(!sonuc)sonuc={reply:metin,sources:[]};
+  if(!sonuc.reply)sonuc.reply=metin;
+  return sonuc;
+}
+async function sohbetGonder(text){
+  const veri={messages:conversation,model:localStorage.getItem('emre-model')||null,
+    backend:localStorage.getItem('emre-backend')||'ollama',session:activeChatId||''};
+  if(localStorage.getItem('emre-akis')!=='0'){
+    const canli=canliSatir();
+    try{const r=await akisOku(veri,canli);canli.sil();return r}
+    catch(e){canli.sil();if(/Oturum|Yetkisiz|403/.test(e.message))throw e}
+  }
+  return api('/api/chat',veri);
+}
+async function askOllama(text){if(busy){notify('Emre önceki yanıtını hazırlıyor.');return}busy=true;conversation.push({role:'user',content:text});notify('Emre düşünüyor…');try{let r=await sohbetGonder(text);let answer=cevapTemizle((r.reply||'Model boş yanıt verdi.'));conversation.push({role:'assistant',content:answer});try{localStorage.setItem('emre-context',JSON.stringify(conversation.slice(-12)));persistActiveChat()}catch(e){}say(answer);kaynaklarGoster(r.sources)}catch(e){conversation.pop();let etiket=(localStorage.getItem('emre-backend')==='api')?'Yapay zekâ sağlayıcısı':'Ollama';say(etiket+' ile bağlantı kurulamadı: '+e.message)}finally{busy=false}}
 function panel(title){returnHome();document.querySelector('main > .content').hidden=true;document.getElementById('simplePage').hidden=false;document.getElementById('simpleTitle').textContent=title;let body=document.getElementById('simpleBody');body.replaceChildren();window.scrollTo({top:0,behavior:'smooth'});return body}document.getElementById('closeFeatures').onclick=()=>document.getElementById('features').hidden=true;
 function element(tag,text){let x=document.createElement(tag);x.textContent=text;return x}function field(placeholder,type='text'){let x=document.createElement('input');x.placeholder=placeholder;x.type=type;x.style.cssText='background:#101b20;color:white;border:1px solid #31454c;border-radius:6px;padding:10px;margin:5px;max-width:100%';return x}function button(text,cb){let b=element('button',text);b.className='iconbtn';b.style.margin='5px';b.onclick=cb;return b}
 async function showReminders(){let body=panel('Hatırlatıcılar'),text=field('Hatırlatıcı'),due=field('', 'datetime-local');body.append(text,due,button('Ekle',async()=>{try{await api('/api/reminders',{text:text.value,due:due.value});showReminders()}catch(e){notify(e.message)}}));try{let r=await api('/api/reminders');if(!r.reminders.length)body.append(element('p','Henüz hatırlatıcı yok.'));for(let item of r.reminders){let row=element('p',`${item.done?'✓':'◷'} ${item.text} — ${item.due.replace('T',' ')}`);if(!item.done)row.append(button('Tamamlandı',async()=>{await api('/api/reminders/done',{id:item.id});showReminders()}));row.append(button('Sil',async()=>{if(!confirm('Bu hatırlatıcı silinsin mi?'))return;try{await api('/api/reminders/delete',{id:item.id,confirmed:true});showReminders();notify('Hatırlatıcı silindi.')}catch(e){notify(e.message)}}));body.append(row)}if('Notification' in window&&Notification.permission==='default')body.append(button('Bildirim izni ver',()=>Notification.requestPermission()))}catch(e){body.append(element('p',e.message))}}
@@ -721,6 +805,33 @@ document.getElementById('systemTab').onclick=async()=>{
       bildirimBilgi.textContent=r.aktif?'Masaüstü bildirimi açık.':'Yalnızca sayfa içinde gösterilir.';
     }catch(e){bildirimKutu.checked=!bildirimKutu.checked;notify(e.message)}
   };
+  /* --- web araması --- */
+  const webKutu=document.createElement('input');webKutu.type='checkbox';webKutu.id='webToggle';
+  const webEtiket=document.createElement('label');
+  webEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  webEtiket.append(webKutu,document.createTextNode(' Güncel sorularda web’de ara (kaynaklı yanıt)'));
+  const webBilgi=element('p','');webBilgi.className='hint';
+  webKutu.onchange=async()=>{
+    try{const r=await api('/api/system/web',{aktif:webKutu.checked});
+      webBilgi.textContent=r.aktif?'Web araması açık; yanıtların altında kaynaklar gösterilir.':'Web araması kapalı.'}
+    catch(e){webKutu.checked=!webKutu.checked;notify(e.message)}
+  };
+  body.append(element('h3','Web araması'),webEtiket,webBilgi,
+    (()=>{const p=element('p','Arama yalnızca “bugün, güncel, hava, fiyat, kimdir, internette ara” gibi '+
+      'sorularda ve senin yazdığın cümleyle yapılır. Sayfalar açılmaz, form gönderilmez, giriş yapılmaz. '+
+      'Kaynaklar yanıtın altında bağlantı olarak listelenir.');p.className='hint';return p})());
+
+  /* --- akışlı yanıt --- */
+  const akisKutu=document.createElement('input');akisKutu.type='checkbox';akisKutu.id='streamToggle';
+  const akisEtiket=document.createElement('label');
+  akisEtiket.style.cssText='display:flex;gap:8px;align-items:center;margin:14px 0 4px';
+  akisEtiket.append(akisKutu,document.createTextNode(' Yanıtı yazarken göster (akışlı)'));
+  const akisBilgi=element('p','');akisBilgi.className='hint';
+  akisKutu.checked=localStorage.getItem('emre-akis')!=='0';
+  akisKutu.onchange=()=>{localStorage.setItem('emre-akis',akisKutu.checked?'1':'0');
+    akisBilgi.textContent=akisKutu.checked?'Akış açık: yanıt yazıldıkça görünür.':'Akış kapalı: yanıt tamamlanınca görünür.'};
+  body.append(element('h3','Yanıt biçimi'),akisEtiket,akisBilgi);
+
   body.append(element('h3','Hatırlatıcı bildirimleri'),bildirimEtiket,bildirimBilgi,
     (()=>{const p=element('p','Hatırlatıcıları sunucu kontrol eder: tarayıcı kapalı olsa da süresi gelen '+
       'hatırlatıcı kaydedilir ve bir sonraki açılışta gösterilir. Bildirim yalnızca bilgisayarında görünür.');p.className='hint';return p})());
@@ -739,6 +850,8 @@ document.getElementById('systemTab').onclick=async()=>{
     kisayolBilgi.textContent=r.hotkey.destekli
       ? (r.hotkey.aktif?'Etkin: '+r.hotkey.gorunen:(r.hotkey.hata||'Kısayol kapalı.'))
       : 'Global kısayol yalnızca Windows’ta çalışır.';
+    if(r.web)webKutu.checked=!!r.web.aktif;
+    webBilgi.textContent=webKutu.checked?'Web araması açık; yanıtların altında kaynaklar gösterilir.':'Web araması kapalı.';
     bildirimKutu.checked=!!r.notifications.aktif;
     bildirimBilgi.textContent=r.notifications.aktif
       ? 'Masaüstü bildirimi açık'+(r.notifications.bekleyen?' · okunmamış '+r.notifications.bekleyen+' bildirim':'')

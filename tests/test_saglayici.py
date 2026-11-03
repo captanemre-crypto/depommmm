@@ -38,9 +38,25 @@ class SahteSaglayici(BaseHTTPRequestHandler):
             return self._json(200, {'data': [{'id': m} for m in MODELLER]})
         self._json(404, {'error': 'yok'})
 
+    def _akis(self, parcalar):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        for parca in parcalar:
+            self.wfile.write(('data: ' + json.dumps({'choices': [{'delta': {'content': parca}}]}) + '\n\n').encode())
+            self.wfile.flush()
+        self.wfile.write(b'data: [DONE]\n\n')
+        self.wfile.flush()
+
     def do_POST(self):
         uzunluk = int(self.headers.get('Content-Length', '0'))
         govde = json.loads(self.rfile.read(uzunluk) or b'{}')
+        if govde.get('stream'):
+            SahteSaglayici.kayitlar.append(('STREAM', self.path, dict(self.headers)))
+            if govde.get('model') == 'hata-model':
+                return self._json(429, {'error': {'message': 'kota doldu'}})
+            return self._akis(['Merhaba', ' dünya', '.'])
         SahteSaglayici.kayitlar.append(('POST', self.path, govde))
         if self.headers.get('Authorization') == 'Bearer gecersiz':
             return self._json(401, {'error': {'message': 'invalid api key'}})
@@ -280,6 +296,55 @@ class SaglayiciTest(unittest.TestCase):
             self.sag.sohbet([{'role': 'user', 'content': 'x'}])
         self.assertIn('Model seçilmemiş', str(ctx.exception))
 
+
+
+class AkisTest(unittest.TestCase):
+    """SSE akışı: gerçek akış isteği, sahte /v1 sunucusuna karşı."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), SahteSaglayici)
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        cls.base = f'http://127.0.0.1:{cls.httpd.server_address[1]}/v1'
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.sag = saglayici.Saglayici(Path(self.tmp.name) / 'akis_ayar.json')
+        self.sag.kaydet(self.base, 'test-anahtar', 'openai/gpt-oss-20b:free')
+
+    def test_chunks_are_streamed_in_order(self):
+        parcalar = list(self.sag.sohbet_akis([{'role': 'user', 'content': 'selam'}]))
+        self.assertEqual(''.join(parcalar), 'Merhaba dünya.')
+
+    def test_stream_requests_sse(self):
+        list(self.sag.sohbet_akis([{'role': 'user', 'content': 'selam'}]))
+        tur, yol, basliklar = [k for k in SahteSaglayici.kayitlar if k[0] == 'STREAM'][-1]
+        self.assertEqual(basliklar.get('Accept'), 'text/event-stream')
+        self.assertEqual(basliklar.get('Authorization'), 'Bearer test-anahtar')
+
+    def test_http_error_is_translated(self):
+        with self.assertRaises(ValueError) as ctx:
+            list(self.sag.sohbet_akis([{'role': 'user', 'content': 'selam'}], model='hata-model'))
+        self.assertIn('kota', str(ctx.exception).lower())
+
+    def test_missing_model_rejected(self):
+        bos = saglayici.Saglayici(Path(self.tmp.name) / 'bos_ayar.json')
+        bos.kaydet(self.base, 'k', '')
+        with self.assertRaises(ValueError):
+            list(bos.sohbet_akis([{'role': 'user', 'content': 'x'}]))
+
+    def test_unreachable_gateway_message(self):
+        kapali = saglayici.Saglayici(Path(self.tmp.name) / 'kapali_ayar.json')
+        kapali.kaydet('http://127.0.0.1:9/v1', 'k', 'model')
+        with self.assertRaises(ValueError) as ctx:
+            list(kapali.sohbet_akis([{'role': 'user', 'content': 'x'}]))
+        self.assertIn('ulaşılamadı', str(ctx.exception))
 
 if __name__ == '__main__':
     unittest.main()

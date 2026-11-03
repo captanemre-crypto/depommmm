@@ -16,8 +16,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 | ~~A1~~ ✅ | **Windows açılışında otomatik başlama + arka planda çalışma** | **Eklendi (2026-11-03):** Başlangıç klasörü kısayolu + sessiz `pythonw` başlatma, Ayarlar › Sistem | — | Düşük |
 | ~~A2~~ ✅ | **Global kısayol ile dikte** (varsayılan `Ctrl+Alt+D`) | **Eklendi:** `kisayol.py` + `/api/hotkey/poll`; sayfa açıksa 1,5 sn içinde tepki, kapalıysa `?dikte=1` ile açılır | — | Düşük |
 | ~~A3~~ ✅ | **Pencere kapalıyken hatırlatıcı** | **Eklendi:** sunucu işçisi (20 sn) + `notifications` tablosu + masaüstü balonu/ses; birikenler açılışta gösterilir | — | Düşük |
-| A4 | **Web’den bilgi getirme (arama + kaynaklı özet)** | Yalnızca `internet_available()` bayrağı; model kendi bilgisiyle konuşuyor | “Bugün hava nasıl”, “bu ürün fiyatı ne” gibi sorularda model uyduruyor; kaynak/link yok | M | Orta (CSP + dış servis) |
-| A5 | **Akışlı (streaming) yanıt** | Yanıt tamamen bitince tek parça geliyor | Uzun yanıtta 5–20 sn boş ekran; algılanan hız düşük | M | Düşük |
+| ~~A4~~ ✅ | **Web’den bilgi getirme (arama + kaynaklı özet)** | **Eklendi:** `arama.py` (DDG Lite → Instant Answer → Vikipedi), yalnızca gerektiğinde, kaynak listesi arayüzde | — | Orta (dış servis) |
+| ~~A5~~ ✅ | **Akışlı (streaming) yanıt** | **Eklendi:** `/api/chat/stream` (SSE), Ollama NDJSON akışı, başarısızlıkta tek parça yola dönüş | — | Düşük |
 
 ## B. “Jarvis hissi”ni tamamlayanlar
 
@@ -58,7 +58,7 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 ## Önerilen sıra
 
 1. ~~A1 + A2 + A3~~ ✅ (2026-11-03'te eklendi: otomatik başlatma, global dikte kısayolu, sunucu taraflı hatırlatıcı).
-2. **A5** (akışlı yanıt) → **A4** (web araması + kaynak).
+2. ~~A5 (akışlı yanıt) + A4 (web araması)~~ ✅ (2026-11-03'te eklendi).
 4. **B1** (skill sistemi) — MCP’nin üzerine hafif eklenti katmanı.
 5. **B2** (akışlı TTS + barge-in) — tam çift yönlü ses.
 6. **C1 + C2 + C4** — güvenlik/bakım paketi.

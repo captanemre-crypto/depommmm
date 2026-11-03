@@ -72,6 +72,20 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         const res = await request(target, { method: opt.method, body: opt.body, headers });
         // jsdom'da Response.blob yok: indirme akışını test edebilmek için ekle.
         res.blob = async () => new window.Blob([res.text], { type: res.ctype || 'application/octet-stream' });
+        // SSE (akışlı sohbet) yanıtlarını ReadableStream gibi sun.
+        if ((res.ctype || '').includes('text/event-stream')) {
+          const parcalar = res.text.match(/[\s\S]{1,64}/g) || [];
+          res.body = {
+            getReader() {
+              let i = 0;
+              return {
+                read: async () => (i < parcalar.length
+                  ? { done: false, value: Uint8Array.from(Buffer.from(parcalar[i++], 'utf8')) }
+                  : { done: true, value: undefined }),
+              };
+            },
+          };
+        }
         return res;
       };
       window.HTMLCanvasElement.prototype.getContext = () => makeCtx();
@@ -267,6 +281,65 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     assert(res.status === 400, 'geçersiz kısayol kabul edildi: ' + res.status);
   });
 
+  await check('sistem: web araması anahtarı', async () => {
+    const once = await (await request('/api/system/status')).json();
+    assert(once.web && typeof once.web.aktif === 'boolean', 'web durumu yok');
+    const kapali = await (await request('/api/system/web', {
+      body: JSON.stringify({ aktif: false }),
+      headers: { 'Content-Type': 'application/json' },
+    })).json();
+    assert(kapali.aktif === false, 'web araması kapatılamadı');
+    await request('/api/system/web', {
+      body: JSON.stringify({ aktif: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  await check('sohbet: akışlı yanıt parça parça geliyor', async () => {
+    // Ücretsiz API arka ucuna geç ki sahte sağlayıcı akışı kullanılsın.
+    await request('/api/provider/connect', {
+      body: JSON.stringify({ base_url: 'http://127.0.0.1:8899/v1', key: 'test', model: 'openai/gpt-oss-20b:free', confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await request('/api/chat/stream', {
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'merhaba' }], backend: 'api' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    assert((res.ctype || '').includes('text/event-stream'), 'SSE içerik tipi değil: ' + res.ctype);
+    const olaylar = res.text.split('\n\n').filter(Boolean)
+      .map(b => { try { return JSON.parse(b.replace(/^data:\s*/, '')); } catch (e) { return null; } })
+      .filter(Boolean);
+    assert(olaylar.some(o => o.type === 'delta'), 'delta olayı yok');
+    const bitti = olaylar.find(o => o.type === 'done');
+    assert(bitti && bitti.reply, 'done olayı yok: ' + JSON.stringify(olaylar).slice(0, 200));
+    await request('/api/provider/disconnect', {
+      body: JSON.stringify({ confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  await check('sohbet: arayüz akışlı yanıtı ekrana yazıyor', async () => {
+    await request('/api/provider/connect', {
+      body: JSON.stringify({ base_url: 'http://127.0.0.1:8899/v1', key: 'test', model: 'openai/gpt-oss-20b:free', confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    window.localStorage.setItem('emre-backend', 'api');
+    window.localStorage.setItem('emre-akis', '1');
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Sohbet').click();
+    await sleep(400);
+    const girdi = $('input');
+    girdi.value = 'merhaba';
+    $('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await sleep(2500);
+    const metin = $('messages').textContent;
+    assert(/Sahte akış yanıtı/.test(metin), 'akışlı yanıt ekranda yok: ' + metin.slice(-200));
+    window.localStorage.setItem('emre-backend', 'ollama');
+    await request('/api/provider/disconnect', {
+      body: JSON.stringify({ confirmed: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
   await check('sistem: bildirim anahtarı ve durum ucu', async () => {
     const once = await (await request('/api/system/status')).json();
     assert(typeof once.notifications.aktif === 'boolean', 'bildirim durumu yok');
@@ -340,9 +413,10 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 
   await check('mükerrer hesap: Türkçe uyumlu ret', async () => {
-    const r1 = await request('/api/accounts', { body: JSON.stringify({ name: 'İlker' }), headers: { 'Content-Type': 'application/json' } });
+    const ad = 'E2EIlker' + Date.now().toString().slice(-5);
+    const r1 = await request('/api/accounts', { body: JSON.stringify({ name: ad }), headers: { 'Content-Type': 'application/json' } });
     assert(r1.status === 200, 'ilk hesap eklenemedi: ' + r1.text);
-    const r2 = await request('/api/accounts', { body: JSON.stringify({ name: 'ilker' }), headers: { 'Content-Type': 'application/json' } });
+    const r2 = await request('/api/accounts', { body: JSON.stringify({ name: ad.toLowerCase() }), headers: { 'Content-Type': 'application/json' } });
     assert(r2.status === 400, 'Türkçe büyük/küçük harf farkı yakalanmadı');
     const msg = JSON.parse(r2.text).error;
     assert(/zaten var/.test(msg) && !/UNIQUE|constraint/.test(msg), 'İngilizce SQL hatası sızdı: ' + msg);
@@ -471,7 +545,8 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     $('input').value = 'merhaba';
     $('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     await sleep(1500);
-    assert(/Sahte sağlayıcı yanıtı/.test($('messages').textContent), 'sağlayıcı yanıtı görünmedi: ' + $('messages').textContent.slice(-200));
+    // Akışlı yanıt açıksa sahte sağlayıcının akış metni, kapalıysa tek parça metni gelir.
+    assert(/Sahte (sağlayıcı|akış) yanıtı/.test($('messages').textContent), 'sağlayıcı yanıtı görünmedi: ' + $('messages').textContent.slice(-200));
 
     // Bağlantıyı kes → Ollama'ya dön
     [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();

@@ -63,10 +63,10 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**291 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi ve otomatik başlatma modüllerini kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**329 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması ve akışlı yanıtı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
-`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (44 kontrol).
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (47 kontrol).
 
 ```bash
 python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
@@ -174,6 +174,47 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Akışlı yanıt ve web araması (2026-11-03 · üçüncü tur)
+
+### 1. Akışlı (streaming) yanıt
+
+- Yeni `POST /api/chat/stream` ucu, yanıtı **kelime kelime** gönderir (SSE, `text/event-stream`).
+  Sağlayıcı akışı OpenAI uyumlu `stream: true` ile, Ollama ise NDJSON akışıyla okunur.
+- Arayüz yazılan metni anında ekrana basar; akış desteklenmezse **kendiliğinden** eski tek parça
+  `/api/chat` yoluna döner (sessiz bozulma yok).
+- Defter/hatırlatıcı gibi **kural tabanlı** yanıtlar model çağrılmadan tek parça döner; Ollama kapalıyken de çalışır.
+- Sistem istemindeki güvenlik kuralları korunur; modelin ham düşünce blokları (`<think>`) temizlenir.
+- Ayarlar › Sistem › “Yanıtı yazarken göster (akışlı)” ile kapatılabilir.
+
+Olay biçimi:
+
+```
+data: {"type":"start","sources":[...]}
+data: {"type":"delta","text":"Merhaba"}
+data: {"type":"done","reply":"Merhaba dünya.","sources":[{"baslik":"...","url":"https://..."}]}
+```
+
+### 2. Web araması (ücretsiz, anahtar gerekmez)
+
+- `arama.py` üç kaynağı sırayla dener: **DuckDuckGo Lite** → **DuckDuckGo Instant Answer** → **Türkçe Vikipedi**.
+- Arama **yalnızca gerektiğinde** yapılır: “bugün, güncel, son dakika, hava, fiyat, kimdir, araştır, internetten bak”
+  gibi kalıplar. “Ahmet 500 TL borç aldı” gibi komutlar aramaya gitmez.
+- Sonuçlar sistem istemine kaynak numaralı olarak eklenir; arayüz yanıtın altında **tıklanabilir kaynak listesi** gösterir.
+- Güvenlik: yalnızca **https**, 8 sn zaman aşımı, 600 KB yanıt sınırı; sayfalar açılmaz, form gönderilmez, giriş yapılmaz.
+  Arama başarısız olursa sohbet **bozulmaz**, kaynak listesi boş kalır.
+- Ayarlar › Sistem › “Güncel sorularda web’de ara” ile kapatılabilir (`web_arama` ayarı).
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `POST /api/chat/stream` | `{messages, backend, model?, session?, web?}` → SSE akışı |
+| `GET /api/web/search?q=...` | `{query, results:[{baslik,url,ozet}]}` (elle arama) |
+| `POST /api/system/web` | `{aktif}` → web aramasını aç/kapa |
+
+### Testler
+
+`tests/test_arama.py` (21), `test_saglayici.py` +5 (SSE akışı), `test_server.py` +12 (web + akış uçları) →
+toplam **329 test**. Arayüz E2E **47/47**.
 
 ## Sistem entegrasyonu (2026-11-03 · ikinci tur)
 

@@ -301,6 +301,68 @@ class Saglayici:
                      'Ayarlar > Ücretsiz API > “Bağlantıyı test et” düğmesi ayrıntıyı gösterir.')
         return temel + ipucu + ((' Ayrıntı: ' + ayrinti) if ayrinti else '')
 
+    def sohbet_akis(self, messages, model=None, max_tokens=500, timeout=120):
+        """Yanıtı parça parça (generator) döndürür: OpenAI uyumlu SSE akışı."""
+        ayar = self.yukle()
+        model = (model or ayar['model'] or '').strip()
+        if not model:
+            raise ValueError('Model seçilmemiş. Ayarlar > Ücretsiz API bölümünden bir model seç.')
+        payload = {'model': model, 'messages': messages, 'max_tokens': max_tokens, 'stream': True}
+        if not ayar['base_url']:
+            raise ValueError('Ücretsiz API sağlayıcısı ayarlanmamış. Ayarlar > Ücretsiz API bölümünden bağlan.')
+        url = ayar['base_url'].rstrip('/') + '/chat/completions'
+        data = json.dumps(payload).encode('utf-8')
+        basliklar = {'Accept': 'text/event-stream', 'Content-Type': 'application/json'}
+        if ayar['key']:
+            basliklar['Authorization'] = 'Bearer ' + ayar['key']
+        for parca in self._akis(url, data, basliklar, timeout, ayar):
+            yield parca
+
+    def _akis(self, url, data, basliklar, timeout, ayar):
+        """SSE satırlarını çözer; `delta.content` parçalarını üretir."""
+        istek = urllib.request.Request(url, data=data, headers=basliklar, method='POST')
+        try:
+            yanit = urllib.request.urlopen(istek, timeout=timeout)
+        except urllib.error.HTTPError as hata:
+            metin = hata.read().decode('utf-8', 'replace')
+            govde = _json_deneme(metin)
+            if ayar['key'] and 'x-api-key' not in basliklar and _anahtar_eksik(govde, metin):
+                yedek = dict(basliklar)
+                yedek['x-api-key'] = ayar['key']
+                with urllib.request.urlopen(urllib.request.Request(
+                        url, data=data, headers=yedek, method='POST'), timeout=timeout) as y2:
+                    yield from self._sse_oku(y2)
+                return
+            raise ValueError(self._http_mesaji(hata.code, govde, metin))
+        except urllib.error.URLError:
+            raise ValueError(self._ulasilamadi(ayar))
+        except TimeoutError:
+            raise ValueError('Sağlayıcı zamanında yanıt vermedi; tekrar dene.')
+        with yanit:
+            yield from self._sse_oku(yanit)
+
+    @staticmethod
+    def _sse_oku(yanit):
+        for ham in yanit:
+            satir = ham.decode('utf-8', 'replace').strip()
+            if not satir or satir.startswith(':'):
+                continue
+            if satir.startswith('data:'):
+                satir = satir[5:].strip()
+            if satir == '[DONE]':
+                break
+            try:
+                olay = json.loads(satir)
+            except ValueError:
+                continue  # SSE yorumu / bozuk satır: atla
+            secenekler = olay.get('choices') or []
+            if not secenekler:
+                continue
+            delta = (secenekler[0] or {}).get('delta') or {}
+            parca = delta.get('content')
+            if isinstance(parca, str) and parca:
+                yield parca
+
     # --- işlemler ----------------------------------------------------------
     def modeller(self, base_url=None, key=None, timeout=25):
         """`/v1/models` listesini döndürür; ücretsiz modeller önce gelir."""

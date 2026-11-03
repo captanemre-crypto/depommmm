@@ -22,9 +22,22 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {'data': [{'id': m} for m in MODELLER]})
         self._json(404, {'error': 'yok'})
 
+    def _akis(self, parcalar):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        for parca in parcalar:
+            self.wfile.write(('data: ' + json.dumps({'choices': [{'delta': {'content': parca}}]}) + '\n\n').encode())
+            self.wfile.flush()
+        self.wfile.write(b'data: [DONE]\n\n')
+        self.wfile.flush()
+
     def do_POST(self):
         n = int(self.headers.get('Content-Length', '0'))
         govde = json.loads(self.rfile.read(n) or b'{}')
+        if govde.get('stream'):
+            return self._akis(['Sahte ', 'akış ', 'yanıtı.'])
         if govde.get('model') == 'tool-model':
             return self._json(200, {'choices': [{'message': {
                 'role': 'assistant', 'content': None,

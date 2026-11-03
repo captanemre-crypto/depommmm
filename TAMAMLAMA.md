@@ -216,3 +216,30 @@ Bilinçli sınırlar:
 - Kısayol yalnızca dikteyi açar/kapatır; başka işlem yapmaz. Tarayıcı kapalıyken dikte, sayfa açılana kadar başlamaz.
 - Masaüstü bildirimi odak çalmayan balondur; Windows bildirim ayarlarında "rahatsız etme" açıksa görünmeyebilir.
 - Hatırlatıcı işçisi sunucu çalışırken aktiftir; Emre tamamen kapalıyken bildirim üretilmez (bir sonraki açılışta birikenler gösterilir).
+
+## Ek tur: akışlı yanıt + web araması (2026-11-03 · üçüncü tur)
+
+**İstek:** “devam edelim” — `YOL_HARITASI.md` A5 ve A4.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| K1 | `saglayici.sohbet_akis()`: OpenAI uyumlu SSE akışı, `x-api-key` yedeği, Türkçe hata çevirisi | ✅ |
+| K2 | `POST /api/chat/stream`: SSE olayları (`start`, `delta`, `done`), kural tabanlı yanıtlarda tek parça, bağlantı kopunca sessiz çıkış | ✅ |
+| K3 | Ollama akışı (`ollama_akis`): NDJSON satırları → parça; `qwen3` için `/no_think` | ✅ |
+| K4 | Arayüz: akışlı yazım (canlı satır), akış başarısızsa otomatik tek parça yola dönüş, `TextDecoder` olmayan ortamlar için bayt çözücü | ✅ |
+| K5 | `arama.py`: DuckDuckGo Lite → Instant Answer → Türkçe Vikipedi; https zorunlu, boyut/süre sınırı, tekilleştirme | ✅ |
+| K6 | `gerekiyor_mu()`: güncel bilgi/belirtilen komut kalıpları; defter/hatırlatıcı komutları aramaya gitmez | ✅ |
+| K7 | Sohbete kaynak ekleme: sistem isteminde numaralı kaynaklar, yanıtta `sources`, arayüzde tıklanabilir liste | ✅ |
+| K8 | Uçlar: `/api/chat/stream`, `/api/web/search`, `/api/system/web`; Sistem sekmesinde web ve akış anahtarları | ✅ |
+| K9 | Testler: `test_arama` (21), `test_saglayici` +5, `test_server` +12 → **329 test**; E2E **47/47** | ✅ |
+
+Yol boyunca düzeltilen hata:
+
+- Açık bilgiler bağlama eklenirken `kisisel` değişkeni sonradan `''` ile eziliyordu; **kişisel bellek sohbete hiç girmiyordu**. Düzeltildi.
+
+Bilinçli sınırlar:
+
+- Akışlı yolda modelin **araç çağrısı** (tool_calls) kullanılmaz; defter/hatırlatıcı işlemleri kural tabanlı çözücülerle yapılır.
+  Modelin tool JSON’u yazması durumunda yanıt güvenli biçimde “işlem yapılmadı” olarak değiştirilir.
+- Web araması bir arama motoruna bağımlı; DuckDuckGo sayfa yapısı değişirse Vikipedi yedeği devreye girer.
+- Arama sonuçları özet düzeyinde; tam sayfa okuma (fetch + çıkarma) yok.

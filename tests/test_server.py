@@ -43,9 +43,23 @@ class SahteSaglayici(BaseHTTPRequestHandler):
             return self._json(200, {'data': [{'id': 'openai/gpt-oss-20b:free'}, {'id': 'tool-model'}]})
         self._json(404, {'error': 'yok'})
 
+    def _akis(self, parcalar):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        for parca in parcalar:
+            govde = json.dumps({'choices': [{'delta': {'content': parca}}]})
+            self.wfile.write(('data: ' + govde + '\n\n').encode())
+            self.wfile.flush()
+        self.wfile.write(b'data: [DONE]\n\n')
+        self.wfile.flush()
+
     def do_POST(self):
         n = int(self.headers.get('Content-Length', '0'))
         govde = json.loads(self.rfile.read(n) or b'{}')
+        if govde.get('stream'):
+            return self._akis(['Merhaba', ', ben', ' akış', ' yanıtı.'])
         if govde.get('model') == 'tool-model':
             return self._json(200, {'choices': [{'message': {
                 'role': 'assistant', 'content': None,
@@ -114,6 +128,27 @@ class ServerTestCase(unittest.TestCase):
                 return exc.code, json.loads(payload), exc.headers.get('Content-Type', '')
             except ValueError:
                 return exc.code, payload, exc.headers.get('Content-Type', '')
+
+    def raw_stream(self, path, data):
+        """SSE ucundan ham gövdeyi ve içerik tipini okur."""
+        govde = json.dumps(data).encode()
+        istek = urllib.request.Request(self.base + path, data=govde, method='POST')
+        istek.add_header('Content-Type', 'application/json')
+        istek.add_header('X-Emre-Token', 'test-anahtar')
+        try:
+            with urllib.request.urlopen(istek, timeout=30) as yanit:
+                return yanit.status, yanit.read().decode('utf-8'), yanit.headers.get('Content-Type', '')
+        except urllib.error.HTTPError as hata:
+            return hata.code, hata.read().decode('utf-8'), hata.headers.get('Content-Type', '')
+
+    @staticmethod
+    def olaylar(govde):
+        olaylar = []
+        for blok in govde.split('\n\n'):
+            blok = blok.strip()
+            if blok.startswith('data:'):
+                olaylar.append(json.loads(blok[5:].strip()))
+        return olaylar
 
     def api(self, path, data=None, expect=200, **kwargs):
         status, payload, _ = self.raw(path, data, **kwargs)
@@ -602,6 +637,105 @@ class ServerTestCase(unittest.TestCase):
             server.bildirim_tara()
         goster.assert_not_called()
         self.assertTrue(any('sessiz' in k['text'] for k in self.api('/api/notifications?since=0')['items']))
+
+    # --- web araması ---------------------------------------------------------
+    def test_web_search_endpoint_uses_module(self):
+        import arama
+        sahte = [{'baslik': 'Örnek', 'url': 'https://ornek.test/a', 'ozet': 'özet'}]
+        with mock.patch.object(arama, 'ara', return_value=sahte) as ara:
+            veri = self.api('/api/web/search?q=hava%20durumu')
+        ara.assert_called_once()
+        self.assertEqual(veri['results'][0]['baslik'], 'Örnek')
+
+    def test_web_search_requires_query(self):
+        hata = self.api('/api/web/search?q=', expect=400)
+        self.assertIn('Arama metni', hata['error'])
+
+    def test_web_toggle(self):
+        self.assertTrue(self.api('/api/system/status')['web']['aktif'])
+        self.api('/api/system/web', {'aktif': False})
+        self.assertFalse(self.api('/api/system/status')['web']['aktif'])
+        self.api('/api/system/web', {'aktif': True})
+
+    def test_chat_includes_web_sources(self):
+        import arama
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        sahte = [{'baslik': 'Hava', 'url': 'https://ornek.test/hava', 'ozet': 'güneşli'}]
+        with mock.patch.object(arama, 'ara', return_value=sahte) as ara:
+            veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'bugün hava nasıl'}],
+                                          'backend': 'api'})
+        ara.assert_called_once()
+        self.assertEqual(veri['sources'][0]['url'], 'https://ornek.test/hava')
+        self.assertTrue(veri['reply'])
+
+    def test_chat_skips_web_for_plain_messages(self):
+        import arama
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(arama, 'ara', return_value=[]) as ara:
+            veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}],
+                                          'backend': 'api'})
+        ara.assert_not_called()
+        self.assertEqual(veri['sources'], [])
+
+    def test_web_disabled_setting_blocks_search(self):
+        import arama
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        self.api('/api/system/web', {'aktif': False})
+        with mock.patch.object(arama, 'ara', return_value=[]) as ara:
+            self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'bugün hava nasıl'}],
+                                   'backend': 'api'})
+        ara.assert_not_called()
+        self.api('/api/system/web', {'aktif': True})
+
+    def test_chat_web_flag_forces_search(self):
+        import arama
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(arama, 'ara', return_value=[]) as ara:
+            self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'merhaba'}],
+                                   'backend': 'api', 'web': True})
+        ara.assert_called_once()
+
+    def test_web_failure_does_not_break_chat(self):
+        import arama
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        with mock.patch.object(arama, 'ara', side_effect=OSError('ağ yok')):
+            veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': 'bugün hava nasıl'}],
+                                          'backend': 'api', 'web': True})
+        self.assertTrue(veri['reply'])
+        self.assertEqual(veri['sources'], [])
+
+    # --- akışlı yanıt --------------------------------------------------------
+    def test_chat_stream_emits_deltas_and_done(self):
+        server.SAG.kaydet(self.provider_base, 'test', 'openai/gpt-oss-20b:free')
+        durum, govde, ctype = self.raw_stream('/api/chat/stream', {
+            'messages': [{'role': 'user', 'content': 'merhaba'}], 'backend': 'api', 'web': False})
+        self.assertEqual(durum, 200)
+        self.assertIn('text/event-stream', ctype)
+        olaylar = self.olaylar(govde)
+        self.assertTrue(any(o['type'] == 'delta' for o in olaylar))
+        bitti = [o for o in olaylar if o['type'] == 'done']
+        self.assertEqual(len(bitti), 1)
+        self.assertIn('akış', bitti[0]['reply'])
+
+    def test_chat_stream_rule_based_single_event(self):
+        # Hatırlatıcı niyeti model çağrılmadan, tek parça yanıtlanır (Ollama kapalı olsa da).
+        durum, govde, _ = self.raw_stream('/api/chat/stream', {
+            'messages': [{'role': 'user', 'content': 'yarın 09:00 su iç diye hatırlat'}], 'backend': 'api'})
+        self.assertEqual(durum, 200, govde[:200])
+        olaylar = self.olaylar(govde)
+        self.assertEqual([o['type'] for o in olaylar], ['delta', 'done'])
+        self.assertIn('hatırlat', olaylar[-1]['reply'].lower())
+
+    def test_chat_stream_rejects_empty_messages(self):
+        durum, govde, _ = self.raw_stream('/api/chat/stream', {'messages': []})
+        self.assertEqual(durum, 400)
+        self.assertIn('Mesaj boş', json.loads(govde)['error'])
+
+    def test_chat_stream_unknown_backend(self):
+        durum, govde, _ = self.raw_stream('/api/chat/stream', {
+            'messages': [{'role': 'user', 'content': 'selam'}], 'backend': 'bilinmeyen'})
+        self.assertEqual(durum, 400)
+        self.assertIn('Bilinmeyen', json.loads(govde)['error'])
 
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')
