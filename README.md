@@ -63,10 +63,10 @@ testler.bat                                # Windows (çift tıkla)
 python3 -m unittest discover -s tests -t .  # Linux/macOS
 ```
 
-**329 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması ve akışlı yanıtı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
+**399 test**; defter araçları, tutar ayrıştırma, Türkçe zaman ayrıştırma, sohbetten hatırlatıcı, HTTP yetkilendirmesi (token + Origin + Host), defter/hatırlatıcı/dışa aktarma akışı, girdi doğrulaması, Arena köprüsü durum makinesi (sahte Playwright), Piper model doğrulaması, yerel ses işçisi zaman aşımı, uyandırma sözcüğü, kişisel bellek, MCP istemcisi (sahte stdio sunucu), ekran görüntüsü, global kısayol, masaüstü bildirimi, otomatik başlatma, web araması, akışlı yanıt, beceri sistemi, denetim izi ve tanılamayı kapsar. GitHub Actions (`.github/workflows/ci.yml`) her push ve pull request'te Python 3.11 ve 3.12 üzerinde sözdizimi kontrolü ile testleri çalıştırır. Tarama sonuçlarının tamamı `DENETIM.md` (statik) ve `E2E_DENETIM.md` (uçtan uca) dosyalarındadır.
 
 ### Arayüz uçtan uca testi (isteğe bağlı, Node gerekir)
-`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (47 kontrol).
+`tools/e2e` gerçek sunucu ve gerçek `index.html` üzerinde arayüzü jsdom ile sürer (49 kontrol).
 
 ```bash
 python3 tools/e2e/baslat.py      # ayrı terminal, geçici veritabanı
@@ -174,6 +174,66 @@ Emre artık **OpenAI uyumlu** her sohbet servisine bağlanabilir. Ollama kurulu 
 | `POST /api/provider/connect` | `{base_url, key, model, confirmed:true}` → model listede yoksa reddeder |
 | `POST /api/provider/disconnect` | `{confirmed:true}` → anahtarı siler, Ollama'ya döner |
 | `POST /api/chat` | `backend:'api'` ile ücretsiz sağlayıcı kullanılır; `ollama` varsayılan kalır |
+
+## Beceriler, denetim izi ve tanılama (2026-11-03 · dördüncü tur)
+
+### 1. Beceri (skill) sistemi
+
+Kendi yeteneğini eklemek için tek klasör yeter: `beceriler/<ad>/SKILL.md`
+
+```
+---
+ad: metin-analiz
+aciklama: Verilen metnin karakter, kelime ve cümle sayısını hesaplar.
+tetik: kelime say, karakter say
+komut: python calistir.py
+---
+Bu beceri tamamen yerel çalışır.
+```
+
+- `komut` varsa beceri **alt süreç** olarak çalışır: stdin'e `{"metin": "...", "beceri": "...", "klasor": "..."}`
+  JSON'u yazılır, stdout'tan `{"reply": "..."}` (veya düz metin) okunur. **Kabuk kullanılmaz**,
+  `python`/`python3`/`py` otomatik olarak Emre'nin yorumlayıcısına çevrilir.
+- `komut` yoksa beceri yalnızca açıklamadır; modelin sistem isteminde listelenir, çalıştırılmaz.
+- Sınırlar: ad `a-z 0-9 _ -` (en fazla 40 karakter), 40 beceri, 20 sn zaman aşımı, çıktı 4000 karakter,
+  giriş 2000 karakter.
+- Çalıştırma **iki yolla** olur ve ikisi de senin açık isteğinle: arayüzde **Ayarlar › Beceriler › Çalıştır**
+  (onay sorar) veya sohbette **`!beceri-adı metin`**. Her çalıştırma denetim izine yazılır.
+- Depoda çalışan bir örnek var: `!metin-analiz bir iki üç` → “3 kelime …”.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/skills` | `{skills:[{ad,klasor,aciklama,tetik,komut,calistirilabilir,hata?}], folder}` |
+| `POST /api/skills/run` | `{ad, metin, confirmed:true}` → `{ok, ad, reply, sure}` |
+
+### 2. Denetim izi (audit)
+
+- Şeffaflık için önemli işlemler `audit` tablosuna yazılır: MCP araç çağrıları, beceri çalıştırmaları,
+  ekran görüntüsü/sorusu, etkin pencereye yazma, defter ve bellek değişiklikleri, sağlayıcı bağlama/kesme,
+  uygulama açma, otomatik başlatma ve global kısayol ayarları.
+- **Sırlar maskelenir**: `Bearer …`, `sk-…`, `api_key:`, `token:`, `parola:` gibi değerler `[gizli]` olur.
+- En fazla 2000 kayıt tutulur; eskiler otomatik budanır. Kayıtlar dışarı gönderilmez.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/audit?limit=50&kind=` | son kayıtlar (yeniden eskiye) |
+| `POST /api/audit/clear` | `{confirmed:true}` → tüm kayıtları siler |
+
+### 3. Tanılama
+
+- `tanilama.py` on kontrol yapar: Python sürümü, platform, disk alanı, yazma izni, veritabanı,
+  port, Ollama, ses ortamı, beceriler, MCP ayarı.
+- Her kontrol `ok` / `uyari` / `hata` döner; arayüzde **Ayarlar › Sistem › Kendi kendini kontrol** altında görünür.
+- Yazma testi geçici bir dosya oluşturup hemen siler; başka hiçbir dosyaya dokunulmaz.
+
+| Uç nokta | Açıklama |
+| --- | --- |
+| `GET /api/diagnose` | `{checks:[{ad,durum,mesaj}], ozet:{ok,uyari,hata,mesaj}}` |
+
+### Testler
+
+`tests/test_beceriler.py` (28), `test_denetim.py` (16), `test_tanilama.py` (16), `test_server.py` +12 →
+**399 test**. Arayüz E2E **49/49**.
 
 ## Akışlı yanıt ve web araması (2026-11-03 · üçüncü tur)
 

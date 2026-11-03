@@ -243,3 +243,28 @@ Bilinçli sınırlar:
   Modelin tool JSON’u yazması durumunda yanıt güvenli biçimde “işlem yapılmadı” olarak değiştirilir.
 - Web araması bir arama motoruna bağımlı; DuckDuckGo sayfa yapısı değişirse Vikipedi yedeği devreye girer.
 - Arama sonuçları özet düzeyinde; tam sayfa okuma (fetch + çıkarma) yok.
+
+## Ek tur: beceriler, denetim izi, tanılama (2026-11-03 · dördüncü tur)
+
+**İstek:** “ekleyelim” — `YOL_HARITASI.md` B1 + C1 + C4.
+
+| # | Madde | Durum |
+| --- | --- | --- |
+| T1 | `beceriler.py`: `beceriler/<ad>/SKILL.md` ayrıştırma, tetik kelimeleri, listele/bul/eşleştir | ✅ |
+| T2 | Beceri çalıştırma: kabuk yok, `shlex` ile argümanlar, stdin JSON, stdout JSON/düz metin, 20 sn zaman aşımı, çıktı sınırı | ✅ |
+| T3 | Sohbet entegrasyonu: `!beceri-adı metin` açık komutu (`/api/chat` ve `/api/chat/stream`), bağlamda beceri listesi | ✅ |
+| T4 | Örnek beceri: `beceriler/metin-analiz` (SKILL.md + calistir.py), depoda hazır | ✅ |
+| T5 | `denetim.py`: `audit` tablosu, sır maskeleme (`Bearer`, `sk-`, `token:`, `parola:`), 2000 kayıt budaması | ✅ |
+| T6 | Denetim kancaları: MCP, beceri, ekran, dikte yazımı, defter/bellek, sağlayıcı, uygulama, otomatik başlatma, kısayol | ✅ |
+| T7 | `tanilama.py`: 10 kontrol (Python, platform, disk, yazma, veritabanı, port, Ollama, ses, beceri, MCP) + özet | ✅ |
+| T8 | Uçlar: `GET /api/skills`, `POST /api/skills/run`, `GET /api/audit`, `POST /api/audit/clear`, `GET /api/diagnose` | ✅ |
+| T9 | Arayüz: **Ayarlar › Beceriler** sekmesi (liste + onaylı çalıştırma), Sistem sekmesinde tanılama ve denetim izi bölümleri | ✅ |
+| T10 | Testler: `test_beceriler` (28), `test_denetim` (16), `test_tanilama` (16), `test_server` +12 → **399 test**; E2E **49/49** | ✅ |
+
+Bilinçli sınırlar:
+
+- Beceriler Emre'nin kullanıcısıyla aynı yetkilerle çalışır; yalnızca **senin yazdığın** dosyalardan oluşur ve
+  her çalıştırma onay ya da açık `!ad` komutu ister. Üçüncü taraftan beceri indirme yoktur.
+- Beceri çıktısı 4000 karakterle sınırlı; uzun çıktılar kırpılır.
+- Denetim izi yalnızca bu bilgisayarda; dışa aktarma/senkron yok. Silme onay ister.
+- Tanılama yalnızca okuma yapar (tek istisna: yazma testi için geçici dosya).

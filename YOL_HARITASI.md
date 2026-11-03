@@ -23,7 +23,7 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 
 | # | Eksik | Notlar | Emek |
 | --- | --- | --- | --- |
-| B1 | **Skill (yetenek) sistemi** | `skills/<ad>/SKILL.md` + basit yükleyici; her skill bir Python fonksiyonu veya MCP sunucusu. Leon/Hermes’in eklenti modelinin hafif karşılığı. İncelemedeki kalan 5. madde | M |
+| ~~B1~~ ✅ | **Skill (yetenek) sistemi** | **Eklendi (2026-11-03):** `beceriler/<ad>/SKILL.md` + alt süreçle çalıştırma, `!ad` komutu, arayüz paneli, örnek beceri | M |
 | B2 | **Akışlı TTS + barge-in** | Yanıtı cümle cümle seslendir, kullanıcı konuşmaya başlayınca sesi kes. Şu an tek parça WAV | M |
 | B3 | **Belge okuma ve soru-cevap** | PDF/Word/txt içe aktarma, yerel parçalama + arama, yanıtta sayfa referansı | L |
 | B4 | **Takvim / e-posta** | ICS okuma (salt okunur, en güvenli seçenek); IMAP ile “son 10 maili özetle” | L |
@@ -33,10 +33,10 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 
 | # | Eksik | Notlar | Emek |
 | --- | --- | --- | --- |
-| C1 | **Araç çağrısı denetim izi** | MCP çağrıları, uygulama açma, dosya yazma, dikte yazımı için “son 100 işlem” kaydı + panel. Onay disiplinini görünür kılar | S |
+| ~~C1~~ ✅ | **Araç çağrısı denetim izi** | **Eklendi:** `audit` tablosu + Ayarlar › Sistem › Denetim izi (sırlar maskeli, 2000 kayıt) | S |
 | C2 | **Bellek dışa/içe aktarma ve yaşlandırma** | JSON yedeği, eski kayıtları arşivleme, “bunu unut” komutu | S |
 | C3 | **Sağlayıcı yedeği ve kota sayacı** | 429/401’de ikinci ücretsiz modele otomatik geçiş; günlük istek sayacı | M |
-| C4 | **Açılışta kendi kendini kontrol** | Python sürümü, port, DB yazılabilirliği, mikrofon, model hazırlığı → “Tanılama” paneli | S |
+| ~~C4~~ ✅ | **Açılışta kendi kendini kontrol** | **Eklendi:** `tanilama.py` 10 kontrol + Ayarlar › Sistem paneli | S |
 | C5 | **Telefondan erişim** | README’de bilinçli sınır. Ancak Tailscale/ZeroTier + token ile mümkün; **önerilmez** (yüzey alanı büyür) | L |
 
 ## D. Deneyim / kozmetik
@@ -59,8 +59,8 @@ Telegram, kod çalışma alanı, Windows uygulama açma, masaüstü (pywebview) 
 
 1. ~~A1 + A2 + A3~~ ✅ (2026-11-03'te eklendi: otomatik başlatma, global dikte kısayolu, sunucu taraflı hatırlatıcı).
 2. ~~A5 (akışlı yanıt) + A4 (web araması)~~ ✅ (2026-11-03'te eklendi).
-4. **B1** (skill sistemi) — MCP’nin üzerine hafif eklenti katmanı.
+4. ~~B1 (skill sistemi) + C1 (denetim izi) + C4 (tanılama)~~ ✅ (2026-11-03'te eklendi).
 5. **B2** (akışlı TTS + barge-in) — tam çift yönlü ses.
-6. **C1 + C2 + C4** — güvenlik/bakım paketi.
+6. **C2 + C3 + C5** — bellek yedeği, sağlayıcı yedeği, (isteğe bağlı) dış erişim.
 
 Yaklaşık toplam: A bloğu ~1,5 hafta, B1–B2 ~1 hafta, C1–C4 ~3 gün.

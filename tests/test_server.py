@@ -737,6 +737,84 @@ class ServerTestCase(unittest.TestCase):
         self.assertEqual(durum, 400)
         self.assertIn('Bilinmeyen', json.loads(govde)['error'])
 
+    # --- beceriler -----------------------------------------------------------
+    def test_skills_listed(self):
+        veri = self.api('/api/skills')
+        self.assertIn('metin-analiz', [b['klasor'] for b in veri['skills']])
+        self.assertTrue(veri['folder'].endswith('beceriler'))
+
+    def test_skill_run_requires_confirmation(self):
+        hata = self.api('/api/skills/run', {'ad': 'metin-analiz', 'metin': 'a b c'}, expect=400)
+        self.assertIn('onay', hata['error'])
+
+    def test_skill_runs_and_is_audited(self):
+        veri = self.api('/api/skills/run', {'ad': 'metin-analiz', 'metin': 'bir iki üç',
+                                            'confirmed': True})
+        self.assertTrue(veri['ok'])
+        self.assertIn('3 kelime', veri['reply'])
+        kayitlar = self.api('/api/audit')['items']
+        self.assertTrue(any('metin-analiz' in k['action'] for k in kayitlar))
+
+    def test_unknown_skill_is_400(self):
+        hata = self.api('/api/skills/run', {'ad': 'yok-boyle', 'confirmed': True}, expect=400)
+        self.assertIn('bulunamadı', hata['error'])
+
+    def test_chat_runs_skill_with_bang_command(self):
+        # '!' öneki kullanıcının açık komutudur; model çağrılmadan beceri çalışır.
+        veri = self.api('/api/chat', {'messages': [{'role': 'user', 'content': '!metin-analiz bir iki'}],
+                                      'backend': 'ollama'})
+        self.assertIn('2 kelime', veri['reply'])
+
+    def test_chat_stream_runs_skill(self):
+        durum, govde, _ = self.raw_stream('/api/chat/stream', {
+            'messages': [{'role': 'user', 'content': '!metin-analiz a b c d'}], 'backend': 'api'})
+        self.assertEqual(durum, 200, govde[:200])
+        olaylar = self.olaylar(govde)
+        self.assertEqual(olaylar[-1]['type'], 'done')
+        self.assertIn('4 kelime', olaylar[-1]['reply'])
+
+    # --- denetim izi ---------------------------------------------------------
+    def test_audit_records_memory_add(self):
+        self.api('/api/memory/add', {'text': 'Ahmet aradı'})
+        kayitlar = self.api('/api/audit?kind=bellek')['items']
+        self.assertTrue(any(k['action'] == 'bellek kaydı eklendi' for k in kayitlar))
+
+    def test_audit_records_mcp_failure(self):
+        sahte = mock.MagicMock()
+        sahte.cagir.side_effect = ValueError('araç patladı')
+        server.MCP.sunucular['yok'] = sahte
+        try:
+            self.api('/api/mcp/call', {'server': 'yok', 'tool': 'x', 'confirmed': True}, expect=400)
+        finally:
+            server.MCP.sunucular.pop('yok', None)
+        kayitlar = self.api('/api/audit?kind=mcp')['items']
+        self.assertTrue(kayitlar)
+        self.assertEqual(kayitlar[0]['status'], 'hata')
+
+    def test_audit_masks_secrets(self):
+        import denetim
+        _ = denetim  # modülün maskesi sunucu kaydında da geçerli
+        self.api('/api/memory/add', {'text': 'token: cokgizlianahtar123'})
+        detaylar = ' '.join(k['detail'] for k in self.api('/api/audit')['items'])
+        self.assertNotIn('cokgizlianahtar123', detaylar)
+
+    def test_audit_clear_requires_confirmation(self):
+        self.api('/api/audit/clear', {}, expect=400)
+        self.api('/api/audit/clear', {'confirmed': True})
+
+    def test_diagnose_shape(self):
+        veri = self.api('/api/diagnose')
+        self.assertEqual(len(veri['checks']), 10)
+        self.assertIn('ozet', veri)
+        adlar = [k['ad'] for k in veri['checks']]
+        self.assertIn('Python', adlar)
+        self.assertIn('Veritabanı', adlar)
+
+    def test_diagnose_reports_temp_database(self):
+        veri = self.api('/api/diagnose')
+        veritabani = next(k for k in veri['checks'] if k['ad'] == 'Veritabanı')
+        self.assertEqual(veritabani['durum'], 'ok')
+
     def test_speech_status_includes_model(self):
         veri = self.api('/api/speech/status')
         self.assertIn('installed', veri)

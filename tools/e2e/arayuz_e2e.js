@@ -195,7 +195,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await check('ayarlar: tüm sekmeler açılıyor', async () => {
     [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
     await sleep(400);
-    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'memoryTab', 'mcpTab', 'systemTab', 'arenaApiTab', 'ollamaTab']) {
+    for (const id of ['openjarvisTab', 'browserAccessTab', 'voiceTab', 'telegramTab', 'memoryTab', 'mcpTab', 'systemTab', 'skillsTab', 'arenaApiTab', 'ollamaTab']) {
       const before = problems.length;
       $(id).click();
       await sleep(500);
@@ -372,6 +372,34 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       body: JSON.stringify({ ids: [bulundu.id] }),
       headers: { 'Content-Type': 'application/json' },
     });
+  });
+
+  await check('beceriler: liste ve onaylı çalıştırma', async () => {
+    [...d.querySelectorAll('.nav button')].find(b => b.dataset.section === 'Ayarlar').click();
+    await sleep(300);
+    $('skillsTab').click();
+    await sleep(800);
+    const govde = $('settingsBody');
+    assert(/metin-analiz/.test(govde.textContent), 'örnek beceri listede yok: ' + govde.textContent.slice(0, 200));
+    const calistir = [...govde.querySelectorAll('button')].find(b => b.textContent === 'Çalıştır');
+    assert(calistir, 'çalıştır düğmesi yok');
+    const girdi = [...govde.querySelectorAll('input')].find(i => /gönderilecek metin/.test(i.placeholder));
+    assert(girdi, 'beceri metin alanı yok');
+    girdi.value = 'bir iki üç dört';
+    calistir.click();
+    await sleep(1500);
+    assert(/4 kelime/.test(govde.textContent), 'beceri sonucu görünmedi: ' + govde.textContent.slice(-200));
+  });
+
+  await check('sistem: tanılama ve denetim izi görünüyor', async () => {
+    $('systemTab').click();
+    await sleep(1500);
+    const tani = $('diagnoseBox');
+    assert(tani && /Python/.test(tani.textContent), 'tanılama sonucu yok: ' + (tani ? tani.textContent.slice(0, 200) : '-'));
+    const denetim = $('auditBox');
+    assert(denetim && denetim.children.length > 0, 'denetim izi boş');
+    await sleep(500);
+    assert(/metin-analiz|bellek|mcp|sistem/i.test(denetim.textContent), 'denetim kaydı beklenen türde değil: ' + denetim.textContent.slice(0, 200));
   });
 
   await check('geliştirici: dosya kaydet ve geri oku', async () => {

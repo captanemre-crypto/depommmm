@@ -21,8 +21,10 @@ from urllib.parse import unquote_plus, urlparse
 
 import arama
 import arena_bridge
+import beceriler
 import bellek
 import bildirim
+import denetim
 import dikte
 import dikte_yaz
 import ekran
@@ -33,6 +35,7 @@ import mcp_istemci
 import otomatik_baslat
 import saglayici
 import ses_baglanti
+import tanilama
 import telegram_bot
 import tts_piper_bridge
 import uyandirma
@@ -44,7 +47,7 @@ OPENJARVIS = 'http://127.0.0.1:8766'
 MODEL = os.getenv('EMRE_MODEL', 'qwen2.5-coder:7b')
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 KEY = secrets.token_urlsafe(32)
-VERSION = '2026-11-03.3'
+VERSION = '2026-11-03.4'
 SYSTEM = 'Adın Emre. Türkçe konuşan yardımcı bir asistansın. Kısa, doğal ve samimi Türkçe konuş; kullanıcıya sen diye hitap et. Yalnızca sorulan sorunun cevabını ver. Cevaptan sonra ek açıklama, öneri, teklif veya takip sorusu ekleme. Her mesajın sonunda soru sorma; özellikle size nasıl yardımcı olabilirim, nasıl yardımcı olabilirim veya başka bir şey var mı gibi kalıpları tekrar etme. Kullanıcının adı bilinmiyor; ona Emre diye seslenme, Emre senin adın. Mikrofonu doğrudan duyduğunu iddia etme; yalnızca sana iletilen metni okuyorsun. Başka dilde gereksiz sözcük kullanma. Doğrudan istenen yanıtı ver. Yapmadığın işlemleri yapmış gibi söyleme. Kullanıcının izni olmadan mesaj gönderme, program çalıştırma veya dosya değiştirme.'
 
 _INITIALIZED = set()
@@ -66,6 +69,15 @@ def ayar_al(conn, ad, varsayilan=''):
     return satir[0] if satir else varsayilan
 
 
+def _denetle(kind, action, detail='', status='ok'):
+    """Denetim izine kayıt düşer; hata olursa işlemi bozmaz."""
+    try:
+        with db() as c:
+            denetim.kaydet(c, kind, action, detail, status)
+    except Exception:
+        pass
+
+
 def ayar_yaz(conn, ad, deger):
     conn.execute('INSERT INTO settings(key,value) VALUES(?,?) '
                  'ON CONFLICT(key) DO UPDATE SET value=excluded.value', (ad, str(deger)))
@@ -83,6 +95,8 @@ def _init_schema(conn, path):
         CREATE TABLE IF NOT EXISTS telegram_messages (id INTEGER PRIMARY KEY, update_id INTEGER UNIQUE, chat_id INTEGER, sender TEXT, text TEXT, date INTEGER, read INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS telegram_state (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, action TEXT NOT NULL,
+            detail TEXT NOT NULL DEFAULT "", status TEXT NOT NULL DEFAULT "ok", created TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL, created TEXT NOT NULL, seen INTEGER DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session, id);
         CREATE INDEX IF NOT EXISTS idx_ledger_person ON ledger(person);
@@ -393,6 +407,20 @@ def sohbet_istegi(data):
     return clean, last_user, session, backend, selected, api_model
 
 
+def beceri_cagrisi(metin):
+    """`!beceri-adı ...` yazılmışsa beceriyi çalıştırır; (yanıt, beceri) döndürür."""
+    ad, kalan = beceriler.acik_komut(metin)
+    if not ad:
+        return None, None
+    try:
+        sonuc = beceriler.calistir(ad, kalan)
+    except ValueError as hata:
+        _denetle('beceri', f'{ad} çalıştırılamadı', str(hata), 'hata')
+        return f'“{ad}” çalıştırılamadı: {hata}', ad
+    _denetle('beceri', f'{ad} sohbetten çalıştırıldı', f'{len(sonuc["reply"])} karakter')
+    return sonuc['reply'], ad
+
+
 def web_baglami(last_user, istenen=None):
     """Gerekiyorsa web araması yapar: (sistem_metni, kaynaklar)."""
     with db() as c:
@@ -470,7 +498,10 @@ class Handler(BaseHTTPRequestHandler):
             if session: store_message(session,'assistant',metin)
             self.sse({'type':'done','reply':metin,'sources':kaynaklar})
 
-        # Kural tabanlı işlemler modelden önce çözülür (defter, hatırlatıcı).
+        # Açık beceri çağrısı (!beceri ...) ve kural tabanlı işlemler modelden önce çözülür.
+        beceri_yanit, _ = beceri_cagrisi(last_user)
+        if beceri_yanit is not None:
+            return tek_parca(beceri_yanit)
         for cozum in (ledger_tools.create_account_from_text(last_user,db),
                       hatirlatici.direct_reminder_action(last_user,db),
                       ledger_tools.direct_ledger_action(last_user,db)):
@@ -491,7 +522,8 @@ class Handler(BaseHTTPRequestHandler):
         else:
             raise ValueError('Bilinmeyen yapay zekâ bağlantısı.')
 
-        system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kısa ve doğrudan yanıt ver.'
+        beceri_metin=beceriler.baglam()
+        system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kısa ve doğrudan yanıt ver.'
         mesajlar=[{'role':'system','content':system}]+clean
         self.sse_basla()
         self.sse({'type':'start','sources':kaynaklar})
@@ -659,6 +691,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out({'items':kayitlar,'total':len(kayitlar)})
             if path=='/api/wake/status':
                 return self.out({**uyandirma.ayar_oku(),'ses_modeli':uyandirma.ses_ile_var()})
+            if path=='/api/skills':
+                with db() as c: web_acik=ayar_al(c,'web_arama','1')=='1'
+                return self.out({'skills':beceriler.listele(),'folder':str(beceriler.KOK),
+                                 'web':web_acik})
+            if path=='/api/audit':
+                query=dict(pair.split('=',1) for pair in urlparse(self.path).query.split('&') if '=' in pair)
+                try: limit=min(max(int(query.get('limit',50)),1),300)
+                except ValueError: limit=50
+                tur=query.get('kind')
+                with db() as c: kayitlar=denetim.son(c,limit=limit,kind=tur)
+                return self.out({'items':kayitlar})
+            if path=='/api/diagnose':
+                sonuc=tanilama.calistir(db_yolu=DB,kok=ROOT,port=self.server.server_address[1])
+                return self.out(sonuc)
             if path=='/api/system/status':
                 with db() as c:
                     bildirim_acik=ayar_al(c,'bildirim_aktif','1')=='1'
@@ -823,12 +869,14 @@ class Handler(BaseHTTPRequestHandler):
                 if tur is not None and not isinstance(tur,str): raise ValueError('Tür metin olmalı.')
                 with db() as c:
                     kid=bellek.ekle(c,metin,kind=tur or 'not',subject=konu or '',source='arayuz')
+                _denetle('bellek','bellek kaydı eklendi',metin)
                 return self.out({'ok':True,'id':kid})
             if path=='/api/memory/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
                 with db() as c:
                     sayi=bellek.sil(c,int(data.get('id') or 0))
                 if not sayi: raise ValueError('Kayıt bulunamadı.')
+                _denetle('bellek','bellek kaydı silindi',f'id={data.get("id")}')
                 return self.out({'ok':True,'deleted':sayi})
             if path=='/api/wake/status':
                 ayar=uyandirma.ayar_oku()
@@ -852,12 +900,19 @@ class Handler(BaseHTTPRequestHandler):
                 argumanlar=data.get('arguments')
                 if argumanlar is None: argumanlar={}
                 if not isinstance(argumanlar,dict): raise ValueError('Argümanlar nesne olmalı.')
-                MCP.yenile()
-                sonuc=MCP.cagir(sunucu,arac,argumanlar)
+                try:
+                    MCP.yenile()
+                    sonuc=MCP.cagir(sunucu,arac,argumanlar)
+                except Exception as hata:
+                    _denetle('mcp',f'{sunucu}/{arac} çağrısı başarısız',str(hata),'hata')
+                    raise
+                _denetle('mcp',f'{sunucu}/{arac} çağrıldı',f'{len(sonuc["metin"])} karakter')
                 return self.out({'ok':not sonuc['hata'],'result':sonuc['metin']})
             if path=='/api/screen/capture':
                 if data.get('confirmed') is not True: raise ValueError('Ekran görüntüsü için onay gerekli.')
-                return self.out({'image':ekran.base64_png(),'type':'image/png'})
+                gorsel=ekran.base64_png()
+                _denetle('ekran','ekran görüntüsü alındı',f'{len(gorsel)//1024} KB (base64)')
+                return self.out({'image':gorsel,'type':'image/png'})
             if path=='/api/screen/ask':
                 if data.get('confirmed') is not True: raise ValueError('Ekranı sormak için onay gerekli.')
                 soru=str(data.get('question') or 'Ekranda ne var? Kısaca açıkla.').strip()[:600]
@@ -871,6 +926,7 @@ class Handler(BaseHTTPRequestHandler):
                           {'role':'user','content':[{'type':'text','text':soru},
                                                     {'type':'image_url','image_url':{'url':'data:image/png;base64,'+gorsel}}]}]
                 msg=SAG.sohbet(mesajlar, max_tokens=500, timeout=90)
+                _denetle('ekran','ekran sorusu yanıtlandı',soru)
                 return self.out({'reply':(msg.get('content') or '').strip()})
             if path=='/api/dictate/window':
                 # Canlı dikte: istemci her ~1 sn'de son birkaç saniyeyi gönderir.
@@ -933,7 +989,9 @@ class Handler(BaseHTTPRequestHandler):
                 hedef=data.get('target') or ''
                 if not isinstance(hedef,str) or len(hedef)>80: raise ValueError('Hedef pencere adı geçersiz.')
                 enter=bool(data.get('enter'))
-                return self.out(dikte_yaz.yaz(metin, hedef=hedef, enter=enter))
+                sonuc=dikte_yaz.yaz(metin, hedef=hedef, enter=enter)
+                _denetle('dikte','etkin pencereye yazıldı',f'{len(metin)} karakter · {hedef or "(serbest)"}')
+                return self.out(sonuc)
             if path=='/api/dictate/status':
                 return self.out({'sessions':len(DIKTE),'model':ses_baglanti.model(),
                                  'typing_supported':os.name=='nt',
@@ -972,6 +1030,7 @@ class Handler(BaseHTTPRequestHandler):
                 exe=system/'explorer.exe' if app=='explorer.exe' else system/'System32'/app
                 if not exe.is_file(): raise ValueError('Uygulama bu bilgisayarda bulunamadı.')
                 subprocess.Popen([str(exe)],close_fds=True)
+                _denetle('uygulama','uygulama açıldı',app)
                 return self.out({'ok':True})
             if path=='/api/arena/open-normal':
                 if os.name != 'nt': raise ValueError('Bu özellik Windows içindir.')
@@ -1030,10 +1089,12 @@ class Handler(BaseHTTPRequestHandler):
                 if model.strip() not in modeller:
                     raise ValueError('Seçilen model sağlayıcının listesinde yok. Listeyi yenileyip tekrar seç.')
                 SAG.kaydet(taban, anahtar or '', model)
+                _denetle('saglayici','sağlayıcı bağlandı',f'{taban} · {model}')
                 return self.out({'ok':True,'status':SAG.durum()})
             if path=='/api/provider/disconnect':
                 if data.get('confirmed') is not True: raise ValueError('Bağlantıyı kesmek için onay gerekli.')
                 SAG.sil()
+                _denetle('saglayici','sağlayıcı bağlantısı kesildi','anahtar silindi')
                 return self.out({'ok':True})
             if path=='/api/telegram/connect':
                 candidate=str(data.get('token','')).strip()
@@ -1080,6 +1141,8 @@ class Handler(BaseHTTPRequestHandler):
                 def yanitla(text, kaynaklar=None):
                     if session: store_message(session,'assistant',text)
                     return self.out({'reply':text,'sources':kaynaklar or []})
+                beceri_yanit, beceri_adi = beceri_cagrisi(last_user)
+                if beceri_yanit is not None: return yanitla(beceri_yanit)
                 direct=ledger_tools.create_account_from_text(last_user,db)
                 if direct is not None: return yanitla(direct)
                 # Hatırlatıcı niyeti modelden önce kural tabanlı çözülür (A1).
@@ -1100,7 +1163,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Qwen3 supports both the API flag and an explicit no-thinking directive.
                     if selected.lower().startswith('qwen3'):
                         clean[-1]['content'] += '\n/no_think'
-                system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
+                beceri_metin=beceriler.baglam()
+                system=SYSTEM+(' '+kisisel if kisisel else '')+(' '+beceri_metin if beceri_metin else '')+(' '+web_metin if web_metin else '')+' Yerel tarih ve saat: '+datetime.now().strftime('%Y-%m-%d %H:%M')+'. Kullanıcı defter kaydı veya bakiyesi isterse uygun aracı kullan. Kayıt belirsizse soru sor. Gerçek ödeme yapma. Hatırlatıcı için açık tarih ve saat gerekli. Deftere kayıt, tahsilat ve ödeme ekleme için ayrıca onay sorma.'
                 if backend=='openjarvis':
                     if selected not in ('emre-cpu','emre-cpu:latest'): return self.out({'error':'OpenJarvis için önce emre-cpu modelini oluştur ve Ayarlar’dan seç.'},400)
                     # Client-supplied tools keep tool execution under Emre's validation.
@@ -1181,6 +1245,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/ledger/delete':
                 if data.get('confirmed') is not True: raise ValueError('Silme onayı gerekli.')
                 with db() as c: c.execute('DELETE FROM ledger WHERE id=?',(int_field(data,'id',1,2**53,label='Kayıt numarası'),))
+                _denetle('defter','kayıt silindi',f'id={data.get("id")}')
                 return self.out({'ok':True})
             if path=='/api/reminders':
                 text=text_field(data,'text',300,required=True,label='Hatırlatıcı metni'); due=text_field(data,'due',40,required=True,label='Tarih')
@@ -1198,12 +1263,29 @@ class Handler(BaseHTTPRequestHandler):
                         c.executemany('UPDATE notifications SET seen=1 WHERE id=?',[(i,) for i in temiz])
                     else: c.execute('UPDATE notifications SET seen=1')
                 return self.out({'ok':True})
+            if path=='/api/skills/run':
+                if data.get('confirmed') is not True: raise ValueError('Beceri çalıştırmak için onay gerekli.')
+                ad=str(data.get('ad') or '').strip().lower()
+                metin=str(data.get('metin') or '')[:2000]
+                try:
+                    sonuc=beceriler.calistir(ad,metin)
+                except ValueError as hata:
+                    _denetle('beceri',f'{ad} çalıştırılamadı',str(hata),'hata')
+                    raise
+                _denetle('beceri',f'{ad} çalıştırıldı',f'{len(sonuc["reply"])} karakter, {sonuc["sure"]} sn')
+                return self.out({'ok':True,**sonuc})
+            if path=='/api/audit/clear':
+                if data.get('confirmed') is not True: raise ValueError('Denetim kayıtlarını silmek için onay gerekli.')
+                with db() as c: sayi=denetim.temizle(c)
+                _denetle('denetim','kayıtlar temizlendi',f'{sayi} kayıt')
+                return self.out({'ok':True,'deleted':sayi})
             if path=='/api/system/autostart':
                 if data.get('confirmed') is not True: raise ValueError('Açılış ayarı için onay gerekli.')
                 aktif=data.get('aktif')
                 if not isinstance(aktif,bool): raise ValueError('Aktif alanı doğru/yanlış olmalı.')
                 if aktif: sonuc=otomatik_baslat.kur(ROOT)
                 else: sonuc=otomatik_baslat.kaldir(ROOT)
+                _denetle('sistem','otomatik başlatma ' + ('kuruldu' if aktif else 'kaldırıldı'),sonuc.get('yol') or '')
                 return self.out(sonuc)
             if path=='/api/system/hotkey':
                 aktif=data.get('aktif')
@@ -1229,6 +1311,7 @@ class Handler(BaseHTTPRequestHandler):
                     KISAYOL.durdur()
                     with db() as c: ayar_yaz(c,'kisayol_aktif','0')
                 durum=dict(KISAYOL.durum()); durum['acik']=bool(aktif)
+                _denetle('sistem','global kısayol ' + ('açıldı' if aktif else 'kapatıldı'),durum['gorunen'])
                 return self.out(durum)
             if path=='/api/system/web':
                 aktif=data.get('aktif')
